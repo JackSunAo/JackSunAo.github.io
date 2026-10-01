@@ -724,7 +724,7 @@ void main(){
   alb *= (0.86 + 0.28 * sid) * (0.80 + 0.40 * streak);
   if (h == 0.0) alb = mix(alb, root * 0.55, 0.5);
   // ---------------- special skin materials
-  float spec0 = 0.0, rough = 0.0;
+  float spec0 = 0.0, rough = 0.0, wet = 0.0;
   if (mat > 0.5) {
     if (mat < 1.5) { // nose leather
       vec3 nc = vec3(0.2512, 0.2665, 0.0);
@@ -736,7 +736,7 @@ void main(){
       float nos = band(length((d.yz - vec2(-0.0016, 0.0024 * sign(d.z))) * vec2(1.0, 1.8)) - 0.0010, 0.00045, 0.0003);
       alb *= 1.0 - 0.75 * nos * step(0.0012, abs(d.z));
       alb *= 0.85 + 0.3 * n3(rp * 600.0);
-      spec0 = 0.5;
+      spec0 = 0.5; wet = 1.0;
     } else if (mat < 2.5) {
       // With the mouth shut these polygons are not a cavity, they are the lip
       // line. Painted near-black, as they were, the downward curve of the mouth
@@ -752,7 +752,7 @@ void main(){
       else alb = vec3(0.84, 0.84, 0.83);
     } else { // paw pads
       alb = vec3(0.50, 0.24, 0.25);
-      spec0 = 0.25;
+      spec0 = 0.25; wet = 0.3;
     }
   }
   // ---------------- lighting
@@ -817,6 +817,18 @@ void main(){
     float fres = 0.04 + 0.96 * pow(1.0 - NoV, 5.0);
     col += envColor(R) * fres * spec0 * 0.6 * ao;
     col += uLightCol * pow(max(dot(N, H), 0.0), 60.0) * spec0 * 0.8 * sh;
+    // A cat's nose is damp, and damp is two things at once: the surface goes
+    // darker because the film soaks it, and it carries a small very bright
+    // highlight that a matte nose cannot. A dry nose is the single easiest
+    // place to see that a cat is not real.
+    if (wet > 0.0) {
+      col *= mix(1.0, 0.80, wet);
+      col += uLightCol * pow(max(dot(N, H), 0.0), 150.0) * wet * 1.6 * sh * ao;
+      col += envColor(R) * pow(1.0 - NoV, 4.0) * wet * 0.55 * ao;
+      // the window reflected in the film is what actually reads as wet, the way
+      // it does in any photograph of a cat
+      col += vec3(1.05, 1.03, 1.0) * smoothstep(0.90, 0.975, dot(R, uWinDir)) * wet * 1.1 * ao;
+    }
   }
   if (mat > 1.5 && mat < 2.5) {
     col *= mix(0.95, 1.0, smoothstep(0.0, 0.5, uMouthOpen));
@@ -892,6 +904,9 @@ void main(){
   float lidShade = mix(1.0, 0.62, smoothstep(0.20, 0.75, n.y)) * mix(1.0, 0.75, smoothstep(-0.55, -0.85, n.y));
   lit *= lidShade;
   col = lit + refl * 0.55 + uLightCol * hl + vec3(hlWin);
+  // the tear film pools where the lids meet the eye and picks up the light
+  float menis = smoothstep(0.46, 0.72, abs(n.y)) * (1.0 - smoothstep(0.76, 0.93, abs(n.y)));
+  col += vec3(0.62, 0.63, 0.66) * menis * (0.22 + 0.78 * NoL) * sh * 0.45;
   oCol = vec4(outColor(col), 1.0);
 }`.replace('float hashA', 'float band01(float pe){ return 1.0 - smoothstep(0.0, 0.25, abs(pe - 1.1)); }\nfloat hashA');
 
