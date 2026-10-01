@@ -2984,113 +2984,277 @@ function interpTrack(track, t) {
   }
   return track[track.length - 1].slice(1);
 }
-// Klatt-style cascade resonators with time-varying formants
+// ---- the source: one glottal pulse ----------------------------------------
+// The shape of a single pulse is what decides whether a synthesised voice
+// reads as a voice or as a buzzer. The folds slam shut far faster than they
+// open, and the short return phase as they come back together sets how bright
+// the voice is. This is the Liljencrants-Fant pulse written so it can be
+// evaluated straight from the cycle phase; its output is already the
+// derivative of glottal flow, which is what a listener hears, so no extra
+// differentiation is needed downstream.
+function lfPulse(ph, oq, sq, ta) {
+  const Te = oq, Tp = Te * sq / (1 + sq);
+  if (ph >= Te) {
+    if (ta < 1e-4) return 0;
+    const e = 1 / ta, k = 1 - Math.exp(-e * (1 - Te));
+    return -(Math.exp(-e * (ph - Te)) - Math.exp(-e * (1 - Te))) / Math.max(k, 1e-6);
+  }
+  const norm = Math.abs(Math.sin(Math.PI * (1 + sq) / sq));   // |value| at the excitation instant
+  return Math.exp(3 * (ph / Te - 1)) * Math.sin(Math.PI * ph / Tp) / Math.max(norm, 1e-3);
+}
+// two-pole resonator and its inverse, the two-zero antiresonator
+function resoCoef(f, bw, sr) {
+  const C = -Math.exp(-2 * Math.PI * bw / sr);
+  const B = 2 * Math.exp(-Math.PI * bw / sr) * Math.cos(2 * Math.PI * f / sr);
+  return [1 - B - C, B, C];
+}
+function antiCoef(f, bw, sr) {
+  const [A, B, C] = resoCoef(f, bw, sr);
+  return [1 / A, -B / A, -C / A];
+}
+
+// ---- the vocal tract -------------------------------------------------------
+// A cascade of formants, plus one pole-zero pair standing in for the nasal
+// cavity. Every meow begins and ends with the mouth shut, and the notch that
+// the nasal cavity puts in the spectrum is what makes that closed-mouth part
+// sound like an [m] instead of just a quiet vowel. When nasality is zero the
+// pole and the zero sit on top of each other and cancel exactly, so the oral
+// path is untouched.
 function voice(sr, o) {
   const n = Math.floor(o.dur * sr);
   const out = new Float32Array(n);
   const rnd = mulberry(o.seed || 7);
-  let ph = 0;
-  const st = [];
-  for (let f = 0; f < 4; f++) st.push([0, 0]);
-  let coef = [];
-  let lp = 0, hpPrev = 0, hpOut = 0;
+  const st = [[0, 0], [0, 0], [0, 0], [0, 0]];
+  let np = [0, 0], zx1 = 0, zx2 = 0;
+  let coef = [], nc = [1, 0, 0], zc = [1, 0, 0];
+  const oq = o.oq || 0.60, sq = o.sq || 2.2;
+  // cats are perturbed talkers: a percent or two of cycle-to-cycle wobble in
+  // both pitch and amplitude, and they slip into period doubling easily
+  const jitAmt = o.jit === undefined ? 0.018 : o.jit;
+  const shimAmt = o.shim === undefined ? 0.07 : o.shim;
+  let ph = 1, jit = 0, shim = 1, sub = 0, ta = 0.06;
+  let hpPrev = 0, hpOut = 0;
   for (let i = 0; i < n; i++) {
     const t = i / sr, u = t / o.dur;
-    if (i % 32 === 0) {
+    if (i % 24 === 0) {
       const F = interpTrack(o.formants, u);
-      coef = F.map((f, k) => {
-        const bw = (o.bw || [130, 170, 240, 320])[k];
-        const C = -Math.exp(-2 * Math.PI * bw / sr), B = 2 * Math.exp(-Math.PI * bw / sr) * Math.cos(2 * Math.PI * f / sr);
-        return [1 - B - C, B, C];
-      });
+      const nas = o.nasal ? clamp(interpTrack(o.nasal, u)[0], 0, 1) : 0;
+      const bw = o.bw || [110, 150, 220, 300];
+      // the nasal cavity is lossy: everything damps when the mouth shuts
+      coef = F.map((f, k) => resoCoef(f, bw[k] * (1 + 1.5 * nas), sr));
+      nc = resoCoef(280, 300, sr);
+      zc = antiCoef(lerp(280, 1000, nas), 300, sr);
+      // the voice also gets softer-edged as it closes down
+      ta = (o.ta === undefined ? 0.055 : o.ta) * (1 + 1.4 * nas);
     }
-    const f0 = interpTrack(o.f0, u)[0] * (1 + (o.vib || 0.015) * Math.sin(2 * Math.PI * (o.vibHz || 5.5) * t) + (rnd() - 0.5) * (o.jit || 0.006));
-    ph += f0 / sr;
-    if (ph >= 1) ph -= 1;
-    // glottal flow derivative (smooth pulse), open quotient 0.6
-    const oq = 0.62;
-    let g;
-    if (ph < oq * 0.66) g = Math.sin(Math.PI * ph / (oq * 0.66)) * 0.6;
-    else if (ph < oq) g = -Math.sin(0.5 * Math.PI * (ph - oq * 0.66) / (oq * 0.34)) * 1.0;
-    else g = -Math.exp(-(ph - oq) * f0 * 0 - (ph - oq) / (60 / sr * f0 + 1e-9) * 1) * 0.0;
-    // subharmonic roughness (growls)
-    if (o.rough) g *= 1 + o.rough * Math.sin(2 * Math.PI * f0 * 0.5 * t);
-    const env = interpTrack(o.amp, u)[0];
-    const breath = (rnd() * 2 - 1) * (o.breath || 0.08) * (ph < oq ? 1 : 0.4);
-    let x = (g * (o.voiced === undefined ? 1 : interpTrack(o.voiced, u)[0]) + breath) * env;
+    const f0 = interpTrack(o.f0, u)[0] * (1 + (o.vib || 0.012) * Math.sin(2 * Math.PI * (o.vibHz || 5.5) * t));
+    ph += f0 * (1 + jit) / sr;
+    if (ph >= 1) {
+      ph -= 1;
+      jit = (rnd() * 2 - 1) * jitAmt;
+      shim = 1 + (rnd() * 2 - 1) * shimAmt;
+      if (o.rough) sub = rnd() < o.rough ? 1 - sub : sub;
+    }
+    let g = lfPulse(ph, oq, sq, ta) * shim * (sub ? 1 - (o.subDepth || 0.45) : 1);
+    // aspiration leaks through mostly while the folds are apart
+    const voiced = o.voiced === undefined ? 1 : interpTrack(o.voiced, u)[0];
+    let x = (g * voiced + (rnd() * 2 - 1) * (o.breath || 0.05) * (ph < oq ? 1 : 0.25)) * interpTrack(o.amp, u)[0];
     if (o.am) x *= 1 - o.am.depth * (0.5 + 0.5 * Math.sin(2 * Math.PI * o.am.hz * t));
-    // cascade formants
+    // nasal zero then nasal pole
+    const zy = zc[0] * x + zc[1] * zx1 + zc[2] * zx2;
+    zx2 = zx1; zx1 = x;
+    x = nc[0] * zy + nc[1] * np[0] + nc[2] * np[1];
+    np[1] = np[0]; np[0] = x;
     for (let k = 0; k < coef.length; k++) {
       const [A, B, C] = coef[k];
       const y = A * x + B * st[k][0] + C * st[k][1];
       st[k][1] = st[k][0]; st[k][0] = y; x = y;
     }
-    // gentle high-pass to remove rumble, then pre-emphasis so the voice is not muffled
-    hpOut = 0.995 * (hpOut + x - hpPrev);
-    const emph = hpOut + (o.emph === undefined ? 3.2 : o.emph) * (hpOut - lp);
-    lp = hpOut; hpPrev = x;
-    out[i] = emph;
+    hpOut = 0.995 * (hpOut + x - hpPrev); hpPrev = x;    // block DC only
+    out[i] = hpOut;
   }
   return normalise(out, o.gain || 0.8);
 }
 function normalise(a, peak) { let m = 1e-9; for (const v of a) m = Math.max(m, Math.abs(v)); const k = peak / m; for (let i = 0; i < a.length; i++) a[i] *= k; return a; }
-const VOWEL = { m: [560, 1620, 3400, 4400], i: [620, 2650, 3800, 4800], a: [1150, 1800, 3500, 4600], u: [560, 1250, 3350, 4400], e: [800, 2200, 3600, 4600] };
+
+// A cat's tract is short, so its formants sit high and far apart, and with an
+// F0 up around 700 Hz only a handful of harmonics fall under the first one.
+const VOWEL = { m: [430, 1500, 2900, 4100], i: [600, 2500, 3500, 4600], a: [1050, 1750, 3150, 4300], u: [540, 1150, 3000, 4100], e: [800, 2050, 3300, 4400] };
 const trk = (pairs) => pairs.map(([t, v]) => [t, ...VOWEL[v]]);
 
-function synthAll(sr) {
-  const B = {};
-  B.meow = voice(sr, { dur: 0.78, seed: 3, f0: [[0, 560], [0.35, 760], [0.75, 640], [1, 500]], formants: trk([[0, 'm'], [0.12, 'i'], [0.38, 'a'], [0.62, 'a'], [0.92, 'u'], [1, 'u']]), amp: [[0, 0], [0.06, 0.5], [0.3, 1], [0.7, 0.85], [0.9, 0.35], [1, 0]], breath: 0.06 });
-  B.meowShort = voice(sr, { dur: 0.42, seed: 5, f0: [[0, 700], [0.3, 820], [1, 640]], formants: trk([[0, 'm'], [0.15, 'e'], [0.45, 'a'], [1, 'u']]), amp: [[0, 0], [0.08, 0.7], [0.4, 1], [0.85, 0.4], [1, 0]] });
-  B.meowLong = voice(sr, { dur: 1.15, seed: 9, f0: [[0, 520], [0.25, 700], [0.6, 720], [1, 460]], formants: trk([[0, 'm'], [0.1, 'i'], [0.3, 'a'], [0.7, 'a'], [0.95, 'u'], [1, 'u']]), amp: [[0, 0], [0.05, 0.4], [0.3, 1], [0.75, 0.9], [0.95, 0.2], [1, 0]], vib: 0.02 });
-  B.mew = voice(sr, { dur: 0.26, seed: 11, f0: [[0, 880], [0.4, 980], [1, 820]], formants: trk([[0, 'i'], [0.5, 'e'], [1, 'u']]), amp: [[0, 0], [0.12, 0.9], [0.6, 1], [1, 0]], gain: 0.6 });
-  B.annoyed = voice(sr, { dur: 0.55, seed: 13, f0: [[0, 380], [0.4, 460], [1, 340]], formants: trk([[0, 'm'], [0.2, 'a'], [0.7, 'a'], [1, 'u']]), amp: [[0, 0], [0.1, 0.8], [0.5, 1], [1, 0]], rough: 0.5, breath: 0.15 });
-  B.trill = voice(sr, { dur: 0.42, seed: 17, f0: [[0, 470], [1, 720]], formants: trk([[0, 'm'], [0.6, 'm'], [1, 'u']]), amp: [[0, 0], [0.12, 0.8], [0.7, 1], [1, 0]], am: { hz: 24, depth: 0.8 }, gain: 0.55, bw: [200, 260, 320, 400] });
-  B.chirp = voice(sr, { dur: 0.16, seed: 19, f0: [[0, 720], [1, 1120]], formants: trk([[0, 'e'], [1, 'i']]), amp: [[0, 0], [0.2, 1], [0.7, 0.7], [1, 0]], gain: 0.55 });
-  B.growl = voice(sr, { dur: 1.1, seed: 23, f0: [[0, 135], [0.5, 150], [1, 125]], formants: trk([[0, 'e'], [0.5, 'a'], [1, 'u']]), amp: [[0, 0], [0.1, 0.8], [0.8, 1], [1, 0]], am: { hz: 28, depth: 0.55 }, rough: 0.8, breath: 0.6, jit: 0.06, gain: 0.5, bw: [200, 260, 340, 420] });
-  B.yawn = voice(sr, { dur: 1.5, seed: 29, f0: [[0, 900], [0.25, 1180], [0.7, 760], [1, 520]], formants: trk([[0, 'i'], [0.2, 'a'], [0.75, 'a'], [1, 'u']]), amp: [[0, 0], [0.15, 0.8], [0.5, 0.6], [0.85, 0.25], [1, 0]], voiced: [[0, 0.7], [0.6, 0.5], [0.85, 0.1], [1, 0]], breath: 0.4, gain: 0.45 });
-  // chatter: a run of tiny chirps with teeth clicks
-  {
+// ---- the room --------------------------------------------------------------
+// Anything synthesised and played back dry sounds synthetic however good the
+// synthesis is, because no real sound ever reaches an ear without the room
+// around it. A few early reflections off the floor and the near wall, then a
+// short diffuse tail that loses its top end as it decays.
+function roomIR(sr) {
+  const n = Math.floor(0.4 * sr), ir = new Float32Array(n);
+  const rnd = mulberry(99);
+  for (const [t, g] of [[0.0072, 0.5], [0.0129, -0.36], [0.0191, 0.28], [0.0264, -0.22], [0.0347, 0.17]]) {
+    const i = Math.floor(t * sr); if (i < n) ir[i] += g;
+  }
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    lp += ((rnd() * 2 - 1) - lp) * 0.34;
+    ir[i] += lp * Math.exp(-t / 0.075) * Math.min(1, t / 0.004) * 0.4;
+  }
+  return ir;
+}
+// the other ear hears a different set of reflections off the same room
+function roomIR2(sr) {
+  const n = Math.floor(0.4 * sr), ir = new Float32Array(n);
+  const rnd = mulberry(1733);
+  for (const [t, g] of [[0.0081, 0.47], [0.0118, -0.34], [0.0207, 0.3], [0.0251, -0.2], [0.0362, 0.18]]) {
+    const i = Math.floor(t * sr); if (i < n) ir[i] += g;
+  }
+  let lp = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    lp += ((rnd() * 2 - 1) - lp) * 0.34;
+    ir[i] += lp * Math.exp(-t / 0.075) * Math.min(1, t / 0.004) * 0.4;
+  }
+  return ir;
+}
+
+// ---- the purr --------------------------------------------------------------
+// Not a tone: a train of laryngeal pulses at around 25 Hz, each one a short
+// damped resonance of the larynx and the chest, running right through both the
+// in-breath and the out-breath with a different colour on each. The ragged
+// spacing of the pulses is a good part of why a real purr sounds alive.
+function purrLoop(sr, seed) {
+  const dur = 6.4, n = Math.floor(dur * sr), a = new Float32Array(n);
+  const rnd = mulberry(seed);
+  const lar = resoCoef(168, 95, sr), chest = resoCoef(430, 240, sr);
+  const s1 = [0, 0], s2 = [0, 0];
+  const exc = new Float32Array(n);
+  let t = 0;
+  while (t < dur) {
+    const inhale = t > 3.45;
+    const f = (inhale ? 22.5 : 26.5) * (1 + (rnd() * 2 - 1) * 0.08);
+    const i0 = Math.floor(t * sr);
+    const len = Math.floor(0.0045 * sr);
+    for (let k = 0; k < len && i0 + k < n; k++) {
+      const e = 1 - k / len;
+      exc[i0 + k] += ((rnd() * 2 - 1) * 0.55 + (k === 0 ? 1 : 0)) * e * e * (inhale ? 0.72 : 1);
+    }
+    t += 1 / f;
+  }
+  for (let i = 0; i < n; i++) {
+    const tt = i / sr;
+    // one breath cycle per loop, fading to nothing at the seam so it tiles
+    const env = tt < 3.45 ? Math.sin(Math.PI * tt / 3.45) ** 0.55 : Math.sin(Math.PI * (tt - 3.45) / 2.95) ** 0.55 * 0.72;
+    const x = exc[i];
+    const y1 = lar[0] * x + lar[1] * s1[0] + lar[2] * s1[1]; s1[1] = s1[0]; s1[0] = y1;
+    const y2 = chest[0] * x + chest[1] * s2[0] + chest[2] * s2[1]; s2[1] = s2[0]; s2[0] = y2;
+    a[i] = (y1 + y2 * 0.55) * env;
+  }
+  return normalise(a, 0.9);
+}
+
+// ---- the calls -------------------------------------------------------------
+// Each call is synthesised three times from different seeds and with its pitch
+// and timing nudged, because hearing the identical waveform twice is the
+// fastest way to stop believing in an animal.
+// Returned as a list of jobs rather than a finished set, because synthesising
+// everything takes about a second and doing it in one go would freeze the page
+// on the very click that starts the scene. Ordered so the calls the cat makes
+// soonest are ready first.
+function synthJobs(sr) {
+  const J = [];
+  const variants = (name, n, make) => { for (let v = 0; v < n; v++) J.push({ name, make: () => make(v) }); };
+  // nasal 1 at the ends: a meow is a hum that opens into a vowel and shuts again
+  const meowNasal = [[0, 1], [0.1, 0.75], [0.22, 0], [0.74, 0], [0.9, 0.8], [1, 1]];
+  variants('meow', 3, (v) => {
+    const k = 1 + (v - 1) * 0.045;
+    return voice(sr, { dur: 0.78 + v * 0.05, seed: 3 + v * 17,
+      f0: [[0, 540 * k], [0.3, 760 * k], [0.72, 690 * k], [1, 470 * k]],
+      formants: trk([[0, 'm'], [0.2, 'e'], [0.4, 'a'], [0.64, 'a'], [0.88, 'u'], [1, 'm']]),
+      nasal: meowNasal,
+      amp: [[0, 0], [0.05, 0.45], [0.28, 1], [0.7, 0.86], [0.92, 0.3], [1, 0]],
+      breath: 0.05, rough: 0.05, jit: 0.02 });
+  });
+  variants('meowShort', 3, (v) => {
+    const k = 1 + (v - 1) * 0.05;
+    return voice(sr, { dur: 0.4 + v * 0.03, seed: 5 + v * 23,
+      f0: [[0, 680 * k], [0.3, 830 * k], [1, 610 * k]],
+      formants: trk([[0, 'm'], [0.22, 'e'], [0.5, 'a'], [1, 'm']]),
+      nasal: [[0, 1], [0.16, 0], [0.7, 0], [1, 1]],
+      amp: [[0, 0], [0.08, 0.7], [0.4, 1], [0.85, 0.4], [1, 0]], jit: 0.022 });
+  });
+  variants('meowLong', 2, (v) => voice(sr, { dur: 1.15 + v * 0.08, seed: 9 + v * 31,
+    f0: [[0, 505], [0.25, 700], [0.6, 715], [1, 440]],
+    formants: trk([[0, 'm'], [0.16, 'i'], [0.34, 'a'], [0.7, 'a'], [0.9, 'u'], [1, 'm']]),
+    nasal: [[0, 1], [0.12, 0], [0.8, 0], [1, 1]],
+    amp: [[0, 0], [0.05, 0.4], [0.3, 1], [0.75, 0.9], [0.95, 0.2], [1, 0]], vib: 0.02, rough: 0.07 }));
+  variants('mew', 3, (v) => {
+    const k = 1 + (v - 1) * 0.06;
+    return voice(sr, { dur: 0.26, seed: 11 + v * 13,
+      f0: [[0, 850 * k], [0.4, 960 * k], [1, 790 * k]],
+      formants: trk([[0, 'm'], [0.3, 'e'], [0.7, 'i'], [1, 'u']]),
+      nasal: [[0, 0.9], [0.25, 0], [0.8, 0.4], [1, 0.7]],
+      amp: [[0, 0], [0.12, 0.9], [0.6, 1], [1, 0]], gain: 0.6, jit: 0.025 });
+  });
+  variants('annoyed', 2, (v) => voice(sr, { dur: 0.55 + v * 0.05, seed: 13 + v * 19,
+    f0: [[0, 360], [0.4, 440], [1, 320]],
+    formants: trk([[0, 'm'], [0.25, 'a'], [0.7, 'a'], [1, 'u']]),
+    nasal: [[0, 0.8], [0.2, 0], [1, 0.5]],
+    amp: [[0, 0], [0.1, 0.8], [0.5, 1], [1, 0]], rough: 0.5, subDepth: 0.5, breath: 0.14, jit: 0.04 }));
+  // a trill is made with the mouth shut throughout: it is a hum, not a call
+  variants('trill', 3, (v) => voice(sr, { dur: 0.42 + v * 0.04, seed: 17 + v * 29,
+    f0: [[0, 455 + v * 20], [1, 720 + v * 25]],
+    formants: trk([[0, 'm'], [0.6, 'm'], [1, 'u']]),
+    nasal: [[0, 1], [1, 0.85]],
+    amp: [[0, 0], [0.12, 0.8], [0.7, 1], [1, 0]],
+    am: { hz: 24 + v * 2, depth: 0.8 }, gain: 0.55, jit: 0.015 }));
+  variants('chirp', 3, (v) => voice(sr, { dur: 0.16, seed: 19 + v * 7,
+    f0: [[0, 700 + v * 40], [1, 1120 + v * 60]],
+    formants: trk([[0, 'e'], [1, 'i']]),
+    nasal: [[0, 0.5], [0.4, 0], [1, 0.3]],
+    amp: [[0, 0], [0.2, 1], [0.7, 0.7], [1, 0]], gain: 0.55, jit: 0.03 }));
+  variants('growl', 2, (v) => voice(sr, { dur: 1.1 + v * 0.1, seed: 23 + v * 11,
+    f0: [[0, 130], [0.5, 148], [1, 120]],
+    formants: trk([[0, 'e'], [0.5, 'a'], [1, 'u']]),
+    amp: [[0, 0], [0.1, 0.8], [0.8, 1], [1, 0]],
+    am: { hz: 28, depth: 0.55 }, rough: 0.75, subDepth: 0.55, breath: 0.5, jit: 0.055,
+    gain: 0.5, bw: [180, 240, 320, 400] }));
+  variants('yawn', 2, (v) => voice(sr, { dur: 1.5 + v * 0.12, seed: 29 + v * 23,
+    f0: [[0, 880], [0.25, 1150], [0.7, 740], [1, 500]],
+    formants: trk([[0, 'i'], [0.2, 'a'], [0.75, 'a'], [1, 'u']]),
+    amp: [[0, 0], [0.15, 0.8], [0.5, 0.6], [0.85, 0.25], [1, 0]],
+    voiced: [[0, 0.7], [0.6, 0.5], [0.85, 0.1], [1, 0]], breath: 0.38, gain: 0.45 }));
+  // chatter: the stuttering run of chirps and jaw clicks aimed at prey
+  variants('chatter', 2, (v) => {
     const n = Math.floor(0.95 * sr), a = new Float32Array(n);
     for (let k = 0; k < 8; k++) {
-      const c = voice(sr, { dur: 0.055, seed: 31 + k, f0: [[0, 900 + k * 12], [1, 1050]], formants: trk([[0, 'e'], [1, 'i']]), amp: [[0, 0], [0.3, 1], [1, 0]], gain: 0.35 });
-      const off = Math.floor((0.05 + k * 0.11) * sr);
+      const c = voice(sr, { dur: 0.055, seed: 31 + k + v * 101,
+        f0: [[0, 900 + k * 12], [1, 1050]], formants: trk([[0, 'e'], [1, 'i']]),
+        amp: [[0, 0], [0.3, 1], [1, 0]], gain: 0.35, jit: 0.04 });
+      const off = Math.floor((0.05 + k * 0.11 + (v ? 0.008 : 0)) * sr);
       for (let i = 0; i < c.length && off + i < n; i++) a[off + i] += c[i];
-      const r = mulberry(80 + k);
+      const r = mulberry(80 + k + v * 7);
       for (let i = 0; i < 0.006 * sr; i++) a[off + i] += (r() * 2 - 1) * 0.25 * (1 - i / (0.006 * sr));
     }
-    B.chatter = normalise(a, 0.45);
-  }
-  // purr loop: ~26 Hz laryngeal pulses, inhale/exhale cycles
-  {
-    const dur = 5.6, n = Math.floor(dur * sr), a = new Float32Array(n);
-    const r = mulberry(41);
-    let ph = 0, lp1 = 0, lp2 = 0, burst = 0;
-    for (let i = 0; i < n; i++) {
-      const t = i / sr;
-      const inhale = t < 2.5;
-      const pt = inhale ? t / 2.5 : (t - 2.5) / 3.1;
-      const env = Math.sin(Math.PI * clamp(pt, 0, 1)) ** 0.6 * (inhale ? 0.65 : 1.0);
-      const f = inhale ? 27 : 24;
-      ph += f / sr;
-      if (ph >= 1) { ph -= 1; burst = 1; }
-      burst *= Math.exp(-1 / (0.011 * sr));
-      let x = (r() * 2 - 1) * burst * 1.2 + Math.sin(2 * Math.PI * ph * 2) * 0.3 * burst;
-      // low-pass (~1.3 kHz) and remove the sub-bass so small speakers can reproduce the rattle
-      lp1 += (x - lp1) * 0.18;
-      const hp = lp1 - lp2; lp2 += (lp1 - lp2) * 0.02;
-      a[i] = hp * env;
-    }
-    B.purr = normalise(a, 0.9);
-  }
+    return normalise(a, 0.45);
+  });
+  variants('purr', 1, () => purrLoop(sr, 41));
   const thump = (dur, f, noise, seed) => {
     const n = Math.floor(dur * sr), a = new Float32Array(n); const r = mulberry(seed);
     let lp = 0;
     for (let i = 0; i < n; i++) { const t = i / sr; const e = Math.exp(-t / (dur * 0.25)); const ec = Math.exp(-t / 0.006); lp += ((r() * 2 - 1) - lp) * 0.45; a[i] = (Math.sin(2 * Math.PI * f * t * (1 - t * 2)) * 0.6 + lp * noise * 0.6) * e + (r() * 2 - 1) * 0.5 * ec; }
     return normalise(a, 0.7);
   };
-  B.bounce = thump(0.12, 190, 0.6, 51);
-  B.land = thump(0.2, 85, 0.9, 53);
-  B.hop = thump(0.1, 120, 1.4, 57);
+  variants('bounce', 2, (v) => thump(0.12, 190 + v * 25, 0.6, 51 + v * 9));
+  variants('land', 2, (v) => thump(0.2, 85 + v * 10, 0.9, 53 + v * 9));
+  variants('hop', 2, (v) => thump(0.1, 120 + v * 14, 1.4, 57 + v * 9));
+  const rank = { trill: 0, mew: 1, meowShort: 2, purr: 3, meow: 4, chirp: 5, land: 6, hop: 6, bounce: 6 };
+  return J.map((j, i) => [j, (rank[j.name] === undefined ? 9 : rank[j.name]) * 100 + i])
+    .sort((a, b) => a[1] - b[1]).map(([j]) => j);
+}
+// everything at once; used by the offline analysis harness
+function synthAll(sr) {
+  const B = {};
+  for (const j of synthJobs(sr)) (B[j.name] = B[j.name] || []).push(j.make());
   return B;
 }
 
@@ -3104,14 +3268,39 @@ function initAudio() {
   comp.threshold.value = -14; comp.ratio.value = 3;
   AUDIO.master = ctx.createGain(); AUDIO.master.gain.value = 0.9;
   AUDIO.master.connect(comp); comp.connect(ctx.destination);
-  const raw = synthAll(ctx.sampleRate);
-  for (const k in raw) { const b = ctx.createBuffer(1, raw[k].length, ctx.sampleRate); b.copyToChannel(raw[k], 0); AUDIO.bufs[k] = b; }
+  // the room the cat is actually in, as a short convolution everything is sent to
+  const ir = roomIR(ctx.sampleRate);
+  const irBuf = ctx.createBuffer(2, ir.length, ctx.sampleRate);
+  irBuf.copyToChannel(ir, 0);
+  irBuf.copyToChannel(roomIR2(ctx.sampleRate), 1);   // decorrelated, so the tail has width
+  AUDIO.verb = ctx.createConvolver(); AUDIO.verb.buffer = irBuf;
+  AUDIO.verbGain = ctx.createGain(); AUDIO.verbGain.gain.value = 0.9;
+  AUDIO.verb.connect(AUDIO.verbGain); AUDIO.verbGain.connect(AUDIO.master);
   AUDIO.purrGain = ctx.createGain(); AUDIO.purrGain.gain.value = 0;
   AUDIO.purrGain.connect(AUDIO.master);
-  const src = ctx.createBufferSource(); src.buffer = AUDIO.bufs.purr; src.loop = true; src.connect(AUDIO.purrGain); src.start();
-  AUDIO.purrSrc = src;
+  // a few milliseconds of synthesis per turn, so the click that starts the
+  // scene does not sit on a frozen page; a call stays silent until its first
+  // take has been made
+  const jobs = synthJobs(ctx.sampleRate);
+  const run = () => {
+    const t0 = performance.now();
+    while (jobs.length && performance.now() - t0 < 6) {
+      const j = jobs.shift();
+      const a = j.make();
+      const b = ctx.createBuffer(1, a.length, ctx.sampleRate);
+      b.copyToChannel(a, 0);
+      (AUDIO.bufs[j.name] = AUDIO.bufs[j.name] || []).push(b);
+      if (j.name === 'purr' && !AUDIO.purrSrc) {
+        const src = ctx.createBufferSource();
+        src.buffer = b; src.loop = true; src.connect(AUDIO.purrGain); src.start();
+        AUDIO.purrSrc = src;
+        AUDIO.purrGain.gain.setTargetAtTime(AUDIO.on ? CAT.purr * 0.55 : 0, ctx.currentTime, 0.4);
+      }
+    }
+    if (jobs.length) setTimeout(run, 0); else SOUNDS.ready = true;
+  };
   AUDIO.on = true;
-  SOUNDS.ready = true;
+  run();
 }
 function setSound(on) {
   AUDIO.on = on;
@@ -3121,24 +3310,30 @@ SOUNDS.play = function (kind, opts = {}) {
   if (!AUDIO.ctx || !AUDIO.on) return { scale: 1, stretch: 1 };
   let name = kind;
   if (kind === 'meowShort' && opts.annoyed) name = 'annoyed';
-  const buf = AUDIO.bufs[name];
-  if (!buf) return { scale: 1, stretch: 1 };
+  const set = AUDIO.bufs[name];
+  if (!set || !set.length) return { scale: 1, stretch: 1 };
   const ctx = AUDIO.ctx;
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const rate = (['bounce', 'land', 'hop'].includes(kind) ? 1 : rand(0.93, 1.08));
+  const src = ctx.createBufferSource();
+  src.buffer = pick(set);                              // never the same take twice running
+  const rate = (['bounce', 'land', 'hop'].includes(kind) ? rand(0.95, 1.05) : rand(0.94, 1.07));
   src.playbackRate.value = rate;
   const g = ctx.createGain();
-  let vol = { bounce: clamp((opts.v || 1) / 4, 0.1, 0.8), land: 0.5, hop: 0.3, growl: 0.55, chatter: 0.5, purr: 0 }[kind];
+  const vol = { bounce: clamp((opts.v || 1) / 4, 0.1, 0.8), land: 0.5, hop: 0.3, growl: 0.55, chatter: 0.5, purr: 0 }[kind];
   g.gain.value = vol === undefined ? 0.85 : vol;
-  // distance attenuation from the camera
+  // distance attenuation from the camera, and more of the room the further away it is
   const d = v3.dist(R.camPos, CAT.pos);
   g.gain.value *= clamp(1.4 / (0.6 + d), 0.25, 1.3);
   src.connect(g); g.connect(AUDIO.master);
+  if (AUDIO.verb) {
+    const send = ctx.createGain();
+    send.gain.value = g.gain.value * clamp(0.1 + d * 0.22, 0.1, 0.5);
+    g.connect(send); send.connect(AUDIO.verb);
+  }
   src.start();
   return { scale: 1, stretch: 1 / rate };
 };
 SOUNDS.purr = function (level) {
-  if (!AUDIO.ctx) return;
+  if (!AUDIO.ctx || !AUDIO.purrGain) return;
   AUDIO.purrGain.gain.setTargetAtTime(AUDIO.on ? level * 0.55 : 0, AUDIO.ctx.currentTime, 0.4);
 };
 
