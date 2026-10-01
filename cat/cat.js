@@ -456,9 +456,11 @@ vec2 headPat(vec3 p, vec3 pa, vec3 nr){
   float side = smoothstep(0.62, 0.80, az) * smoothstep(1.85, 1.55, az);
   float e1 = band(el - (0.040 - 0.12 * (az - 0.75) + 0.05 * (az - 0.75) * (az - 0.75)) + w * 0.03, 0.018, 0.014);
   dark = max(dark, e1 * side);
-  // cheek swirl below
-  float e2 = band(el - (-0.24 + 0.18 * smoothstep(0.8, 1.6, az)) + w * 0.03, 0.016, 0.012);
-  dark = max(dark, e2 * smoothstep(0.70, 0.90, az) * smoothstep(1.75, 1.45, az));
+  // Cheek stripe. It has to stay well back on the cheek and well above the
+  // mouth: swept any lower and forward it stops reading as a tabby marking and
+  // starts reading as a drawn-on downturned mouth.
+  float e2 = band(el - (-0.09 + 0.17 * smoothstep(1.0, 1.8, az)) + w * 0.03, 0.013, 0.013);
+  dark = max(dark, e2 * smoothstep(1.02, 1.26, az) * smoothstep(2.00, 1.70, az) * 0.5);
   // pale muzzle, chin and throat
   float muz = smoothstep(0.62, 0.38, az) * smoothstep(-0.02, -0.26, el);
   float chin = smoothstep(-0.30, -0.55, el) * smoothstep(1.4, 0.9, az);
@@ -1424,6 +1426,57 @@ function poseBlend(a, b, t) {
 // add rotations of pose d (relative to identity) on top of a
 function poseAddBone(p, name, rx, ry, rz) { const i = BI(name); p.q[i] = Q.mul(p.q[i], Q.euler(rx, ry, rz)); }
 
+// ---- smooth noise: the slow, never-repeating drift of a body that is alive
+function hashN(i) { let s = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b); s ^= s >>> 13; s = Math.imul(s, 0xc2b2ae35); return ((s ^ (s >>> 16)) >>> 0) / 2147483648 - 1; }
+function noise1(x) { const i = Math.floor(x), f = x - i; return lerp(hashN(i), hashN(i + 1), f * f * (3 - 2 * f)); }
+function fnoise(x, seed = 0) { return noise1(x + seed * 37.7) * 0.68 + noise1(x * 2.31 + seed * 91.3 + 5.5) * 0.32; }
+
+// ---- overlapping action ---------------------------------------------------
+// An animal does not drive every joint to its new angle on one curve: the hips
+// commit first, the shoulders follow, the head settles last and the tail
+// trails behind everything. Giving each group its own slice of the transition,
+// and letting limbs swing a little past their mark before coming back, is most
+// of what separates a cat from a mechanism.
+const STAGE = [
+  [0.00, 1.00],   // 0 core: pelvis and spine lead
+  [0.14, 0.86],   // 1 head & neck: arrive last
+  [0.05, 0.95],   // 2 front left
+  [0.11, 0.89],   // 3 front right — deliberately unequal to the left
+  [0.08, 0.92],   // 4 hind left
+  [0.03, 0.97],   // 5 hind right
+  [0.20, 0.80],   // 6 tail — the spring chain does the rest
+  [0.16, 0.84],   // 7 ears
+];
+const STAGE_OF = (() => {
+  const g = new Int8Array(NB);
+  const set = (names, k) => names.forEach((n) => { if (SK.idx[n] !== undefined) g[BI(n)] = k; });
+  set(['root', 'pelvis', 'spine1', 'spine2'], 0);
+  set(['neck', 'head', 'jaw', 'lidUL', 'lidDL', 'lidUR', 'lidDR'], 1);
+  set(['scapL', 'armL', 'foreL', 'handL', 'fingL'], 2);
+  set(['scapR', 'armR', 'foreR', 'handR', 'fingR'], 3);
+  set(['thighL', 'shinL', 'footL', 'toeL'], 4);
+  set(['thighR', 'shinR', 'footR', 'toeR'], 5);
+  for (let i = 0; i < 8; i++) set(['tail' + i], 6);
+  set(['earL', 'earR'], 7);
+  return g;
+})();
+// ease out with a small overshoot: a limb thrown by muscle, not driven to a stop
+function easeSettle(t) { const u = clamp(t, 0, 1) - 1; return 1 + u * u * (2.1 * u + 1.1); }
+function poseBlendStaged(a, b, t) {
+  const o = poseNew();
+  const done = t >= 1;
+  const e = STAGE.map(([d, span], gi) => {
+    const u = clamp((t - d) / span, 0, 1);
+    return gi === 0 ? smoother(u) : easeSettle(u);     // the core must not overshoot its height
+  });
+  for (let i = 0; i < NB; i++) o.q[i] = done ? b.q[i].slice() : Q.slerp(a.q[i], b.q[i], e[STAGE_OF[i]]);
+  for (const k of ['dx', 'dy', 'dz', 'pitch', 'roll', 'yaw', 'plant', 'jaw']) o[k] = lerp(a[k], b[k], e[0]);
+  return o;
+}
+// paired bones that should never be perfectly mirrored
+const ASYM_BONES = ['scapL', 'armL', 'foreL', 'handL', 'scapR', 'armR', 'foreR', 'handR', 'thighL', 'shinL', 'footL', 'thighR', 'shinR', 'footR'];
+const ASYM = (() => { const a = []; for (let i = 0; i < NB; i++) a.push([hashN(i * 3 + 1), hashN(i * 3 + 2), hashN(i * 3 + 3)]); return a; })();
+
 // ---- pose library (degrees; bones in the cat frame, +X forward, +Y up, +Z right)
 // rz > 0 swings a downward bone forward / lifts a forward bone
 const TAIL_UP = { tail0: [0, 0, -52], tail1: [0, 0, -26], tail2: [0, 0, -8], tail3: [0, 0, 2], tail4: [0, 0, 6], tail5: [0, 0, 8], tail6: [0, 0, 10], tail7: [0, 0, 12] };
@@ -1597,6 +1650,9 @@ const GAITS = {
   trot: { duty: 0.50, off: { HL: 0.0, FR: 0.02, HR: 0.5, FL: 0.52 }, lift: 0.040, bob: 0.006 },
   gallop: { duty: 0.32, off: { HL: 0.0, HR: 0.10, FL: 0.48, FR: 0.60 }, lift: 0.055, bob: 0.018 },
 };
+// small fixed per-leg quirks, so the four legs never run in lockstep
+const GAIT_JITTER = { FL: 0.021, FR: -0.016, HL: -0.012, HR: 0.018 };
+const GAIT_CURL = { FL: 1.06, FR: 0.93, HL: 0.97, HR: 1.04 };
 class Gait {
   constructor() {
     this.phase = 0;
@@ -1629,11 +1685,13 @@ class Gait {
     const vv = Math.max(v, Math.abs(cat.yawRate) * 0.11);
     const P = this.params(vv);
     this.P = P;
-    this.phase = (this.phase + P.freq * dt) % 1;
+    // no animal is a metronome: the cadence drifts a little as it goes
+    this.phase = (this.phase + P.freq * (1 + 0.06 * fnoise(cat.time * 0.35, 90)) * dt) % 1;
     const stanceT = P.duty / P.freq;
     for (const k of LEGKEYS) {
       const l = this.legs[k];
-      const p = (this.phase + P.off[k]) % 1;
+      // ...and each leg runs a hair early or late against the others
+      const p = ((this.phase + P.off[k] + GAIT_JITTER[k]) % 1 + 1) % 1;
       if (!l.F) l.F = homeContact(k, cat);
       if (p < P.duty || vv < 0.01) {
         if (l.swinging) { l.swinging = false; l.F = l.to; }
@@ -1654,7 +1712,7 @@ class Gait {
         const F = v3.lerp(l.from, l.to, e);
         F[1] += P.lift * Math.sin(Math.PI * s) * clamp(v3.dist(l.from, l.to) / 0.08, 0.35, 1.0);
         l.F = F;
-        l.flex = Math.sin(Math.PI * Math.min(1, s * 1.15)) * clamp(vv * 1.2, 0.4, 1);
+        l.flex = Math.sin(Math.PI * Math.min(1, s * 1.15)) * clamp(vv * 1.2, 0.4, 1) * GAIT_CURL[k];
       }
     }
   }
@@ -1666,6 +1724,68 @@ function plantFeet(P, cat, offsets) {
   for (const k of LEGKEYS) {
     const T = homeContact(k, cat, offsets ? offsets[k] : null);
     solveLeg(k, T, qy, 0, P.plant);
+  }
+}
+
+// ---- tail: simulated rather than keyframed ---------------------------------
+// The tail carries most of a cat's body language, and it is the first thing
+// that reads as fake when a sine wave drives it. Here the pose only says what
+// the muscles intend; each segment is a spring chasing that intent while
+// gravity, its own inertia and the hips moving underneath drag it around. The
+// delay down the chain comes out on its own, and so does the whip when the cat
+// turns. Runs on world transforms, after the pose is on the skeleton.
+const TAILSIM = { dir: null, vel: null, base: null };
+function layerTailSim(cat, dt) {
+  const n = META.tailN;
+  const ids = [], want = [];
+  for (let i = 0; i < n; i++) {
+    const bi = BI('tail' + i);
+    ids.push(bi);
+    want.push(v3.norm(Q.rot(SK.wq[bi], v3.sub(META.bones[bi].end, SK.rest[bi]))));
+  }
+  const base = SK.wp[ids[0]];
+  if (!TAILSIM.dir) {
+    TAILSIM.dir = want.map((d) => d.slice());
+    TAILSIM.vel = want.map(() => [0, 0, 0]);
+    TAILSIM.base = base.slice();
+  }
+  // how fast the root of the tail is travelling — this is what whips the tip
+  const bv = v3.mul(v3.sub(base, TAILSIM.base), 1 / Math.max(dt, 1e-4));
+  TAILSIM.base = base.slice();
+  const limp = cat.sleeping ? 0.45 : 1;              // a sleeping cat's tail goes slack
+  const heavy = cat.sleeping ? 1.7 : 1;
+  const steps = Math.min(5, Math.max(1, Math.ceil(dt / 0.008)));
+  const h = dt / steps;
+  for (let s = 0; s < steps; s++) {
+    for (let i = 0; i < n; i++) {
+      const k = i / (n - 1);
+      const stiff = lerp(420, 120, k) * limp;        // muscular at the root, loose at the tip
+      const damp = lerp(34, 12, k);                  // the tip keeps ringing after the base has stopped
+      // the muscles' target, pulled down by the tail's own weight
+      const tgt = v3.norm(v3.madd(want[i], [0, -1, 0], lerp(0.02, 0.22, k) * heavy / limp));
+      let d = TAILSIM.dir[i], v = TAILSIM.vel[i];
+      let acc = v3.mul(v3.sub(tgt, d), stiff);
+      acc = v3.madd(acc, bv, -lerp(6, 34, k));       // inertia: the tail lags the hips
+      acc = v3.madd(acc, v, -damp);
+      v = v3.madd(v, acc, h);
+      d = v3.norm(v3.madd(d, v, h));
+      v = v3.madd(v, d, -v3.dot(v, d));              // velocity stays tangent to the sphere
+      // a tail bends; it does not kink back along the segment before it
+      if (i > 0) {
+        const p = TAILSIM.dir[i - 1], c = v3.dot(d, p);
+        if (c < 0.35) {
+          const t2 = v3.sub(d, v3.mul(p, c)), tl = v3.len(t2);
+          d = tl > 1e-6 ? v3.norm(v3.madd(v3.mul(p, 0.35), v3.mul(t2, 1 / tl), 0.937)) : p.slice();
+        }
+      }
+      TAILSIM.dir[i] = d; TAILSIM.vel[i] = v;
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    const bi = ids[i];
+    const cur = v3.norm(Q.rot(SK.wq[bi], v3.sub(META.bones[bi].end, SK.rest[bi])));
+    SK.setWorldRot(bi, Q.norm(Q.mul(Q.fromTo(cur, TAILSIM.dir[i]), SK.wq[bi])));
+    SK.update();
   }
 }
 
@@ -1751,7 +1871,8 @@ class CatSim {
     this.tail = { mode: 'up', ph: 0, lash: 0, quiver: 0, curl: 0 };
     this.jaw = 0; this.jawAnim = null; this.tongue = 0;
     this.purr = 0; this.purrT = 0;
-    this.breathPh = 0; this.breathRate = 0.45;
+    this.breathPh = 0; this.breathRate = 0.45; this.breath = 0;
+    this.settle = { y: 0, vy: 0, p: 0, vp: 0, r: 0, vr: 0 };
     this.whisker = 0; this.whiskerT = 0;
     this.pet = { active: false, region: null, point: [0, 0, 0], dir: [1, 0, 0], strength: 0, time: 0, total: 0, last: -10 };
     this.extra = null;             // per-frame additive pose callback from scripts
@@ -1854,15 +1975,16 @@ class CatSim {
     else if (this.mode === 'jump') P = this.updateJump(dt);
     else {
       this.bt += dt;
-      const e = smoother(this.bt / this.bdur);
-      P = poseBlend(this.from, this.to, e);
+      P = poseBlendStaged(this.from, this.to, this.bt / this.bdur);
     }
     this.groundY = this.mode === 'jump' ? this.groundY : expDecay(this.groundY, supportY(this.pos[0], this.pos[2], this), 12, dt);
+    this.layerSettle(P, dt);
     this.base = P;
     const L = poseCopy(P);
 
     // ---- additive layers
-    this.layerBreath(dt);
+    this.layerBreath(L, dt);
+    this.layerLife(L, dt);
     this.layerTail(L, dt);
     this.layerEars(L, dt);
     if (this.extra) this.extra(L, dt);
@@ -1873,6 +1995,7 @@ class CatSim {
     applyPose(L, this);
     SK.update();
     this.layerLook(L, dt);       // works on world transforms
+    layerTailSim(this, dt);      // ditto: the tail follows wherever the body ended up
     if (this.mode === 'gait') {
       const qy = Q.axis([0, 1, 0], this.yaw);
       for (const k of LEGKEYS) { const l = this.gait.legs[k]; solveLeg(k, l.F, qy, l.flex, 1); }
@@ -1918,7 +2041,18 @@ class CatSim {
     const runW = clamp((this.speed - 0.5) / 1.2, 0, 1);
     const P = poseBlend(POSES.stand, POSES.run, runW);
     const ph = this.gait.phase * Math.PI * 2;
-    P.dy += -G.bob * (0.5 + 0.5 * Math.cos(2 * ph)) * (1 - G.mix.gallop) - G.bob * 0.6 * Math.sin(ph) * G.mix.gallop;
+    const bobY = -G.bob * (0.5 + 0.5 * Math.cos(2 * ph)) * (1 - G.mix.gallop) - G.bob * 0.6 * Math.sin(ph) * G.mix.gallop;
+    P.dy += bobY;
+    // the head rides level while the body bobs underneath it
+    poseAddBone(P, 'neck', 0, 0, -bobY * 400);
+    poseAddBone(P, 'head', 0, 0, -bobY * 250);
+    // the trunk sways laterally as the weight crosses from one side to the other
+    const vmix = clamp(this.speed / 0.8, 0.25, 1);
+    const lat = Math.sin(ph) * (2.6 * (1 - G.mix.gallop) + 1.0 * G.mix.gallop) * vmix;
+    poseAddBone(P, 'pelvis', lat * 0.5, 0, 0);
+    poseAddBone(P, 'spine1', lat * 0.9, 0, 0);
+    poseAddBone(P, 'spine2', lat * 0.6, 0, 0);
+    P.roll += lat * 0.55;
     if (G.mix.gallop > 0) {
       const flex = Math.sin(ph + 0.6) * 11 * G.mix.gallop;
       poseAddBone(P, 'spine1', 0, 0, flex); poseAddBone(P, 'spine2', 0, 0, flex * 0.7);
@@ -1965,21 +2099,82 @@ class CatSim {
   }
 
   // ---------- layers
-  layerBreath(dt) {
-    const rate = this.sleeping ? 0.32 : (this.mode === 'gait' && this.speed > 1 ? 1.4 : this.breathRate);
-    this.breathPh += dt * rate * Math.PI * 2;
-    SCENE.breath = Math.sin(this.breathPh) * (this.sleeping ? 1.25 : 0.8) + (this.purr > 0.1 ? Math.sin(this.time * 2 * Math.PI * 26) * 0.06 * this.purr : 0);
+  // The body has mass: it arrives at a new height slightly late and rocks past
+  // it before coming to rest, instead of landing exactly on the pose.
+  layerSettle(P, dt) {
+    const S = this.settle;
+    if (this.mode !== 'pose') { S.y = P.dy; S.p = P.pitch; S.r = P.roll; S.vy = S.vp = S.vr = 0; return; }
+    const n = Math.max(1, Math.ceil(dt / 0.012)), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      [S.y, S.vy] = springStep(S.y, S.vy, P.dy, 420, 26, h);
+      [S.p, S.vp] = springStep(S.p, S.vp, P.pitch, 300, 22, h);
+      [S.r, S.vr] = springStep(S.r, S.vr, P.roll, 300, 22, h);
+    }
+    P.dy = S.y; P.pitch = S.p; P.roll = S.r;
   }
+  layerBreath(P, dt) {
+    const running = this.mode === 'gait' && this.speed > 0.9;
+    const rate = this.sleeping ? 0.30 : running ? 1.5 : this.breathRate;
+    this.breathPh += dt * rate * Math.PI * 2;
+    // a breath is not a sine: the inhale is quicker than the fall back out
+    const ph = this.breathPh;
+    const a = (Math.sin(ph) * 0.62 + Math.sin(2 * ph + 0.9) * 0.18) * (this.sleeping ? 1.45 : running ? 1.3 : 0.9);
+    this.breath = a;
+    SCENE.breath = a + (this.purr > 0.1 ? Math.sin(this.time * 2 * Math.PI * 26) * 0.06 * this.purr : 0);
+    // the ribcage visibly moves: chest lifts, shoulder blades rotate out, and
+    // the head rides along on top of it
+    poseAddBone(P, 'spine2', 0, 0, a * 0.52);
+    poseAddBone(P, 'spine1', 0, 0, a * 0.30);
+    poseAddBone(P, 'scapL', a * 0.9, 0, -a * 0.45);
+    poseAddBone(P, 'scapR', -a * 0.9, 0, -a * 0.45);
+    poseAddBone(P, 'neck', 0, 0, -a * 0.38);
+    P.dy += a * 0.0013;
+  }
+  // Nothing alive holds perfectly still, and nothing alive is bilaterally
+  // symmetric. Slow postural sway, weight shifting from one side to the other,
+  // and a permanent small difference between left and right.
+  layerLife(P, dt) {
+    const t = this.time;
+    const asleep = this.sleeping;
+    const amp = asleep ? 0.25 : this.mode === 'gait' ? 0.4 : 1;
+    P.dx += fnoise(t * 0.23, 1) * 0.0045 * amp;
+    P.dz += fnoise(t * 0.19, 2) * 0.0045 * amp;
+    P.dy += fnoise(t * 0.31, 3) * 0.0016 * amp;
+    P.roll += fnoise(t * 0.21, 4) * 1.15 * amp;
+    P.pitch += fnoise(t * 0.26, 5) * 0.75 * amp;
+    P.yaw += fnoise(t * 0.17, 6) * 0.9 * amp;
+    // standing: weight drifts from one pair of legs to the other
+    if (!asleep && this.mode === 'pose' && P.plant > 0.5) {
+      const w = fnoise(t * 0.085, 11);
+      P.roll += w * 1.9;
+      P.dx += w * 0.004;
+      poseAddBone(P, 'spine1', w * 1.6, 0, 0);
+      poseAddBone(P, 'spine2', w * 1.1, 0, 0);
+    }
+    const k = asleep ? 0.4 : 1;
+    for (const n of ASYM_BONES) {
+      const i = BI(n), A = ASYM[i];
+      poseAddBone(P, n, (A[0] * 0.9 + fnoise(t * 0.14, i) * 0.8) * k,
+        (A[1] * 0.7 + fnoise(t * 0.11, i + 40) * 0.6) * k,
+        (A[2] * 1.1 + fnoise(t * 0.13, i + 80) * 1.0) * k);
+    }
+    poseAddBone(P, 'head', fnoise(t * 0.33, 21) * 1.3 * amp, fnoise(t * 0.27, 22) * 1.5 * amp, fnoise(t * 0.30, 23) * 1.1 * amp);
+    poseAddBone(P, 'neck', 0, fnoise(t * 0.24, 24) * 1.0 * amp, fnoise(t * 0.22, 25) * 0.8 * amp);
+  }
+  // What the tail muscles are *asking* for. The travelling delay down the
+  // chain and the follow-through come from layerTailSim, so the amplitudes
+  // here are deliberately small — the physics amplifies them.
   layerTail(P, dt) {
     const T = this.tail;
-    T.ph += dt * (T.lash > 0.1 ? 3.2 : 0.9);
+    T.ph += dt * (T.lash > 0.1 ? 3.2 : 0.62) * (0.85 + 0.3 * fnoise(this.time * 0.11, 61));
     T.lash = expDecay(T.lash, 0, 0.6, dt);
     T.quiver = expDecay(T.quiver, 0, 1.5, dt);
     const lying = ['loaf', 'side', 'bellyUp', 'curl', 'sit', 'sitTall'].includes(this.poseName) && this.mode === 'pose';
     for (let i = 0; i < 8; i++) {
       const k = i / 7;
-      let sway = Math.sin(T.ph - i * 0.55) * (lying ? 4 + 10 * k : 3 + 7 * k);
-      sway += Math.sin(this.time * 7.0 - i * 0.9) * T.lash * (8 + 18 * k);
+      let sway = Math.sin(T.ph - i * 0.22) * (lying ? 2.2 + 5.0 * k : 1.6 + 3.4 * k);
+      sway += fnoise(this.time * 0.37, 70 + i) * (1.2 + 3.0 * k);
+      sway += Math.sin(this.time * 7.0 - i * 0.5) * T.lash * (6 + 13 * k);
       const qv = Math.sin(this.time * 38 + i) * T.quiver * 2.5 * k;
       if (this.sleeping) sway *= 0.25;
       poseAddBone(P, 'tail' + i, 0, sway, qv);
@@ -2060,17 +2255,19 @@ class CatSim {
     // blinking
     this.blinkT -= dt;
     if (this.blinkT < 0 && this.blinkPh < 0) { this.blinkPh = 0; this.blinkT = this.sleeping ? 99 : rand(2.0, 6.0) * (this.squint > 0.3 ? 0.6 : 1); }
-    let blink = 0;
     if (this.blinkPh >= 0) {
       this.blinkPh += dt / (this.squint > 0.3 ? 0.55 : 0.16);     // slow blink when content
-      blink = Math.sin(Math.PI * clamp(this.blinkPh, 0, 1));
-      if (this.blinkPh >= 1) this.blinkPh = -1;
+      if (this.blinkPh >= 1.12) this.blinkPh = -1;                // runs past 1 so the lagging eye finishes
     }
     const target = this.sleeping ? 1 : clamp(this.lidBase + this.squint * 0.62 + this.sleepy * 0.4 + (this.yawnSquint ? clamp(this.jaw / 20, 0, 0.8) : 0), 0, 1);
     this.lid = expDecay(this.lid, target, this.sleeping ? 3 : 9, dt);
-    const c = clamp(this.lid + blink * (1 - this.lid), 0, 1);
     for (const sd of ['L', 'R']) {
-      const f = EYES[sd === 'L' ? 0 : 1].f;
+      const e = sd === 'L' ? 0 : 1;
+      // the two eyes do not close in perfect unison, and one lid sits a little
+      // lower than the other
+      const b = this.blinkPh >= 0 ? Math.sin(Math.PI * clamp(this.blinkPh - e * 0.09, 0, 1)) * (e ? 0.96 : 1) : 0;
+      const c = clamp(this.lid * (e ? 1.05 : 0.97) + b * (1 - this.lid), 0, 1);
+      const f = EYES[e].f;
       const iu = BI('lidU' + sd), id = BI('lidD' + sd);
       SK.q[iu] = Q.axis(f.lt, -48 * D2R * c - this.look.eyePitch * 0.35);
       SK.q[id] = Q.axis(f.lt, 30 * D2R * c * c);
@@ -3052,13 +3249,25 @@ step(1 / 60); step(1 / 60);
 document.getElementById('loading').hidden = true;
 if (!TEST) requestAnimationFrame(loop);
 
+// Harness hooks: only attached when the page is opened with ?test=1, so the
+// published page carries no scripted control surface.
+if (TEST) { window.__step1 = (dt) => { step(dt); };
 window.__test = {
   async step(n, dt = 1 / 30) { for (let i = 0; i < n; i++) { step(dt); await new Promise((r) => setTimeout(r, 0)); } return CAT.status; },
+  step1(dt = 1 / 30) { step(dt); return CAT.status; },
   draw() { draw(); gl.finish(); return 'ok'; },
   cam(az, el, dist, tx, ty, tz) { CAM.az = CAM.tAz = az; CAM.el = CAM.tEl = el; CAM.dist = CAM.tDist = dist; if (tx !== undefined) CAM.target = [tx, ty, tz]; },
   act(name, arg) { ACTIONS[name](arg); return name; },
   say(k) { CAT.say(k); return k; },
   blep(v) { CAT.tongueT = v; return v; },
+  // test-only: evaluate in module scope so probes can read renderer state
+  dbg(code) { return eval(code); },
+  worldOf() {
+    const g = (n) => SK.wp[BI(n)].map((v) => +v.toFixed(4));
+    return { head: g('head'), jaw: g('jaw'), nose: SK.pointOn(BI('head'), META.mouth.upper[0]).map((v) => +v.toFixed(4)),
+      tongue: SK.pointOn(BI('jaw'), META.mouth.tongue).map((v) => +v.toFixed(4)),
+      eyeL: SK.pointOn(BI('head'), META.eyeL).map((v) => +v.toFixed(4)), yaw: +CAT.yaw.toFixed(3), pos: CAT.pos.map((v) => +v.toFixed(3)) };
+  },
   screenOf(bone, off) {
     const w = SK.pointOn(BI(bone), v3.add(SK.rest[BI(bone)], off || [0, 0, 0]));
     const c = M4.point(R.vp, w);
@@ -3100,6 +3309,31 @@ window.__test = {
     document.body.appendChild(sheet);
     return 'sheet';
   },
+  // contact strip driven by a spec object: run the sim, fire events at given
+  // cells, grab one frame per cell and composite them into a single canvas
+  async sheetFrames2(spec) {
+    noResize = true;
+    const { cols, w, h, cells, stepsPerCell, dt = 1 / 30, events = [] } = spec;
+    const rows = Math.ceil(cells / cols);
+    const sheet = document.createElement('canvas');
+    sheet.width = w * cols; sheet.height = h * rows;
+    const ctx = sheet.getContext('2d');
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; canvas.width = w; canvas.height = h;
+    const px = new Uint8Array(w * h * 4);
+    for (let i = 0; i < cells; i++) {
+      for (const [cell, code] of events) if (cell === i) (0, eval)(code);
+      for (let k = 0; k < stepsPerCell; k++) { step(dt); await new Promise((r) => setTimeout(r, 0)); }
+      draw();
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const img = ctx.createImageData(w, h);
+      for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+      ctx.putImageData(img, (i % cols) * w, Math.floor(i / cols) * h);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect((i % cols) * w, Math.floor(i / cols) * h, 58, 20);
+      ctx.fillStyle = '#fff'; ctx.font = '13px sans-serif';
+      ctx.fillText(((i + 1) * stepsPerCell * dt).toFixed(2) + 's', (i % cols) * w + 6, Math.floor(i / cols) * h + 15);
+    }
+    return sheet.toDataURL('image/png');
+  },
   async sheetFrames(steps, cols, w, h, camFn) {
     // run the sim, capture frames every `steps[i]` sim steps
     noResize = true;
@@ -3126,7 +3360,7 @@ window.__test = {
     return 'sheet';
   },
 };
-document.title = document.title;   // keep
+}
 window.__ready = true;
 
 })();
