@@ -1029,6 +1029,15 @@ void main(){
   } else if (uMat == 15) {   // brushed metal
     alb = vec3(0.30, 0.29, 0.28);
     spec = 0.45; gloss = 110.0;
+  } else if (uMat == 17) {   // the toy mouse; vUV.x says which part this is
+    float part = floor(vUV.x + 0.5);
+    float felt = n3(vLocal * 220.0) * 0.5 + n3(vLocal * 60.0) * 0.5;
+    alb = vec3(0.36, 0.35, 0.36) * (0.84 + 0.32 * felt);
+    spec = 0.03; gloss = 24.0;
+    if (part == 1.0) { alb = vec3(0.60, 0.32, 0.34); spec = 0.25; gloss = 70.0; }        // nose
+    else if (part == 2.0) alb = vec3(0.58, 0.38, 0.39) * (0.9 + 0.2 * felt);             // ears
+    else if (part == 3.0) { alb = vec3(0.52, 0.34, 0.35); spec = 0.15; gloss = 50.0; }   // tail
+    else if (part == 4.0) { alb = vec3(0.72, 0.62, 0.24); spec = 0.45; gloss = 110.0; }  // the brass key
   } else if (uMat == 16) {   // what is in the picture frames
     vec2 q = vLocal.xy * 9.0;
     float f = n3(vec3(q, 1.0)) * 0.6 + n3(vec3(q * 2.7, 3.0)) * 0.4;
@@ -1435,6 +1444,24 @@ R.room = (() => {
   };
 })();
 R.ballMesh = (() => { const g = sphereGeom(1, 32, 20); return makeMesh(g.pos, g.nrm, g.idx, g.uv); })();
+// the wind-up mouse, built nose-first along +X so it shares the cat's convention
+R.mouseMesh = (() => {
+  const sq = (sx, sy, sz, t) => transformGeom(sphereGeom(1, 16, 11),
+    M4.mul(M4.fromQT(Q.id(), t), new Float32Array([sx, 0, 0, 0, 0, sy, 0, 0, 0, 0, sz, 0, 0, 0, 0, 1])));
+  // The parts overlap in space, so which piece a fragment belongs to cannot be
+  // worked out from its position. Each one carries its own id in the uv instead.
+  const tag = (g, id) => { const n = g.pos.length / 3, uv = new Array(n * 2); for (let i = 0; i < n; i++) { uv[i * 2] = id; uv[i * 2 + 1] = 0; } return { pos: g.pos, nrm: g.nrm, idx: g.idx, uv }; };
+  const g = mergeGeom([
+    tag(sq(0.058, 0.034, 0.038, [-0.004, 0.0, 0]), 0),            // body
+    tag(sq(0.030, 0.026, 0.026, [0.050, -0.004, 0]), 0),          // head
+    tag(sq(0.009, 0.007, 0.007, [0.079, -0.008, 0]), 1),          // nose
+    tag(sq(0.004, 0.019, 0.019, [0.030, 0.030, -0.023]), 2),      // ears
+    tag(sq(0.004, 0.019, 0.019, [0.030, 0.030, 0.023]), 2),
+    tag(transformGeom(cylGeom(0.0045, 0.095, 8), M4.fromQT(Q.axis([0, 0, 1], Math.PI / 2 - 0.35), [-0.078, 0.013, 0])), 3),
+    tag(transformGeom(cylGeom(0.0105, 0.040, 10), M4.fromQT(Q.axis([1, 0, 0], Math.PI / 2), [-0.028, 0.040, 0])), 4),
+  ]);
+  return makeMesh(g.pos, g.nrm, g.idx, g.uv);
+})();
 R.tongueMesh = (() => { const g = sphereGeom(1, 20, 12); return makeMesh(g.pos, g.nrm, g.idx, g.uv); })();
 R.toothMesh = (() => {
   // unit cone pointing down -Y from the origin (base ring at y=0)
@@ -1467,6 +1494,10 @@ R.shadow = (() => {
 
 // the red dot: where it is, and how strongly it is showing
 const LASER = { on: false, p: [0.4, 0.004, 0.9], shown: 0, lastMove: -10, idleFrom: 0 };
+// A wind-up mouse. It does not drive in a straight line and it does not run
+// continuously: it bolts, stops dead, swivels and bolts again, which is exactly
+// the pattern that a cat cannot ignore. The spring runs down as it goes.
+const MOUSE = { out: false, p: [0.6, 0.03, 1.4], yaw: 1.2, yawT: 1.2, speed: 0, wind: 0, burst: 0, pinned: 0, bump: 0 };
 const SCENE = {
   ball: { p: [0.9, 0.022, 0.6], v: [0, 0, 0], r: 0.022, rot: Q.id(), visible: true, held: false },
   pet: { p: [0, 0, 0], dir: [1, 0, 0], s: 0 },
@@ -1531,6 +1562,7 @@ function renderShadow() {
   for (const m of [R.room.wood, R.room.linen, R.room.duvet, R.room.books, R.room.ceramic, R.room.metal, R.room.shade, R.room.leaves]) drawMesh(m);
   const b = SCENE.ball;
   if (b.visible) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(b.rot, b.p, b.r)); drawMesh(R.ballMesh); }
+  if (MOUSE.out) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(Q.axis([0, 1, 0], MOUSE.yaw), MOUSE.p)); drawMesh(R.mouseMesh); }
   gl.disable(gl.POLYGON_OFFSET_FILL);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
@@ -1554,6 +1586,13 @@ function renderScene(width, height) {
     [R.room.wood, 10], [R.room.linen, 11], [R.room.books, 12], [R.room.ceramic, 13], [R.room.shade, 14],
     [R.room.metal, 15], [R.room.picture, 16], [R.room.leaves, 7]];
   for (const [m, id] of mats) { gl.uniform1i(rp.u.uMat, id); drawMesh(m); }
+  if (MOUSE.out) {
+    gl.uniform1i(rp.u.uMat, 17);
+    const q = Q.mul(Q.axis([0, 1, 0], MOUSE.yaw), Q.axis([0, 0, 1], MOUSE.bump * 0.5));
+    gl.uniformMatrix4fv(rp.u.uModel, false, M4.fromQT(q, MOUSE.p));
+    drawMesh(R.mouseMesh);
+    gl.uniformMatrix4fv(rp.u.uModel, false, M4.id());
+  }
   if (b.visible) {
     gl.uniform1i(rp.u.uMat, 5);
     gl.uniformMatrix4fv(rp.u.uModel, false, M4.fromQT(Q.id(), b.p, b.r));
@@ -2139,7 +2178,7 @@ Object.assign(POSE_SPECS.groom.b, {
 });
 for (const k of ['run', 'leap', 'reach', 'sitTall', 'groom']) POSES[k] = poseFromSpec(POSE_SPECS[k]);
 
-const SOUNDS = { play() {}, purr() {}, step() {}, ready: false };   // filled in by the audio module
+const SOUNDS = { play() {}, purr() {}, step() {}, whirr() {}, ready: false };   // filled in by the audio module
 
 function poseFromSkeleton(rootLike) {
   const p = poseNew();
@@ -2754,6 +2793,45 @@ function updateBall(dt) {
 }
 const ballSpeed = () => Math.hypot(BALL.v[0], BALL.v[1], BALL.v[2]);
 
+// ---- the wind-up mouse -----------------------------------------------------
+function updateMouse(dt) {
+  if (!MOUSE.out) return;
+  MOUSE.wind = Math.max(0, MOUSE.wind - dt * 0.013);        // good for about a minute and a half
+  if (MOUSE.pinned > 0) {
+    // held down under a paw: it buzzes and struggles but gets nowhere
+    MOUSE.pinned -= dt;
+    MOUSE.speed = 0;
+    MOUSE.yaw += Math.sin(CAT.time * 31) * 0.05;
+    if (MOUSE.pinned <= 0) { MOUSE.yawT = MOUSE.yaw + rand(-2.6, 2.6); MOUSE.burst = 0; }
+    return;
+  }
+  MOUSE.burst -= dt;
+  if (MOUSE.burst <= 0) {
+    if (MOUSE.speed > 0.05) { MOUSE.speed = 0; MOUSE.burst = rand(0.25, 1.0); }
+    else {
+      MOUSE.speed = rand(0.55, 1.15) * clamp(MOUSE.wind, 0, 1);
+      MOUSE.burst = rand(0.45, 1.5);
+      MOUSE.yawT = MOUSE.yaw + rand(-2.3, 2.3);
+    }
+  }
+  MOUSE.yaw = wrapAngle(MOUSE.yaw + clamp(wrapAngle(MOUSE.yawT - MOUSE.yaw), -7 * dt, 7 * dt));
+  const wob = Math.sin(CAT.time * 11.0) * 0.045 * clamp(MOUSE.speed, 0, 1);
+  const f = fwdOf(MOUSE.yaw + wob);
+  const want = v3.madd(MOUSE.p, f, MOUSE.speed * dt);
+  const c = constrainFloor([want[0], 0, want[2]], 'floor');
+  if (Math.hypot(c[0] - want[0], c[2] - want[2]) > 1e-6) {
+    // ran into something: back off and pick a new heading
+    MOUSE.yaw = MOUSE.yawT = MOUSE.yaw + Math.PI + rand(-0.9, 0.9);
+    MOUSE.burst = rand(0.3, 0.8);
+    MOUSE.bump = 1;
+    SOUNDS.play('bounce', { v: 1.1, pos: MOUSE.p, gain: 0.16 });
+  }
+  MOUSE.p = [c[0], MOUSE.p[1], c[2]];
+  MOUSE.bump = Math.max(0, MOUSE.bump - dt * 4);
+  SOUNDS.whirr(MOUSE.speed > 0.05 ? clamp(MOUSE.speed, 0.2, 1) * clamp(MOUSE.wind * 2, 0, 1) : 0, MOUSE.p);
+}
+const mouseFlat = () => [MOUSE.p[0], 0, MOUSE.p[2]];
+
 // ---- small reusable motions -----------------------------------------------------
 async function buttWiggle(cat, tok, dur) {
   cat.extra = (P) => {
@@ -2858,8 +2936,101 @@ function laserChase() {
   });
 }
 
+// Hunting a toy mouse is the opposite of chasing a laser: this one can actually
+// be caught. The cat freezes when it bolts, creeps while it is stopped, pounces,
+// pins it under a paw, and then lets it go — because a cat that has caught
+// something it cannot eat will always let it run again.
+function mouseHunt() {
+  CAT.run('mouse', async (tok) => {
+    resetMood(CAT);
+    CAT.lookFn = () => MOUSE.p;
+    CAT.dilateT = 1.0; CAT.whiskerT = 1.0; CAT.ears.tYaw = [8, 8]; CAT.lidBase = 0.02;
+    CAT.setStatus('发现了那只老鼠');
+    if (CAT.level === 'bed') await jumpTo(CAT, tok, constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor'), 'floor', 0);
+    await CAT.standUp(tok);
+    while (MOUSE.out) {
+      const d = v3.dist([CAT.pos[0], 0, CAT.pos[2]], mouseFlat());
+      if (MOUSE.wind <= 0.01) {
+        CAT.setStatus('老鼠不动了，用爪子拨了拨');
+        if (d > 0.3) await CAT.moveTo(mouseFlat(), 0.8, tok, 0.26, { track: mouseFlat });
+        else { await swatAt(CAT, tok, MOUSE.p); await CAT.wait(rand(0.8, 2.0), tok); }
+        continue;
+      }
+      if (MOUSE.speed > 0.1 && d < 0.75) {
+        // it bolted: freeze, watch it, then go
+        CAT.setStatus('一动不动地盯着');
+        await CAT.toPose('crouch', 0.18, tok);
+        CAT.tail.quiver = 1.0;
+        await CAT.wait(rand(0.15, 0.4), tok);
+      } else if (d > 0.8) {
+        CAT.setStatus('追上去');
+        CAT.tail.lash = 0.5;
+        await CAT.moveTo(mouseFlat(), 2.1, tok, 0.3, { track: mouseFlat });
+      } else if (d > 0.3) {
+        CAT.setStatus('蹑手蹑脚靠近');
+        await CAT.toPose('crouch', 0.26, tok);
+        await CAT.moveTo(mouseFlat(), 0.5, tok, 0.28, { track: mouseFlat });
+      } else {
+        CAT.setStatus('扑！');
+        await CAT.toPose('crouch', 0.2, tok);
+        await buttWiggle(CAT, tok, rand(0.3, 0.7));
+        const tgt = constrainFloor(mouseFlat(), 'floor');
+        SOUNDS.play('hop');
+        await new Promise((res) => { CAT.startJump(tgt, 0, 'floor'); CAT.jump.done = res; });
+        CAT.check(tok);
+        if (v3.dist([CAT.pos[0], 0, CAT.pos[2]], mouseFlat()) < 0.26) {
+          MOUSE.pinned = rand(1.2, 2.6);
+          CAT.setStatus('按住了！');
+          CAT.say('chatter');
+          await swatAt(CAT, tok, MOUSE.p);
+          await CAT.wait(0.5, tok);
+          await swatAt(CAT, tok, MOUSE.p);
+          await CAT.wait(Math.max(0, MOUSE.pinned), tok);
+          CAT.setStatus('一松爪，又跑了');
+        } else {
+          CAT.setStatus('差一点');
+          await swatAt(CAT, tok, MOUSE.p);
+        }
+        await CAT.wait(rand(0.2, 0.5), tok);
+        await CAT.toPose('crouch', 0.25, tok);
+      }
+      await CAT.wait(0.04, tok);
+    }
+    CAT.lidBase = 0.15; CAT.lookFn = null;
+    await CAT.toPose('sit', 0.6, tok);
+    CAT.look.target = R.camPos.slice();
+    CAT.setStatus('玩累了');
+  });
+}
+
 // ---- top-level actions ----------------------------------------------------------
 const ACTIONS = {
+  mouse() {
+    CAT.lastInteraction = CAT.time;
+    if (!MOUSE.out) {
+      // wind it up and set it down somewhere clear of the cat
+      MOUSE.out = true; MOUSE.wind = 1;
+      const a = CAT.yaw + rand(-1.2, 1.2);
+      MOUSE.p = constrainFloor(v3.add([CAT.pos[0], 0, CAT.pos[2]], v3.mul(fwdOf(a), rand(0.9, 1.5))), 'floor');
+      MOUSE.p[1] = 0.03;
+      MOUSE.yaw = MOUSE.yawT = a + Math.PI;
+      MOUSE.speed = 0; MOUSE.burst = 0.3; MOUSE.pinned = 0;
+      mouseHunt();
+    } else if (MOUSE.wind <= 0.01) {
+      // the spring has run down: wind it again rather than putting it away
+      MOUSE.wind = 1; MOUSE.burst = 0.2;
+      if (CAT.busy !== 'mouse') mouseHunt();
+    } else {
+      MOUSE.out = false; MOUSE.wind = 0;
+      SOUNDS.whirr(0);
+      if (CAT.busy === 'mouse') CAT.run('mouseOff', async (tok) => {
+        resetMood(CAT); CAT.lidBase = 0.15;
+        await CAT.toPose('sitTall', 0.6, tok);
+        CAT.look.target = R.camPos.slice();
+        CAT.setStatus('老鼠收起来了');
+      });
+    }
+  },
   laser() {
     LASER.on = !LASER.on;
     CAT.lastInteraction = CAT.time;
@@ -3728,7 +3899,23 @@ function synthJobs(sr) {
   variants('stepFloor', 3, (v) => pawStep({ dur: 0.09, decay: 0.012, cut: 1100, body: 150 + v * 18, tick: 0.18, seed: 211 + v * 13 }));
   variants('stepRug', 3, (v) => pawStep({ dur: 0.10, decay: 0.020, cut: 520, seed: 231 + v * 13 }));
   variants('stepSofa', 2, (v) => pawStep({ dur: 0.12, decay: 0.028, cut: 380, seed: 251 + v * 13 }));
-  const rank = { trill: 0, mew: 1, meowShort: 2, stepRug: 3, stepFloor: 3, purr: 4, meow: 5, chirp: 6, stepSofa: 6, land: 7, hop: 7, bounce: 7 };
+  // the clockwork: gear teeth at 46 Hz through the rattle of a plastic shell.
+  // One second holds a whole number of teeth, so the loop does not click.
+  variants('whirr', 1, () => {
+    const n = sr, a = new Float32Array(n), r = mulberry(601);
+    const g1 = resoCoef(380, 230, sr), g2 = resoCoef(1250, 500, sr);
+    const s1 = [0, 0], s2 = [0, 0];
+    let ph = 0;
+    for (let i = 0; i < n; i++) {
+      ph += 46 / sr; if (ph >= 1) ph -= 1;
+      const x = (ph < 0.17 ? 0.9 : 0.0) + (r() * 2 - 1) * 0.4;
+      const y1 = g1[0] * x + g1[1] * s1[0] + g1[2] * s1[1]; s1[1] = s1[0]; s1[0] = y1;
+      const y2 = g2[0] * x + g2[1] * s2[0] + g2[2] * s2[1]; s2[1] = s2[0]; s2[0] = y2;
+      a[i] = y1 + y2 * 0.45;
+    }
+    return normalise(a, 0.55);
+  });
+  const rank = { trill: 0, mew: 1, meowShort: 2, stepRug: 3, stepFloor: 3, whirr: 3, purr: 4, meow: 5, chirp: 6, stepSofa: 6, land: 7, hop: 7, bounce: 7 };
   return J.map((j, i) => [j, (rank[j.name] === undefined ? 9 : rank[j.name]) * 100 + i])
     .sort((a, b) => a[1] - b[1]).map(([j]) => j);
 }
@@ -3832,6 +4019,24 @@ SOUNDS.play = function (kind, opts = {}) {
   src.start();
   return { scale: 1, stretch: 1 / rate };
 };
+SOUNDS.whirr = function (level, pos) {
+  if (!AUDIO.ctx) return;
+  if (!AUDIO.whirrGain) {
+    const set = AUDIO.bufs.whirr;
+    if (!set || !set.length) return;
+    AUDIO.whirrGain = AUDIO.ctx.createGain(); AUDIO.whirrGain.gain.value = 0;
+    AUDIO.whirrPan = AUDIO.ctx.createStereoPanner ? AUDIO.ctx.createStereoPanner() : null;
+    if (AUDIO.whirrPan) { AUDIO.whirrGain.connect(AUDIO.whirrPan); AUDIO.whirrPan.connect(AUDIO.master); }
+    else AUDIO.whirrGain.connect(AUDIO.master);
+    const src = AUDIO.ctx.createBufferSource();
+    src.buffer = set[0]; src.loop = true; src.connect(AUDIO.whirrGain); src.start();
+    AUDIO.whirrSrc = src;
+  }
+  const d = pos ? v3.dist(R.camPos, pos) : 1;
+  AUDIO.whirrGain.gain.setTargetAtTime(AUDIO.on ? level * 0.20 * clamp(1.4 / (0.6 + d), 0.25, 1.3) : 0, AUDIO.ctx.currentTime, 0.05);
+  if (AUDIO.whirrPan && pos) AUDIO.whirrPan.pan.setTargetAtTime(panOf(pos), AUDIO.ctx.currentTime, 0.05);
+  if (AUDIO.whirrSrc) AUDIO.whirrSrc.playbackRate.setTargetAtTime(0.85 + 0.35 * level, AUDIO.ctx.currentTime, 0.08);
+};
 SOUNDS.step = function (surface, strength, pos) {
   SOUNDS.play('step' + surface, { gain: 0.30 * strength, pos, rate: rand(0.86, 1.16) });
 };
@@ -3850,6 +4055,8 @@ const UI = {
   sleepLabel: document.getElementById('sleepLabel'),
   laser: document.getElementById('aLaser'),
   laserLabel: document.getElementById('laserLabel'),
+  mouse: document.getElementById('aMouse'),
+  mouseLabel: document.getElementById('mouseLabel'),
   start: document.getElementById('start'),
 };
 CAT.onStatus = (s) => { UI.status.textContent = s; };
@@ -3883,10 +4090,14 @@ bind('aSleep', () => { if (CAT.sleeping) ACTIONS.call(); else ACTIONS.sleep(); }
 bind('aJump', () => ACTIONS.jump());
 bind('aSit', () => ACTIONS.sit());
 bind('aLaser', () => ACTIONS.laser());
+bind('aMouse', () => ACTIONS.mouse());
 INPUT.onFirst = () => { UI.hint.classList.add('gone'); };
 document.addEventListener('visibilitychange', () => { if (!AUDIO.ctx) return; if (document.hidden) AUDIO.ctx.suspend(); else if (AUDIO.on) AUDIO.ctx.resume(); });
 function syncButtons() {
   UI.laser.setAttribute('aria-pressed', LASER.on ? 'true' : 'false');
+  UI.mouse.setAttribute('aria-pressed', MOUSE.out ? 'true' : 'false');
+  const ml = !MOUSE.out ? '机械鼠' : MOUSE.wind > 0.01 ? '收起来' : '再上弦';
+  if (UI.mouseLabel.textContent !== ml) UI.mouseLabel.textContent = ml;
   const ll = LASER.on ? '关激光' : '激光笔';
   if (UI.laserLabel.textContent !== ll) UI.laserLabel.textContent = ll;
   const jl = CAT.level === 'bed' ? '跳下来' : '跳上床';
@@ -3911,6 +4122,7 @@ function focusPoint() {
 }
 function step(dt) {
   FRAME_NO++;
+  updateMouse(dt);
   LASER.shown = expDecay(LASER.shown, LASER.on ? 1 : 0, 12, dt);
   if (LASER.on) {
     // no hand holds a laser perfectly still, and the shake is most of why a cat
