@@ -1255,6 +1255,21 @@ const ROOM = {
   rug: { cx: 0.05, cz: 0.95, hx: 0.95, hz: 0.68 },
   lamp: [-2.30, 1.10, -0.40],
 };
+// Everything the cat can be standing on above the floor. Each one gives the
+// patch it can actually stand on, clear of the pillows, the lamp and the books,
+// so it never ends up perched on a mug.
+const PERCHES = {
+  bed:   { b: [ROOM.bed.x0 + 0.30, ROOM.bed.x1 - 0.30, ROOM.bed.z0 + 0.45, ROOM.bed.z1 - 0.14], y: ROOM.bed.seatY, label: '床', soft: true },
+  desk:  { b: [-2.26, -1.30, -0.44, 0.16], y: ROOM.desk.topY, label: '书桌', soft: false },
+  chair: { b: [ROOM.chair.cx - 0.12, ROOM.chair.cx + 0.12, ROOM.chair.cz - 0.12, ROOM.chair.cz + 0.12], y: ROOM.chair.seatY, label: '椅子', soft: true },
+};
+// where the cat stands to jump up, and where it lands coming down
+const perchApproach = (k) => {
+  const b = PERCHES[k].b;
+  if (k === 'bed') return [[(b[0] + b[1]) / 2, 0, b[3] + 0.46], [(b[0] + b[1]) / 2, 0, b[3] + 0.60]];
+  if (k === 'desk') return [[b[1] + 0.42, 0, (b[2] + b[3]) / 2], [b[1] + 0.58, 0, (b[2] + b[3]) / 2]];
+  return [[b[0] - 0.42, 0, (b[2] + b[3]) / 2 + 0.26], [b[0] - 0.56, 0, (b[2] + b[3]) / 2 + 0.36]];
+};
 // footprints the cat walks around, as [x0, x1, z0, z1]
 const BLOCKS = [
   [ROOM.desk.x0 - 0.1, ROOM.desk.x1, ROOM.desk.z0, ROOM.desk.z1],
@@ -1997,7 +2012,7 @@ function homeContact(key, cat, off) {
 
 // support surfaces --------------------------------------------------------
 function supportY(x, z, cat) {
-  if (cat && cat.level === 'bed') return ROOM.bed.seatY;
+  if (cat && PERCHES[cat.level]) return PERCHES[cat.level].y;
   const R0 = ROOM.rug;
   if (Math.abs(x - R0.cx) < R0.hx && Math.abs(z - R0.cz) < R0.hz) return 0.012;
   return 0.0;
@@ -2058,7 +2073,8 @@ class Gait {
           // the paw has just touched down; a step that barely travelled is the
           // leg re-planting, not a footfall, and should stay silent
           if (v3.dist(l.from, l.to) > 0.025) {
-            SOUNDS.step(cat.level === 'bed' ? 'Sofa' : (l.to[1] > 0.006 ? 'Rug' : 'Floor'), clamp(vv / 1.5, 0.12, 1), l.to);
+            const P0 = PERCHES[cat.level];
+            SOUNDS.step(P0 ? (P0.soft ? 'Sofa' : 'Floor') : (l.to[1] > 0.006 ? 'Rug' : 'Floor'), clamp(vv / 1.5, 0.12, 1), l.to);
           }
           l.F = l.to;
         }
@@ -2721,9 +2737,8 @@ class CatSim {
 
 function constrainFloor(p, level) {
   const F = ROOM.floor;
-  if (level === 'bed') {
-    return [clamp(p[0], ROOM.bed.x0 + 0.3, ROOM.bed.x1 - 0.3), p[1], clamp(p[2], ROOM.bed.z0 + 0.42, ROOM.bed.z1 - 0.12)];
-  }
+  const P0 = PERCHES[level];
+  if (P0) return [clamp(p[0], P0.b[0], P0.b[1]), p[1], clamp(p[2], P0.b[2], P0.b[3])];
   let x = clamp(p[0], F.x0 + 0.3, F.x1 - 0.3);
   let z = clamp(p[2], ROOM.backZ + 0.28, F.z1 - 0.3);
   const S = ROOM.bed;
@@ -2853,6 +2868,23 @@ function updateMouse(dt) {
 }
 const mouseFlat = () => [MOUSE.p[0], 0, MOUSE.p[2]];
 
+// step off whatever it is standing on, onto the floor in front of it
+async function getDown(cat, tok) {
+  if (!PERCHES[cat.level]) return;
+  const land = constrainFloor(perchApproach(cat.level)[1], 'floor');
+  await jumpTo(cat, tok, land, 'floor', supportY(land[0], land[2], null));
+}
+// the nearest thing worth jumping onto from where the cat is standing
+function nearestPerch() {
+  let best = null;
+  for (const k in PERCHES) {
+    const a = perchApproach(k)[0];
+    const d = Math.hypot(a[0] - CAT.pos[0], a[2] - CAT.pos[2]);
+    if (!best || d < best.d) best = { k, d };
+  }
+  return best ? best.k : 'bed';
+}
+
 // ---- small reusable motions -----------------------------------------------------
 async function buttWiggle(cat, tok, dur) {
   cat.extra = (P) => {
@@ -2904,7 +2936,7 @@ function laserChase() {
     CAT.lookFn = () => LASER.p;
     CAT.dilateT = 1.0; CAT.whiskerT = 1.0; CAT.ears.tYaw = [12, 12]; CAT.lidBase = 0.0;
     CAT.setStatus('盯上了那个红点');
-    if (CAT.level === 'bed') await jumpTo(CAT, tok, constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor'), 'floor', 0);
+    await getDown(CAT, tok);
     await CAT.standUp(tok);
     let misses = 0;
     while (LASER.on) {
@@ -2967,7 +2999,7 @@ function mouseHunt() {
     CAT.lookFn = () => MOUSE.p;
     CAT.dilateT = 1.0; CAT.whiskerT = 1.0; CAT.ears.tYaw = [8, 8]; CAT.lidBase = 0.02;
     CAT.setStatus('发现了那只老鼠');
-    if (CAT.level === 'bed') await jumpTo(CAT, tok, constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor'), 'floor', 0);
+    await getDown(CAT, tok);
     await CAT.standUp(tok);
     while (MOUSE.out) {
       const d = v3.dist([CAT.pos[0], 0, CAT.pos[2]], mouseFlat());
@@ -3082,10 +3114,7 @@ const ACTIONS = {
       CAT.dilateT = 1.0; CAT.whiskerT = 0.9; CAT.ears.tYaw = [8, 8];
       CAT.lookFn = () => BALL.p;
       if (CAT.mode === 'pose' && ['side', 'bellyUp', 'curl'].includes(CAT.poseName)) await CAT.toPose('loaf', 0.4, tok);
-      if (CAT.level === 'bed') {
-        const down = constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor');
-        await jumpTo(CAT, tok, down, 'floor', 0);
-      }
+      await getDown(CAT, tok);
       if (CAT.mode === 'pose' && ['loaf', 'sit', 'sitTall'].includes(CAT.poseName)) await CAT.toPose('stand', 0.35, tok);
       await CAT.turnToward(BALL.p, tok);
       await CAT.toPose('crouch', 0.25, tok);
@@ -3134,10 +3163,7 @@ const ACTIONS = {
       CAT.say('trill');
       CAT.setStatus('听到你在叫它');
       await CAT.wait(0.35, tok);
-      if (CAT.level === 'bed') {
-        const down = constrainFloor(v3.add([CAT.pos[0], 0, ROOM.bed.z1 + 0.45], [0, 0, 0]), 'floor');
-        await jumpTo(CAT, tok, down, 'floor', 0);
-      }
+      await getDown(CAT, tok);
       await CAT.standUp(tok);
       const spot = viewerSpot(0.5);
       if (v3.dist(spot, CAT.pos) > 0.25) await CAT.moveTo(spot, 0.7, tok, 0.04, { face: R.camPos });
@@ -3221,23 +3247,22 @@ const ACTIONS = {
       resetMood(CAT);
       if (wasSleeping) await wakeUp(CAT, tok);
       await CAT.standUp(tok);
-      const S = ROOM.bed;
-      if (CAT.level !== 'bed') {
-        CAT.setStatus('准备跳上床');
-        const lx = clamp(CAT.pos[0], S.x0 + 0.42, S.x1 - 0.42);
-        const take = [lx + rand(-0.1, 0.1), 0, S.z1 + 0.42];
-        await CAT.moveTo(take, 0.8, tok, 0.03, { face: [lx, 0.4, S.z0] });
-        const land = [lx, 0, S.z1 - 0.32];
-        await jumpTo(CAT, tok, land, 'bed', S.seatY);
-        CAT.setStatus('跳上了床');
+      if (!PERCHES[CAT.level]) {
+        const k = CAT.jumpTo || nearestPerch();
+        CAT.jumpTo = null;
+        const P0 = PERCHES[k], [take] = perchApproach(k);
+        const land = [(P0.b[0] + P0.b[1]) / 2, 0, (P0.b[2] + P0.b[3]) / 2];
+        CAT.setStatus('准备跳上' + P0.label);
+        await CAT.moveTo(constrainFloor(take, 'floor'), 0.8, tok, 0.04, { face: [land[0], P0.y, land[2]] });
+        await jumpTo(CAT, tok, land, k, P0.y);
+        CAT.setStatus('跳上了' + P0.label);
         await CAT.wait(0.4, tok);
         await CAT.turnToward(R.camPos, tok);
         await CAT.toPose('sitTall', 0.6, tok);
         CAT.look.target = R.camPos.slice();
       } else {
-        CAT.setStatus('跳下床');
-        const land = constrainFloor([CAT.pos[0], 0, S.z1 + 0.55], 'floor');
-        await jumpTo(CAT, tok, land, 'floor', supportY(land[0], land[2], null));
+        CAT.setStatus('跳下' + PERCHES[CAT.level].label);
+        await getDown(CAT, tok);
         CAT.setStatus('跳下来了');
         await CAT.wait(0.3, tok);
         await CAT.turnToward(R.camPos, tok);
@@ -4144,7 +4169,7 @@ function syncButtons() {
   if (UI.mouseLabel.textContent !== ml) UI.mouseLabel.textContent = ml;
   const ll = LASER.on ? '关激光' : '激光笔';
   if (UI.laserLabel.textContent !== ll) UI.laserLabel.textContent = ll;
-  const jl = CAT.level === 'bed' ? '跳下来' : '跳上床';
+  const jl = PERCHES[CAT.level] ? '跳下来' : '跳上' + PERCHES[nearestPerch()].label;
   if (UI.jumpLabel.textContent !== jl) UI.jumpLabel.textContent = jl;
   const sl = CAT.sleeping ? '叫醒' : '睡觉';
   if (UI.sleepLabel.textContent !== sl) UI.sleepLabel.textContent = sl;
