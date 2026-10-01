@@ -737,9 +737,16 @@ void main(){
       alb *= 1.0 - 0.75 * nos * step(0.0012, abs(d.z));
       alb *= 0.85 + 0.3 * n3(rp * 600.0);
       spec0 = 0.5;
-    } else if (mat < 2.5) { // mouth interior
-      alb = vec3(0.30, 0.07, 0.08);
-      spec0 = 0.3;
+    } else if (mat < 2.5) {
+      // With the mouth shut these polygons are not a cavity, they are the lip
+      // line. Painted near-black, as they were, the downward curve of the mouth
+      // slit reads as a frown drawn onto the face; painted like lip skin it
+      // reads as a closed mouth, which is what it is.
+      // These polygons are recessed and face away from every light, so they come
+      // out dark whatever albedo they are given; the closed colour has to be
+      // close to the muzzle's for the seam to read as a crease rather than a hole.
+      alb = mix(vec3(0.56, 0.47, 0.44), vec3(0.32, 0.08, 0.09), smoothstep(0.08, 0.45, uMouthOpen));
+      spec0 = 0.22;
     } else if (mat < 3.5) { // inner ear skin with sparse white hairs
       if (h == 0.0) alb = vec3(0.68, 0.48, 0.46);
       else alb = vec3(0.84, 0.84, 0.83);
@@ -811,7 +818,11 @@ void main(){
     col += envColor(R) * fres * spec0 * 0.6 * ao;
     col += uLightCol * pow(max(dot(N, H), 0.0), 60.0) * spec0 * 0.8 * sh;
   }
-  if (mat > 1.5 && mat < 2.5) col *= mix(0.25, 1.0, uMouthOpen) * 0.7;
+  if (mat > 1.5 && mat < 2.5) {
+    col *= mix(0.95, 1.0, smoothstep(0.0, 0.5, uMouthOpen));
+    // a shut mouth sits in the muzzle's own light, not in a cavity's
+    col += alb * mix(0.55, 0.0, smoothstep(0.0, 0.4, uMouthOpen)) * (mix(uGroundCol, uSkyCol, 0.65) + roomFill(N) * 0.8);
+  }
   col += laserOn(vWorld) * (0.07 + 0.17 * h);   // split across the shells, so each takes a share
   float outA = alpha;
   if (uDither > 0.5) {
