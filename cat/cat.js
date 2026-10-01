@@ -319,6 +319,13 @@ function mergeGeom(list) {
 
 // ---------------------------------------------------------------- shaders
 const GLSL_COMMON = `
+#define WIN_X  (-2.596)
+#define WIN_Y0 0.95
+#define WIN_Y1 2.05
+#define WIN_Z0 (-0.85)
+#define WIN_Z1 0.45
+#define WIN_ZM (-0.20)
+#define WIN_YM 1.555
 uniform vec3 uCamPos;
 uniform vec3 uLightDir;      // toward the light
 uniform vec3 uLightCol;
@@ -374,6 +381,21 @@ vec3 laserOn(vec3 p) {
   // near-white and only the halo reads as red, which is how one actually looks
   return (vec3(7.5, 0.70, 0.40) * exp(-d2 / (0.0085 * 0.0085))
         + vec3(1.8, 0.07, 0.05) * exp(-d2 / (0.034 * 0.034))) * uLaser.w;
+}
+// Sunlight comes through the window, not through the wall. Projecting a point
+// back along the light onto the window plane and asking whether it lands in the
+// opening is what puts the window's own shape on the floor — the single thing
+// that most separates a lit room from a room with a light in it. The glazing
+// bars come along for free.
+float sunGate(vec3 p) {
+  float t = (WIN_X - p.x) / uLightDir.x;
+  if (t < 0.0) return 0.0;
+  vec3 w = p + uLightDir * t;
+  float inY = smoothstep(WIN_Y0 - 0.04, WIN_Y0 + 0.04, w.y) * (1.0 - smoothstep(WIN_Y1 - 0.04, WIN_Y1 + 0.04, w.y));
+  float inZ = smoothstep(WIN_Z0 - 0.04, WIN_Z0 + 0.04, w.z) * (1.0 - smoothstep(WIN_Z1 - 0.04, WIN_Z1 + 0.04, w.z));
+  float bar = (1.0 - 0.80 * (1.0 - smoothstep(0.010, 0.032, abs(w.z - WIN_ZM))))
+            * (1.0 - 0.80 * (1.0 - smoothstep(0.010, 0.032, abs(w.y - WIN_YM))));
+  return inY * inZ * bar;
 }
 // soft room environment used for glossy reflections (eyes, nose, ball)
 vec3 envColor(vec3 r){
@@ -760,7 +782,7 @@ void main(){
   vec3 V = normalize(uCamPos - vWorld);
   vec3 T = normalize(vT);
   vec3 L = uLightDir;
-  float sh = h > 0.0 ? shadowFast(vShadow, 0.0012, 2.4) : shadowAt(vShadow, 0.0012, 2.2);
+  float sh = (h > 0.0 ? shadowFast(vShadow, 0.0012, 2.4) : shadowAt(vShadow, 0.0012, 2.2)) * sunGate(vWorld);
   float NoL = dot(N, L);
   float wrap = clamp((NoL + 0.25) / 1.25, 0.0, 1.0);
   float TL = dot(T, L);
@@ -1100,9 +1122,10 @@ void main(){
     ao *= 1.0 - 0.6 * exp(-dot(db, db) / (uBall.w * uBall.w * 1.4)) * smoothstep(uBall.w * 3.0, uBall.w, uBall.y);
   }
   // window light pool
-  vec3 col = alb * ((amb + roomFill(N)) * ao + uLightCol * NoL * sh * (uMat == 8 || uMat == 9 ? ao * ao : 1.0));
+  float sun = sh * sunGate(p);
+  vec3 col = alb * ((amb + roomFill(N)) * ao + uLightCol * NoL * sun * (uMat == 8 || uMat == 9 ? ao * ao : 1.0));
   vec3 H = normalize(uLightDir + V);
-  col += uLightCol * spec * pow(max(dot(N, H), 0.0), gloss) * sh * (uMat == 8 || uMat == 9 ? ao : 1.0);
+  col += uLightCol * spec * pow(max(dot(N, H), 0.0), gloss) * sun * (uMat == 8 || uMat == 9 ? ao : 1.0);
   // and the lamp, which is the warm half of the room
   vec3 ld = lampDir(p);
   float lf = lampFall(p) * ao;
@@ -2753,6 +2776,18 @@ class CatSim {
       // the "blep": tongue tip left out for a few seconds
       this.tongueT = 1;
       setTimeout(() => { this.tongueT = 0; }, rand(2500, 5000));
+    } else if (this.idleT > 12 && Math.random() < dt * 0.025 && !this.sleeping && this.mode === 'pose'
+      && !PERCHES[this.level] && since > 18 && v3.dist([this.pos[0], 0, this.pos[2]], sunSpot()) > 0.45) {
+      this.idleT = 0;
+      this.run('sunbathe', async (tok) => {
+        this.setStatus('去晒太阳');
+        await this.standUp(tok);
+        await this.moveTo(sunSpot(), 0.5, tok, 0.07);
+        await this.toPose('loaf', 1.0, tok);
+        this.squint = 0.5; this.sleepy = 0.35;
+        this.look.target = null;
+        this.setStatus('在太阳底下眯着眼');
+      });
     } else if (this.idleT > 7 && Math.random() < dt * 0.06 && !this.sleeping && this.mode === 'pose') {
       // occasional chirp / meow toward the viewer
       this.look.target = R.camPos.slice();
@@ -2788,6 +2823,12 @@ const BALL = SCENE.ball;
 const G = 9.81;
 
 function mouthPoint() { return SK.pointOn(BI('jaw'), v3.add(endOf('jaw'), [0.012, -0.006, 0])); }
+// Where the sunlight actually lands, worked out the same way the shader gates
+// it. A cat will cross a room for this.
+function sunSpot() {
+  const t = 1.46 / LIGHT_DIR[1];
+  return constrainFloor([ROOM.leftX + 0.004 - LIGHT_DIR[0] * t, 0, -0.20 - LIGHT_DIR[2] * t], 'floor');
+}
 function viewerSpot(dist = 0.55) {
   const cam = [R.camPos[0], 0, R.camPos[2]];
   const dir = v3.norm(v3.sub([CAT.pos[0], 0, CAT.pos[2]], cam));
@@ -3261,6 +3302,12 @@ const ACTIONS = {
       CAT.setStatus('困了');
       if (CAT.mode !== 'pose' || !['loaf', 'side', 'curl'].includes(CAT.poseName)) {
         await CAT.standUp(tok);
+        // a cat asleep in the daytime is asleep in the sun
+        const warm = sunSpot();
+        if (!PERCHES[CAT.level] && v3.dist([CAT.pos[0], 0, CAT.pos[2]], warm) > 0.40) {
+          CAT.setStatus('去找太阳');
+          await CAT.moveTo(warm, 0.55, tok, 0.07);
+        }
         // circle once before lying down
         const c = v3.add(CAT.pos, v3.mul(fwdOf(CAT.yaw + 1.6), 0.1));
         await CAT.moveTo(v3.add(c, v3.mul(fwdOf(CAT.yaw - 1.2), 0.12)), 0.3, tok, 0.02);
