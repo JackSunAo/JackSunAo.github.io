@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="一只实时渲染的银虎斑美国短毛猫：会追球、打滚、睡觉、跳沙发，被摸的时候会咕噜。">
+<title>美短小银</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%90%B1%3C/text%3E%3C/svg%3E">
+<style>
+/* page base (was supplied by the Artifact host) */
+body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}
+/* Layout: full-bleed WebGL living room; a slim name plate top-left, sound top-right, action dock bottom — frosted paper chips over the scene */
+:root{
+  --ink:#2b2420;--ink-soft:#6a5e55;--paper:rgba(251,247,241,.84);--paper-solid:#fbf7f1;--line:rgba(70,52,40,.16);
+  --yarn:#c4472f;--yarn-ink:#fff7f2;--dot:#7aa36b;--scrim:rgba(24,18,14,.42);
+  --serif:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif;
+  --sans:"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%;margin:0;background:#1a1512;overflow:hidden}
+[hidden]{display:none!important}
+body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;background:#1a1512}
+.hud{position:fixed;left:0;right:0;pointer-events:none;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 0}
+.plate{pointer-events:auto;background:var(--paper);-webkit-backdrop-filter:blur(10px) saturate(1.1);backdrop-filter:blur(10px) saturate(1.1);border:1px solid var(--line);border-radius:14px;padding:10px 14px 11px;max-width:min(320px,62vw);box-shadow:0 8px 24px rgba(30,20,12,.14)}
+.plate h1{margin:0;font:600 20px/1.15 var(--serif);letter-spacing:.06em}
+.plate .spec{margin:3px 0 0;font-size:11.5px;color:var(--ink-soft);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.status{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:13.5px;line-height:1.3}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--dot);flex:none;box-shadow:0 0 0 3px rgba(122,163,107,.22);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(122,163,107,0)}}
+.snd{pointer-events:auto;flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;background:var(--paper);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:500 13px var(--sans);color:var(--ink);cursor:pointer}
+.snd svg{width:17px;height:17px}
+.snd[aria-pressed="false"] .on{display:none}.snd[aria-pressed="true"] .off{display:none}
+.dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 16px);pointer-events:none}
+.dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(6,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
+.act{appearance:none;border:0;background:transparent;color:var(--ink);font:500 14px/1 var(--sans);padding:11px 14px;border-radius:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:7px;transition:background .15s}
+.act:hover{background:rgba(70,52,40,.08)}
+.act:active{transform:translateY(1px)}
+.act:focus-visible,.snd:focus-visible,.start button:focus-visible{outline:2px solid var(--yarn);outline-offset:2px}
+.act svg{width:18px;height:18px;flex:none}
+.act.primary{background:var(--yarn);color:var(--yarn-ink)}
+.act.primary:hover{background:#b23d27}
+.hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:rgba(30,22,17,.62);color:#f6efe7;font-size:12.5px;padding:7px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;transition:opacity .6s;letter-spacing:.02em}
+.hint.gone{opacity:0}
+.start{position:fixed;inset:0;display:grid;place-items:center;background:var(--scrim);padding:16px;z-index:5}
+.start .card{background:var(--paper-solid);border-radius:20px;padding:24px 22px 20px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:left}
+.start h2{margin:0 0 6px;font:600 22px/1.25 var(--serif);letter-spacing:.04em}
+.start p{margin:0 0 14px;font-size:14px;line-height:1.65;color:var(--ink-soft)}
+.start ul{margin:0 0 18px;padding:0;list-style:none;display:grid;gap:7px;font-size:13.5px;line-height:1.45}
+.start li{display:flex;gap:9px;align-items:baseline}
+.start li b{font-weight:600;min-width:4.6em;color:var(--ink)}
+.start .row{display:flex;gap:10px}
+.start button{flex:1;appearance:none;border:0;border-radius:12px;padding:12px 10px;font:600 15px var(--sans);cursor:pointer}
+.start .go{background:var(--yarn);color:var(--yarn-ink)}
+.start .mute{background:rgba(70,52,40,.09);color:var(--ink)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;color:#e9dfd4;font-size:14px;letter-spacing:.08em;pointer-events:none}
+@media (max-width:560px){
+  .dock-in{grid-template-columns:repeat(3,1fr);width:100%;max-width:420px}
+  .act{justify-content:center;padding:11px 8px}
+  .hint{bottom:calc(env(safe-area-inset-bottom,0px) + 136px);font-size:12px;white-space:normal;text-align:center;width:max-content;max-width:calc(100vw - 32px)}
+  .plate h1{font-size:18px}
+}
+@media (prefers-reduced-motion:reduce){.status i{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="可以互动的三维美短猫"></canvas>
+<div class="loading" id="loading">正在梳毛…</div>
+<div class="hud">
+  <div class="plate">
+    <h1>小银</h1>
+    <p class="spec">美国短毛猫 · 银色经典虎斑 · 体长 34 cm · 尾长 27 cm</p>
+    <div class="status" aria-live="polite"><i></i><span id="status">在看着你</span></div>
+  </div>
+  <button class="snd" id="snd" aria-pressed="false" type="button">
+    <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+    <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+    <span id="sndLabel">声音关</span>
+  </button>
+</div>
+<div class="hint" id="hint">拖动空白处转视角 · 在猫身上滑动抚摸 · 点地板丢球</div>
+<nav class="dock" aria-label="互动">
+  <div class="dock-in">
+    <button class="act primary" id="aBall" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><path d="M5.5 8.5c4 1 9 1 13 0M4.6 13.5c5 1.5 10 1.5 14.8 0M9 4.6c-2 4.5-2 10.3 0 14.8"/></svg>丢球</button>
+    <button class="act" id="aCall" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M8.5 12a3.5 3.5 0 0 1 7 0"/><circle cx="12" cy="13" r="1"/></svg>叫它</button>
+    <button class="act" id="aRoll" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5v3.2h-3.2"/></svg>打滚</button>
+    <button class="act" id="aSleep" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M18.5 14.5A7.5 7.5 0 0 1 9.5 5.5a7.5 7.5 0 1 0 9 9z"/></svg><span id="sleepLabel">睡觉</span></button>
+    <button class="act" id="aJump" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h6v-5h10"/><path d="M6 13c1-4 4-6 8-6"/><path d="M12 5l2 2-2 2"/></svg><span id="jumpLabel">跳沙发</span></button>
+    <button class="act" id="aSit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20v-6a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v6"/><circle cx="12" cy="6" r="2.4"/><path d="M6 20h12"/></svg>坐下</button>
+  </div>
+</nav>
+<div class="start" id="start">
+  <div class="card">
+    <h2>和小银玩一会儿</h2>
+    <p>一只实时渲染的银虎斑美短。它会追球、打滚、睡觉、跳上沙发，被摸的时候会咕噜。</p>
+    <ul>
+      <li><b>抚摸</b>在它身上来回滑动：头、下巴、背、肚子反应都不一样</li>
+      <li><b>丢球</b>点地板上任意一处，球就丢到那里</li>
+      <li><b>看它</b>拖动空白处转视角，双指或滚轮缩放</li>
+    </ul>
+    <div class="row"><button class="go" id="goSound" type="button">开始，打开声音</button><button class="mute" id="goMute" type="button">静音进入</button></div>
+  </div>
+</div>
+<script src="cat-data.js"></script>
+<script src="cat.js"></script>
+</body>
+</html>
