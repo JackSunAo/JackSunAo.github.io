@@ -570,6 +570,7 @@ void main(){
   // ---------------- strand coverage
   float alpha = 1.0;
   float sid = 0.5;
+  float under = 0.0;           // 1 where what we can see here is undercoat, not topcoat
   if (h > 0.0) {
     vec3 q = rp * uStrandDensity;
     vec3 c = floor(q); vec3 f = fract(q);
@@ -599,7 +600,28 @@ void main(){
     float avg = vDens * clamp(1.0 - pow(h, 2.0), 0.0, 1.0) * 0.9 * (0.75 + 0.5 * hash13(floor(q * 0.5)));
     float lod = max(smoothstep(0.7, 1.4, fp), smoothstep(0.0075, 0.0040, vLen) * 0.8);
     alpha = mix(a, avg, lod);
-    alpha = max(alpha, smoothstep(0.26, 0.04, h) * vDens);
+    // The undercoat: a second, finer and much denser layer living only close to
+    // the skin. A silver tabby carries its markings in the topcoat over a
+    // near-white layer beneath, and that pale layer showing through the gaps is
+    // what makes the coat read as silver rather than grey. Filling the same
+    // space with a solid mass, as this used to, reads as felt.
+    vec3 qu = rp * (uStrandDensity * 2.05);
+    vec3 fwu = fwidth(qu);                       // hoisted: the branch below is not uniform
+    float fpu = max(max(fwu.x, fwu.y), fwu.z);
+    float aau = clamp(fpu * 0.7, 0.02, 0.5);
+    if (h < 0.38) {
+      vec3 cu = floor(qu), fu = fract(qu);
+      vec3 ju = hash33(cu + 91.0);
+      float ulen = 0.20 + 0.17 * hash13(cu + 7.0);
+      vec3 ctru = clamp(0.22 + 0.56 * ju, 0.12, 0.88);
+      vec3 dvu = fu - ctru;
+      float du = length(dvu - vRestN * dot(dvu, vRestN));
+      float radu = 0.66 * (1.0 - pow(min(h / ulen, 1.0), 2.0) * 0.55);
+      float au = smoothstep(radu + aau, radu - aau, du) * smoothstep(1.02, 0.80, h / ulen);
+      au = mix(au, 0.95, smoothstep(0.7, 1.4, fpu)) * vDens;
+      under = clamp(au - alpha, 0.0, 1.0);
+      alpha = max(alpha, au);
+    }
     if (alpha < 0.02) discard;
   }
   // ---------------- pattern
@@ -619,11 +641,14 @@ void main(){
   vec3 SILV = vec3(0.40, 0.41, 0.43);
   vec3 BLK = vec3(0.016, 0.016, 0.019);
   vec3 WHT = vec3(0.66, 0.66, 0.65);
+  // the markings live in the topcoat; the undercoat beneath stays near-white
+  dark *= 1.0 - 0.62 * under;
+  white = max(white, under * 0.40);
   vec3 base = mix(SILV, BLK, dark);
   base = mix(base, WHT, white * (1.0 - 0.75 * dark));
   float rnd = hash13(floor(rp * uStrandDensity) + 3.7);
-  // ticking: dark tips on part of the silver hairs
-  float tick = step(0.55, rnd) * smoothstep(0.72, 0.88, h) * (1.0 - dark) * (1.0 - white);
+  // ticking: dark tips on part of the silver hairs, topcoat only
+  float tick = step(0.55, rnd) * smoothstep(0.72, 0.88, h) * (1.0 - dark) * (1.0 - white) * (1.0 - under);
   base = mix(base, vec3(0.10, 0.10, 0.11), tick * 0.75);
   vec3 root = mix(SILV_ROOT, vec3(0.62), dark * 0.4);
   vec3 alb = mix(root, base, smoothstep(0.10, 0.45, h));
@@ -679,8 +704,21 @@ void main(){
   vec3 amb = mix(uGroundCol, uSkyCol, N.y * 0.5 + 0.5);
   vec3 col = alb * (amb * occ * ao * floorAO + uLightCol * diff * sh * occ * mix(0.6, 1.0, ao));
   col += uLightCol * specC * sh * ao;
-  // rim / back light through the fur fringe
   float NoV = abs(dot(N, V));
+  // Forward scattering. Light that passes through a hair instead of bouncing
+  // off it is what makes a backlit coat glow, and it is the thing that most
+  // separates fur from a furry-looking solid. It needs the light behind the
+  // cat, the view roughly along it, and a short path through the coat, so it
+  // shows up along the silhouette and in the thin fur of the ears and legs.
+  // wrapped past the terminator and kept broad, because light entering a coat
+  // scatters sideways through it rather than glowing on one line of pixels
+  float backLit = clamp((-NoL + 0.35) / 1.35, 0.0, 1.0);
+  float fwdScatter = pow(clamp(dot(V, -L), 0.0, 1.0), 4.0);
+  float thin = pow(1.0 - NoV, 1.3);
+  // deeper in the coat the light has scattered further and comes out warmer
+  vec3 ttTint = mix(vec3(1.0), vec3(1.25, 0.88, 0.72), smoothstep(0.1, 0.9, h));
+  col += alb * ttTint * uLightCol * (backLit * fwdScatter * thin * furry * 3.6 * sh * mix(0.35, 1.0, h));
+  // rim / back light through the fur fringe
   float rim = pow(1.0 - NoV, 3.0) * furry * (0.25 + 0.75 * h);
   col += alb * rim * (amb * 0.5 + uLightCol * 0.45 * sh * max(dot(-V, L) + 0.3, 0.0));
   // thin ears let light through: pink glow on the side facing away from the light
