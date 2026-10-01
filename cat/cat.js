@@ -337,6 +337,8 @@ uniform vec2 uShadowTexel;
 uniform vec3 uWinDir;        // direction toward the window (world)
 uniform vec3 uLampPos;       // the warm lamp on the desk
 uniform vec3 uLampCol;
+uniform vec3 uWinCol;        // what the sky outside looks like right now
+uniform float uFill;         // how much daylight there is to bounce around
 // A real lamp falls off fast, which is what makes a room feel lit rather than
 // flooded, and is most of why the corner it stands in reads as warm.
 float lampFall(vec3 p) { vec3 d = uLampPos - p; return 1.0 / (1.0 + dot(d, d) * 2.2); }
@@ -368,7 +370,7 @@ float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yz
 vec3 roomFill(vec3 n) {
   float win = clamp(dot(n, uWinDir) * 0.5 + 0.55, 0.0, 1.0);
   float down = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
-  return vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down;
+  return (vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down) * uFill;
 }
 uniform vec4 uLaser;         // xyz where the dot is, w how bright
 // The dot is not a sprite pasted over the scene: it is light landing on
@@ -401,7 +403,7 @@ float sunGate(vec3 p) {
 vec3 envColor(vec3 r){
   vec3 room = mix(vec3(0.20,0.17,0.14), vec3(0.55,0.53,0.52), smoothstep(-0.4, 0.8, r.y));
   float w = max(dot(r, uWinDir), 0.0);
-  vec3 win = vec3(1.6,1.65,1.75) * smoothstep(0.80, 0.93, w);
+  vec3 win = uWinCol * 0.78 * smoothstep(0.80, 0.93, w);
   // window mullions
   return room + win;
 }
@@ -1044,8 +1046,8 @@ void main(){
   } else if (uMat == 4) {    // window (emissive)
     vec2 uv = vUV;
     float frame = step(0.47, abs(uv.x - 0.5)) + step(0.47, abs(uv.y - 0.5)) + (1.0 - step(0.012, abs(uv.x - 0.5))) + (1.0 - step(0.010, abs(uv.y - 0.55)));
-    vec3 sky = mix(vec3(2.4, 2.5, 2.7), vec3(1.6, 1.9, 2.4), uv.y);
-    vec3 c = frame > 0.5 ? vec3(0.85, 0.84, 0.82) : sky;
+    vec3 sky = mix(uWinCol * 1.08, uWinCol * 0.72, uv.y);
+    vec3 c = frame > 0.5 ? vec3(0.85, 0.84, 0.82) * (0.25 + 0.75 * uFill) : sky;
     oCol = vec4(outColor(c), 1.0); return;
   } else if (uMat == 5) {    // yarn ball
     vec3 lp = uBallRot * normalize(vLocal);
@@ -1082,7 +1084,7 @@ void main(){
   } else if (uMat == 14) {   // the lamp shade, lit from the inside
     float rim = smoothstep(0.1, 0.5, abs(N.y));
     alb = vec3(0.92, 0.80, 0.62);
-    vec3 glow = vec3(1.55, 1.12, 0.66) * (1.0 - rim * 0.55);
+    vec3 glow = uLampCol * 1.18 * (1.0 - rim * 0.55);
     oCol = vec4(outColor(alb * (mix(uGroundCol, uSkyCol, 0.6) * 0.5) + glow), 1.0); return;
   } else if (uMat == 15) {   // brushed metal
     alb = vec3(0.30, 0.29, 0.28);
@@ -1322,8 +1324,40 @@ const BLOCKS = [
   [ROOM.desk.x0 - 0.1, ROOM.desk.x1, ROOM.desk.z0, ROOM.desk.z1],
   [ROOM.chair.cx - 0.30, ROOM.chair.cx + 0.30, ROOM.chair.cz - 0.30, ROOM.chair.cz + 0.30],
 ];
-const LIGHT_DIR = v3.norm([-0.80, 0.62, 0.30]);
-const LAMP_COL = [1.35, 0.82, 0.42];      // tungsten, against the cool daylight from the window
+// The light in the room follows the clock on the device. Morning sun is high and
+// slightly cool and its beam lands near the window; by late afternoon it is low
+// and orange and reaches right across the floor; after dark there is no sun at
+// all and the desk lamp carries the room. Worked out once at load, because the
+// shadow map and the window gobo are both built from it.
+// `?hour=` overrides it, which is also how it was checked.
+const SKY = (() => {
+  const q = /[?&]hour=([\d.]+)/.exec(location.search);
+  const now = new Date();
+  const h = q ? parseFloat(q[1]) : now.getHours() + now.getMinutes() / 60;
+  const day = clamp((h - 6.1) / 1.5, 0, 1) * clamp((19.4 - h) / 1.8, 0, 1);
+  const u = clamp((h - 6.5) / 12.0, 0, 1);                 // 0 dawn .. 1 dusk
+  const el = 0.18 + Math.sin(Math.PI * u) * 0.80;          // how high the sun sits
+  const az = lerp(-0.62, 0.62, u);                         // and where it swings to
+  const dir = v3.norm([-Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)]);
+  // warm at both ends of the day, white in the middle
+  const warm = Math.pow(1 - Math.sin(Math.PI * clamp(u, 0, 1)), 1.6);
+  const col = [
+    (2.30 + 0.55 * warm) * day,
+    (2.32 - 0.42 * warm) * day,
+    (2.36 - 1.05 * warm) * day,
+  ];
+  const night = 1 - day;
+  return {
+    hour: h, day, dir, col,
+    lamp: [1.30 + 0.95 * night, 0.80 + 0.52 * night, 0.42 + 0.26 * night],
+    sky: [0.38 * day + 0.085, 0.41 * day + 0.090, 0.47 * day + 0.115],
+    ground: [0.26 * day + 0.055, 0.20 * day + 0.045, 0.145 * day + 0.040],
+    fill: 0.25 + 0.75 * day,
+    win: [(1.95 + 0.9 * warm) * day + 0.035, (2.05 - 0.3 * warm) * day + 0.040, (2.25 - 1.1 * warm) * day + 0.065],
+  };
+})();
+const LIGHT_DIR = SKY.dir;
+const LAMP_COL = SKY.lamp;
 const WIN_DIR = v3.norm([-1.0, 0.42, 0.15]);
 
 const R = {
@@ -1608,11 +1642,13 @@ const SCENE = {
 function setCommonUniforms(u) {
   gl.uniform3fv(u.uCamPos, R.camPos);
   gl.uniform3fv(u.uLightDir, LIGHT_DIR);
-  gl.uniform3fv(u.uLightCol, [2.5, 2.28, 2.0]);
-  gl.uniform3fv(u.uSkyCol, [0.38, 0.41, 0.47]);
-  gl.uniform3fv(u.uGroundCol, [0.26, 0.20, 0.145]);
+  gl.uniform3fv(u.uLightCol, SKY.col);
+  gl.uniform3fv(u.uSkyCol, SKY.sky);
+  gl.uniform3fv(u.uGroundCol, SKY.ground);
   gl.uniform1f(u.uExposure, 0.64);
   gl.uniform3fv(u.uWinDir, WIN_DIR);
+  gl.uniform3fv(u.uWinCol, SKY.win);
+  gl.uniform1f(u.uFill, SKY.fill);
   gl.uniform3fv(u.uLampPos, ROOM.lamp);
   gl.uniform3fv(u.uLampCol, LAMP_COL);
   gl.uniform4f(u.uLaser, LASER.p[0], LASER.p[1], LASER.p[2], LASER.shown);
@@ -2810,7 +2846,7 @@ class CatSim {
       // the "blep": tongue tip left out for a few seconds
       this.tongueT = 1;
       setTimeout(() => { this.tongueT = 0; }, rand(2500, 5000));
-    } else if (this.idleT > 12 && Math.random() < dt * 0.025 && !this.sleeping && this.mode === 'pose'
+    } else if (SKY.day > 0.3 && this.idleT > 12 && Math.random() < dt * 0.025 && !this.sleeping && this.mode === 'pose'
       && !PERCHES[this.level] && since > 18 && v3.dist([this.pos[0], 0, this.pos[2]], sunSpot()) > 0.45) {
       this.idleT = 0;
       this.run('sunbathe', async (tok) => {
@@ -3454,7 +3490,7 @@ const ACTIONS = {
         await CAT.standUp(tok);
         // a cat asleep in the daytime is asleep in the sun
         const warm = sunSpot();
-        if (!PERCHES[CAT.level] && v3.dist([CAT.pos[0], 0, CAT.pos[2]], warm) > 0.40) {
+        if (SKY.day > 0.3 && !PERCHES[CAT.level] && v3.dist([CAT.pos[0], 0, CAT.pos[2]], warm) > 0.40) {
           CAT.setStatus('去找太阳');
           await CAT.moveTo(warm, 0.55, tok, 0.07);
         }

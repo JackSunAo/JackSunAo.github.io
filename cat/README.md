@@ -97,6 +97,14 @@ so each carries its own id in the uv rather than being identified by position.
 
 ## The room's own life
 
+- **The light follows the clock on the device.** `SKY` works out the sun's
+  height, angle and colour once at load: high and slightly cool in the morning,
+  swinging round and turning orange through the afternoon, gone after dark, when
+  the desk lamp carries the room on its own. The window, the ambient, the fill
+  and the lamp's own brightness all come from it. `?hour=19` overrides it, which
+  is how it was checked — including that the cat stays legible at night
+  (luminance 0.125 against a 0.146 background) and that it does not go looking
+  for a patch of sun that is not there.
 - **Sunlight comes through the window, not the wall.** `sunGate` projects a point
   back along the light onto the window plane and asks whether it lands in the
   opening, which puts the window's shape and its glazing bars on the floor. The
@@ -178,7 +186,5 @@ call with nasality forced to 0 and to 1 to confirm the nasal zero lands at
   rest of the time.
 - No toy uses the bed or the desk as cover; the cat will chase onto them but the
   mouse and the wand stay on the floor.
-- The sunbeam does not move. A slow drift over the session would be a cheap way
-  to make the room feel like it has a time of day.
 - `sheetPoses` and `sheetFrames` are the older contact-sheet helpers, kept only
   because they predate `sheetFrames2`; nothing uses them now.
