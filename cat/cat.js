@@ -256,6 +256,38 @@ function roundBoxGeom(sx, sy, sz, r, n = 10) {
   }
   return { pos, nrm, uv, idx };
 }
+function cylGeom(r, h, seg = 18, capped = true) {
+  const pos = [], nrm = [], uv = [], idx = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = i / seg * Math.PI * 2, c = Math.cos(a), si = Math.sin(a);
+    pos.push(c * r, -h / 2, si * r); nrm.push(c, 0, si); uv.push(i / seg, 0);
+    pos.push(c * r, h / 2, si * r); nrm.push(c, 0, si); uv.push(i / seg, 1);
+  }
+  for (let i = 0; i < seg; i++) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 2, k + 1, k + 3); }
+  if (capped) for (const sy of [-1, 1]) {
+    const base = pos.length / 3;
+    pos.push(0, sy * h / 2, 0); nrm.push(0, sy, 0); uv.push(0.5, 0.5);
+    for (let i = 0; i <= seg; i++) {
+      const a = i / seg * Math.PI * 2, c = Math.cos(a), si = Math.sin(a);
+      pos.push(c * r, sy * h / 2, si * r); nrm.push(0, sy, 0); uv.push(0.5 + c * 0.5, 0.5 + si * 0.5);
+    }
+    for (let i = 0; i < seg; i++) {
+      if (sy > 0) idx.push(base, base + 1 + i, base + 2 + i); else idx.push(base, base + 2 + i, base + 1 + i);
+    }
+  }
+  return { pos, nrm, uv, idx };
+}
+function coneGeom(r0, r1, h, seg = 20) {
+  const pos = [], nrm = [], uv = [], idx = [];
+  const sl = Math.hypot(r0 - r1, h), ny = (r0 - r1) / sl, nr = h / sl;
+  for (let i = 0; i <= seg; i++) {
+    const a = i / seg * Math.PI * 2, c = Math.cos(a), si = Math.sin(a);
+    pos.push(c * r0, -h / 2, si * r0); nrm.push(c * nr, ny, si * nr); uv.push(i / seg, 0);
+    pos.push(c * r1, h / 2, si * r1); nrm.push(c * nr, ny, si * nr); uv.push(i / seg, 1);
+  }
+  for (let i = 0; i < seg; i++) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 2, k + 1, k + 3); }
+  return { pos, nrm, uv, idx };
+}
 function transformGeom(g, m) {
   const pos = [], nrm = [];
   for (let i = 0; i < g.pos.length; i += 3) {
@@ -286,6 +318,12 @@ uniform float uExposure;
 uniform sampler2DShadow uShadow;
 uniform vec2 uShadowTexel;
 uniform vec3 uWinDir;        // direction toward the window (world)
+uniform vec3 uLampPos;       // the warm lamp on the desk
+uniform vec3 uLampCol;
+// A real lamp falls off fast, which is what makes a room feel lit rather than
+// flooded, and is most of why the corner it stands in reads as warm.
+float lampFall(vec3 p) { vec3 d = uLampPos - p; return 1.0 / (1.0 + dot(d, d) * 2.2); }
+vec3 lampDir(vec3 p) { return normalize(uLampPos - p + vec3(1e-5)); }
 const vec2 POISSON[12] = vec2[12](vec2(-0.326,-0.406),vec2(-0.840,-0.074),vec2(-0.696,0.457),vec2(-0.203,0.621),vec2(0.962,-0.195),vec2(0.473,-0.480),vec2(0.519,0.767),vec2(0.185,-0.893),vec2(0.507,0.064),vec2(0.896,0.412),vec2(-0.322,-0.933),vec2(-0.792,-0.598));
 float shadowAt(vec4 sc, float bias, float rad){
   vec3 p = sc.xyz / sc.w * 0.5 + 0.5;
@@ -306,6 +344,15 @@ vec3 outColor(vec3 c){ c = aces(c * uExposure); return pow(c, vec3(1.0/2.2)); }
 float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
 vec3 hash33(vec3 p){ p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+// The window is a metre-wide area source, not a point. A single directional
+// light can carry its shadows but not its fill, which is why everything turned
+// away from it went black; this is the broad wash it actually throws, plus the
+// warm bounce back up off the oak floor.
+vec3 roomFill(vec3 n) {
+  float win = clamp(dot(n, uWinDir) * 0.5 + 0.55, 0.0, 1.0);
+  float down = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
+  return vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down;
+}
 // soft room environment used for glossy reflections (eyes, nose, ball)
 vec3 envColor(vec3 r){
   vec3 room = mix(vec3(0.20,0.17,0.14), vec3(0.55,0.53,0.52), smoothstep(-0.4, 0.8, r.y));
@@ -702,8 +749,12 @@ void main(){
   float ao = mix(0.35, 1.0, vAO);
   float floorAO = mix(0.55, 1.0, smoothstep(0.0, 0.05, vWorld.y));
   vec3 amb = mix(uGroundCol, uSkyCol, N.y * 0.5 + 0.5);
-  vec3 col = alb * (amb * occ * ao * floorAO + uLightCol * diff * sh * occ * mix(0.6, 1.0, ao));
+  vec3 col = alb * ((amb + roomFill(N) * 0.85) * occ * ao * floorAO + uLightCol * diff * sh * occ * mix(0.6, 1.0, ao));
   col += uLightCol * specC * sh * ao;
+  // the desk lamp, wrapped the same way the key light is so the fur keeps its softness
+  vec3 lampL = lampDir(vWorld);
+  float lampWrap = clamp((dot(N, lampL) + 0.25) / 1.25, 0.0, 1.0);
+  col += alb * uLampCol * lampWrap * lampFall(vWorld) * occ * ao * 0.9;
   float NoV = abs(dot(N, V));
   // Forward scattering. Light that passes through a hair instead of bouncing
   // off it is what makes a backlit coat glow, and it is the thing that most
@@ -872,6 +923,7 @@ void main(){
   gl_Position = uVP * w;
 }`;
 const ROOM_FS = GLSL_COMMON + `
+#define ROOM_WALL_Y 2.6
 in vec3 vWorld; in vec3 vN; in vec2 vUV; in vec4 vShadow; in vec3 vLocal;
 uniform int uMat;
 uniform sampler3D uNoise;
@@ -902,8 +954,9 @@ void main(){
     alb *= 1.0 - 0.45 * clamp(seam, 0.0, 1.0);
     spec = 0.06; gloss = 40.0;
   } else if (uMat == 1) {    // walls
-    alb = vec3(0.56, 0.54, 0.51) * (0.97 + 0.06 * n3(p * 3.0));
-    if (p.y < 0.09) alb = vec3(0.86, 0.85, 0.82);      // skirting board
+    alb = vec3(0.60, 0.55, 0.49) * (0.97 + 0.06 * n3(p * 3.0));
+    if (p.y < 0.09) alb = vec3(0.87, 0.85, 0.80);      // skirting board
+    if (p.y > ROOM_WALL_Y - 0.02) alb = vec3(0.70, 0.68, 0.65);   // ceiling
   } else if (uMat == 2) {    // wool rug
     vec2 q = p.xz;
     float weave = n3(vec3(q * 60.0, 1.0)) * 0.5 + n3(vec3(q * 180.0, 2.0)) * 0.5;
@@ -913,10 +966,10 @@ void main(){
     float border = band2(max(lp.x / 0.95, lp.y / 0.66));
     alb = mix(alb, vec3(0.55, 0.50, 0.44) * (0.8 + 0.3 * weave), border);
     spec = 0.0;
-  } else if (uMat == 3) {    // sofa fabric
+  } else if (uMat == 3) {    // the duvet folded over the foot of the bed
     float weave = n3(vec3(p.x * 220.0, p.y * 220.0, p.z * 220.0)) * 0.5 + n3(p * 40.0) * 0.5;
-    alb = vec3(0.56, 0.50, 0.43) * (0.86 + 0.20 * weave);
-    spec = 0.01;
+    alb = vec3(0.45, 0.33, 0.27) * (0.86 + 0.24 * weave);
+    spec = 0.015; gloss = 14.0;
   } else if (uMat == 4) {    // window (emissive)
     vec2 uv = vUV;
     float frame = step(0.47, abs(uv.x - 0.5)) + step(0.47, abs(uv.y - 0.5)) + (1.0 - step(0.012, abs(uv.x - 0.5))) + (1.0 - step(0.010, abs(uv.y - 0.55)));
@@ -935,6 +988,39 @@ void main(){
     alb = vec3(0.30, 0.20, 0.13);
   } else if (uMat == 7) {    // leaves
     alb = vec3(0.10, 0.22, 0.08) * (0.8 + 0.4 * n3(p * 8.0));
+  } else if (uMat == 10) {   // furniture: a warmer, paler oak than the floor
+    float grain = n3(vec3(p.x * 2.2, p.y * 26.0, p.z * 2.0)) * 0.6 + n3(p * 42.0) * 0.4;
+    alb = mix(vec3(0.42, 0.30, 0.19), vec3(0.60, 0.46, 0.31), grain);
+    spec = 0.05; gloss = 46.0;
+  } else if (uMat == 11) {   // bed linen
+    float weave = n3(p * 300.0) * 0.5 + n3(p * 70.0) * 0.5;
+    alb = vec3(0.80, 0.77, 0.71) * (0.90 + 0.14 * weave);
+    spec = 0.015; gloss = 18.0;
+  } else if (uMat == 12) {   // book spines, each its own colour
+    vec3 cell = floor(vLocal * vec3(26.0, 1.0, 1.0));
+    float t = hash12(cell.xy + 3.0);
+    vec3 c1 = vec3(0.42, 0.13, 0.11), c2 = vec3(0.15, 0.26, 0.33), c3 = vec3(0.44, 0.35, 0.16), c4 = vec3(0.20, 0.30, 0.19);
+    alb = t < 0.3 ? c1 : t < 0.55 ? c2 : t < 0.8 ? c3 : c4;
+    alb *= 0.82 + 0.36 * hash12(cell.xy + 11.0);
+    // a pale band along the top where the pages show
+    alb = mix(alb, vec3(0.80, 0.76, 0.67), smoothstep(0.55, 0.85, fract(vLocal.y * 5.0)) * step(0.5, N.y));
+    spec = 0.05; gloss = 30.0;
+  } else if (uMat == 13) {   // glazed ceramic
+    alb = vec3(0.72, 0.70, 0.66);
+    spec = 0.3; gloss = 80.0;
+  } else if (uMat == 14) {   // the lamp shade, lit from the inside
+    float rim = smoothstep(0.1, 0.5, abs(N.y));
+    alb = vec3(0.92, 0.80, 0.62);
+    vec3 glow = vec3(1.55, 1.12, 0.66) * (1.0 - rim * 0.55);
+    oCol = vec4(outColor(alb * (mix(uGroundCol, uSkyCol, 0.6) * 0.5) + glow), 1.0); return;
+  } else if (uMat == 15) {   // brushed metal
+    alb = vec3(0.30, 0.29, 0.28);
+    spec = 0.45; gloss = 110.0;
+  } else if (uMat == 16) {   // what is in the picture frames
+    vec2 q = vLocal.xy * 9.0;
+    float f = n3(vec3(q, 1.0)) * 0.6 + n3(vec3(q * 2.7, 3.0)) * 0.4;
+    alb = mix(vec3(0.62, 0.64, 0.60), vec3(0.34, 0.30, 0.26), smoothstep(0.42, 0.62, f));
+    spec = 0.08; gloss = 40.0;
   } else if (uMat == 8) {    // teeth
     alb = vec3(0.80, 0.78, 0.72); spec = 0.35; gloss = 70.0;
   } else if (uMat == 9) {    // tongue
@@ -946,7 +1032,9 @@ void main(){
   vec3 amb = mix(uGroundCol, uSkyCol, N.y * 0.5 + 0.5);
   // soft contact shadows under the cat and the ball
   float ao = 1.0;
-  if (uMat >= 8) ao = uInMouth;
+  // 8 and 9 are the teeth and the tongue, which are only lit when the mouth is
+  // open. Everything above that is furniture and must not be dimmed by it.
+  if (uMat == 8 || uMat == 9) ao = uInMouth;
   if (uMat == 0 || uMat == 2) {
     vec2 dc = (p.xz - uCatPos.xz);
     ao *= 1.0 - 0.45 * exp(-dot(dc, dc) / (0.11 * 0.11)) * smoothstep(0.12, 0.0, uCatPos.y);
@@ -954,9 +1042,14 @@ void main(){
     ao *= 1.0 - 0.6 * exp(-dot(db, db) / (uBall.w * uBall.w * 1.4)) * smoothstep(uBall.w * 3.0, uBall.w, uBall.y);
   }
   // window light pool
-  vec3 col = alb * (amb * ao + uLightCol * NoL * sh * (uMat >= 8 ? ao * ao : 1.0));
+  vec3 col = alb * ((amb + roomFill(N)) * ao + uLightCol * NoL * sh * (uMat == 8 || uMat == 9 ? ao * ao : 1.0));
   vec3 H = normalize(uLightDir + V);
-  col += uLightCol * spec * pow(max(dot(N, H), 0.0), gloss) * sh * (uMat >= 8 ? ao : 1.0);
+  col += uLightCol * spec * pow(max(dot(N, H), 0.0), gloss) * sh * (uMat == 8 || uMat == 9 ? ao : 1.0);
+  // and the lamp, which is the warm half of the room
+  vec3 ld = lampDir(p);
+  float lf = lampFall(p) * ao;
+  col += alb * uLampCol * max(dot(N, ld), 0.0) * lf;
+  col += uLampCol * spec * pow(max(dot(N, normalize(ld + V)), 0.0), gloss) * lf;
   if (uMat == 0) {
     vec3 R = reflect(-V, N);
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -1104,13 +1197,27 @@ class Skeleton {
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 820);
 const QUALITY = { shells: IS_MOBILE ? 20 : 30, dprMax: IS_MOBILE ? 1.6 : 2.0, shadowSize: IS_MOBILE ? 1536 : 2048, level: 0 };
 
+// A small warm room rather than a hall: a bed along the back wall, a desk under
+// the window with a lamp on it, a chair pulled out, and a shelf of books. The
+// cat has to be able to get around all of it, so every piece that stands on the
+// floor is listed in BLOCKS and kept out of its way.
 const ROOM = {
-  floor: { x0: -3.0, x1: 3.0, z0: -2.4, z1: 3.2 },
-  backZ: -2.4, leftX: -3.0,
-  sofa: { x0: -0.75, x1: 1.35, z0: -2.4, z1: -1.52, seatY: 0.43 },
-  rug: { cx: 0.15, cz: 0.15, hx: 0.95, hz: 0.66 },
+  floor: { x0: -2.6, x1: 2.6, z0: -2.3, z1: 2.6 },
+  backZ: -2.3, leftX: -2.6, wallY: 2.6,
+  bed: { x0: 0.25, x1: 2.35, z0: -2.3, z1: -0.60, seatY: 0.49 },
+  desk: { x0: -2.55, x1: -1.15, z0: -0.60, z1: 0.30, topY: 0.74 },
+  chair: { cx: -0.86, cz: -0.12, yaw: 0.42, seatY: 0.44, hw: 0.23 },
+  shelf: { x0: -2.30, x1: -0.78, y: 1.45, z: -2.19, d: 0.22 },
+  rug: { cx: 0.05, cz: 0.95, hx: 0.95, hz: 0.68 },
+  lamp: [-2.30, 1.10, -0.40],
 };
+// footprints the cat walks around, as [x0, x1, z0, z1]
+const BLOCKS = [
+  [ROOM.desk.x0 - 0.1, ROOM.desk.x1, ROOM.desk.z0, ROOM.desk.z1],
+  [ROOM.chair.cx - 0.30, ROOM.chair.cx + 0.30, ROOM.chair.cz - 0.30, ROOM.chair.cz + 0.30],
+];
 const LIGHT_DIR = v3.norm([-0.80, 0.62, 0.30]);
+const LAMP_COL = [1.35, 0.82, 0.42];      // tungsten, against the cool daylight from the window
 const WIN_DIR = v3.norm([-1.0, 0.42, 0.15]);
 
 const R = {
@@ -1180,35 +1287,137 @@ function fixWinding(g) {
   return g;
 }
 R.room = (() => {
-  const F = ROOM.floor;
+  const F = ROOM.floor, WY = ROOM.wallY;
+  const box = (w, h, d, r, n, t, yaw) => transformGeom(roundBoxGeom(w, h, d, r, n), M4.fromQT(yaw ? Q.axis([0, 1, 0], yaw) : Q.id(), t));
+  const cyl = (r, h, t, q, seg) => transformGeom(cylGeom(r, h, seg || 18), M4.fromQT(q || Q.id(), t));
+  const shell = (g) => makeMesh(g.pos, g.nrm, g.idx, g.uv);
+
   const floor = fixWinding(quadGeom([F.x0, 0, F.z0], [F.x1 - F.x0, 0, 0], [0, 0, F.z1 - F.z0], [0, 1, 0]));
-  const back = fixWinding(quadGeom([F.x0, 0, ROOM.backZ], [F.x1 - F.x0, 0, 0], [0, 2.7, 0], [0, 0, 1]));
-  const left = fixWinding(quadGeom([ROOM.leftX, 0, F.z0], [0, 0, F.z1 - F.z0], [0, 2.7, 0], [1, 0, 0]));
-  const right = fixWinding(quadGeom([F.x1, 0, F.z0], [0, 0, F.z1 - F.z0], [0, 2.7, 0], [-1, 0, 0]));
-  const front = fixWinding(quadGeom([F.x0, 0, F.z1], [F.x1 - F.x0, 0, 0], [0, 2.7, 0], [0, 0, -1]));
-  const win = fixWinding(quadGeom([ROOM.leftX + 0.004, 0.72, 0.35], [0, 0, -1.5], [0, 1.45, 0], [1, 0, 0]));
-  const rugG = transformGeom(roundBoxGeom(ROOM.rug.hx * 2, 0.012, ROOM.rug.hz * 2, 0.006, 6), M4.fromQT(Q.id(), [ROOM.rug.cx, 0.0, ROOM.rug.cz]));
-  // sofa from rounded boxes
-  const S = ROOM.sofa;
-  const sw = S.x1 - S.x0, sd = S.z1 - S.z0;
-  const cx = (S.x0 + S.x1) / 2, cz = (S.z0 + S.z1) / 2;
-  const parts = [
-    [roundBoxGeom(sw - 0.30, 0.20, sd - 0.05, 0.04, 8), [cx, 0.14, cz + 0.02]],                 // base
-    [roundBoxGeom((sw - 0.32) / 2 - 0.01, 0.15, sd - 0.25, 0.06, 10), [cx - (sw - 0.32) / 4, S.seatY - 0.075, cz + 0.07]],  // cushions
-    [roundBoxGeom((sw - 0.32) / 2 - 0.01, 0.15, sd - 0.25, 0.06, 10), [cx + (sw - 0.32) / 4, S.seatY - 0.075, cz + 0.07]],
-    [roundBoxGeom(sw - 0.30, 0.50, 0.20, 0.08, 10), [cx, 0.62, S.z0 + 0.12]],                     // back
-    [roundBoxGeom(0.16, 0.62, sd, 0.07, 10), [S.x0 + 0.08, 0.31, cz]],                            // arms
-    [roundBoxGeom(0.16, 0.62, sd, 0.07, 10), [S.x1 - 0.08, 0.31, cz]],
-  ];
-  const sofa = mergeGeom(parts.map(([g, t]) => transformGeom(g, M4.fromQT(Q.id(), t))));
-  const legs = mergeGeom([[S.x0 + 0.08, S.z0 + 0.08], [S.x1 - 0.08, S.z0 + 0.08], [S.x0 + 0.08, S.z1 - 0.08], [S.x1 - 0.08, S.z1 - 0.08]].map(([x, z]) => transformGeom(roundBoxGeom(0.05, 0.06, 0.05, 0.01, 2), M4.fromQT(Q.id(), [x, 0.03, z]))));
+  const back = fixWinding(quadGeom([F.x0, 0, ROOM.backZ], [F.x1 - F.x0, 0, 0], [0, WY, 0], [0, 0, 1]));
+  const left = fixWinding(quadGeom([ROOM.leftX, 0, F.z0], [0, 0, F.z1 - F.z0], [0, WY, 0], [1, 0, 0]));
+  const right = fixWinding(quadGeom([F.x1, 0, F.z0], [0, 0, F.z1 - F.z0], [0, WY, 0], [-1, 0, 0]));
+  const front = fixWinding(quadGeom([F.x0, 0, F.z1], [F.x1 - F.x0, 0, 0], [0, WY, 0], [0, 0, -1]));
+  const ceil = fixWinding(quadGeom([F.x0, WY, F.z0], [F.x1 - F.x0, 0, 0], [0, 0, F.z1 - F.z0], [0, -1, 0]));
+  const win = fixWinding(quadGeom([ROOM.leftX + 0.004, 0.95, 0.45], [0, 0, -1.3], [0, 1.10, 0], [1, 0, 0]));
+  const rugG = box(ROOM.rug.hx * 2, 0.014, ROOM.rug.hz * 2, 0.007, 6, [ROOM.rug.cx, 0.0, ROOM.rug.cz]);
+
+  // ---- bed: frame, mattress, headboard, duvet over the foot, two pillows
+  const B = ROOM.bed;
+  const bw = B.x1 - B.x0, bd = B.z1 - B.z0, bx = (B.x0 + B.x1) / 2, bz = (B.z0 + B.z1) / 2;
+  const bedWood = mergeGeom([
+    box(bw, 0.26, bd, 0.02, 4, [bx, 0.14, bz]),
+    box(bw, 0.62, 0.07, 0.02, 4, [bx, 0.52, B.z0 + 0.04]),            // headboard
+    box(0.09, 0.26, 0.09, 0.012, 3, [B.x0 + 0.07, 0.13, B.z1 - 0.07]),
+    box(0.09, 0.26, 0.09, 0.012, 3, [B.x1 - 0.07, 0.13, B.z1 - 0.07]),
+  ]);
+  const bedLinen = mergeGeom([
+    box(bw - 0.07, 0.20, bd - 0.07, 0.05, 9, [bx, 0.38, bz]),          // mattress, top ~0.48
+    box(0.56, 0.15, 0.34, 0.07, 9, [B.x0 + 0.56, 0.555, B.z0 + 0.30]), // pillows
+    box(0.56, 0.15, 0.34, 0.07, 9, [B.x1 - 0.56, 0.555, B.z0 + 0.30]),
+  ]);
+  const duvet = box(bw - 0.04, 0.14, 0.78, 0.07, 10, [bx, 0.53, B.z1 - 0.36]);
+
+  // ---- desk under the window, with a drawer stack on one side
+  const D = ROOM.desk;
+  const dw = D.x1 - D.x0, dd = D.z1 - D.z0, dx = (D.x0 + D.x1) / 2, dz = (D.z0 + D.z1) / 2;
+  const legY = D.topY - 0.045;
+  const deskWood = mergeGeom([
+    box(dw, 0.045, dd, 0.008, 3, [dx, D.topY - 0.022, dz]),
+    box(0.44, legY, dd - 0.10, 0.01, 3, [D.x1 - 0.24, legY / 2, dz]),  // drawers
+    box(0.055, legY, 0.055, 0.008, 3, [D.x0 + 0.06, legY / 2, D.z0 + 0.06]),
+    box(0.055, legY, 0.055, 0.008, 3, [D.x0 + 0.06, legY / 2, D.z1 - 0.06]),
+  ]);
+
+  // ---- chair, turned away from the desk the way a chair actually sits
+  const C = ROOM.chair;
+  const cq = Q.axis([0, 1, 0], C.yaw);
+  const chairAt = (w, h, d, r, n, lx, ly, lz) =>
+    transformGeom(roundBoxGeom(w, h, d, r, n), M4.fromQT(cq, v3.add([C.cx, 0, C.cz], Q.rot(cq, [lx, ly, lz]))));
+  const chair = mergeGeom([
+    chairAt(0.44, 0.05, 0.44, 0.015, 3, 0, C.seatY, 0),
+    chairAt(0.42, 0.50, 0.045, 0.015, 3, 0, C.seatY + 0.27, -0.195),   // back
+    chairAt(0.045, C.seatY, 0.045, 0.008, 3, -0.19, C.seatY / 2, -0.19),
+    chairAt(0.045, C.seatY, 0.045, 0.008, 3, 0.19, C.seatY / 2, -0.19),
+    chairAt(0.045, C.seatY, 0.045, 0.008, 3, -0.19, C.seatY / 2, 0.19),
+    chairAt(0.045, C.seatY, 0.045, 0.008, 3, 0.19, C.seatY / 2, 0.19),
+  ]);
+
+  // ---- shelf on the back wall
+  const SH = ROOM.shelf;
+  const shelfW = SH.x1 - SH.x0, shx = (SH.x0 + SH.x1) / 2;
+  const shelf = mergeGeom([
+    box(shelfW, 0.035, SH.d, 0.006, 3, [shx, SH.y, SH.z + SH.d / 2]),
+    box(0.03, 0.17, SH.d - 0.04, 0.005, 2, [SH.x0 + 0.1, SH.y - 0.10, SH.z + SH.d / 2]),
+    box(0.03, 0.17, SH.d - 0.04, 0.005, 2, [SH.x1 - 0.1, SH.y - 0.10, SH.z + SH.d / 2]),
+  ]);
+
+  // ---- books: a leaning row on the shelf and a short stack on the desk
+  const books = [];
+  let bxp = SH.x0 + 0.14;
+  for (let i = 0; i < 11; i++) {
+    const t = (i * 7919 % 97) / 97;
+    const w = 0.028 + t * 0.022, hh = 0.19 + ((i * 7717 % 53) / 53) * 0.07;
+    const lean = i === 8 ? 0.30 : 0;
+    books.push(transformGeom(roundBoxGeom(w, hh, 0.15, 0.004, 2),
+      M4.fromQT(Q.axis([0, 0, 1], lean), [bxp + w / 2, SH.y + 0.018 + hh / 2, SH.z + 0.10])));
+    bxp += w + 0.004;
+  }
+  for (let i = 0; i < 3; i++) {
+    books.push(box(0.21 - i * 0.012, 0.028, 0.15 - i * 0.008, 0.004, 2,
+      [D.x0 + 0.78, D.topY + 0.014 + i * 0.028, dz - 0.14], 0.12 + i * 0.09));
+  }
+  const bookG = mergeGeom(books);
+
+  // ---- the lamp: base, arm, shade. Its light is the warm one in the room.
+  const L = ROOM.lamp;
+  const armQ = Q.axis([0, 0, 1], -0.26);
+  const lampMetal = mergeGeom([
+    cyl(0.075, 0.022, [L[0] + 0.10, D.topY + 0.011, L[2]]),
+    transformGeom(cylGeom(0.013, 0.42, 10), M4.mul(M4.fromQT(Q.id(), [L[0] + 0.10, D.topY + 0.22, L[2]]), M4.fromQT(armQ, [0, 0, 0]))),
+  ]);
+  const lampShade = transformGeom(coneGeom(0.115, 0.075, 0.14, 22), M4.fromQT(Q.axis([0, 0, 1], -0.18), [L[0], L[1], L[2]]));
+
+  // ---- a mug, a plant by the window, a framed picture over the bed
+  const ceramic = mergeGeom([
+    cyl(0.043, 0.095, [D.x0 + 0.42, D.topY + 0.047, dz + 0.22]),
+    cyl(0.14, 0.17, [F.x0 + 0.30, 0.085, 0.95], null, 14),               // plant pot
+  ]);
+  const leaves = mergeGeom([0, 1, 2, 3, 4, 5].map((i) => {
+    const a = i * 1.04, r = 0.10 + (i % 3) * 0.035;
+    return transformGeom(sphereGeom(0.085 + (i % 2) * 0.03, 10, 7),
+      M4.fromQT(Q.id(), [F.x0 + 0.30 + Math.cos(a) * r, 0.25 + (i % 3) * 0.085, 0.95 + Math.sin(a) * r]));
+  }));
+  const frame = mergeGeom([
+    box(0.46, 0.34, 0.025, 0.006, 2, [bx - 0.1, 1.62, ROOM.backZ + 0.015]),
+    box(0.17, 0.21, 0.022, 0.004, 2, [SH.x1 + 0.42, 1.18, ROOM.backZ + 0.014]),
+  ]);
+  const picture = mergeGeom([
+    box(0.40, 0.28, 0.006, 0.002, 2, [bx - 0.1, 1.62, ROOM.backZ + 0.030]),
+    box(0.13, 0.17, 0.006, 0.002, 2, [SH.x1 + 0.42, 1.18, ROOM.backZ + 0.028]),
+  ]);
+  // window frame and sill, so the opening reads as a window in a wall
+  const winWood = mergeGeom([
+    box(0.05, 0.05, 1.42, 0.008, 2, [ROOM.leftX + 0.03, 0.93, -0.20]),
+    box(0.05, 0.05, 1.42, 0.008, 2, [ROOM.leftX + 0.03, 2.07, -0.20]),
+    box(0.05, 1.20, 0.05, 0.008, 2, [ROOM.leftX + 0.03, 1.50, 0.47]),
+    box(0.05, 1.20, 0.05, 0.008, 2, [ROOM.leftX + 0.03, 1.50, -0.87]),
+    box(0.17, 0.035, 1.52, 0.006, 2, [ROOM.leftX + 0.09, 0.915, -0.20]),   // sill
+  ]);
+
   return {
-    floor: makeMesh(floor.pos, floor.nrm, floor.idx, floor.uv),
-    walls: (() => { const g = mergeGeom([back, left, right, front]); return makeMesh(g.pos, g.nrm, g.idx, g.uv); })(),
-    window: makeMesh(win.pos, win.nrm, win.idx, win.uv),
-    rug: makeMesh(rugG.pos, rugG.nrm, rugG.idx, rugG.uv),
-    sofa: makeMesh(sofa.pos, sofa.nrm, sofa.idx, sofa.uv),
-    legs: makeMesh(legs.pos, legs.nrm, legs.idx, legs.uv),
+    floor: shell(floor),
+    walls: shell(mergeGeom([back, left, right, front, ceil])),
+    window: shell(win),
+    rug: shell(rugG),
+    wood: shell(mergeGeom([bedWood, deskWood, chair, shelf, winWood])),
+    linen: shell(bedLinen),
+    duvet: shell(duvet),
+    books: shell(bookG),
+    ceramic: shell(ceramic),
+    leaves: shell(leaves),
+    metal: shell(mergeGeom([lampMetal, frame])),
+    shade: shell(lampShade),
+    picture: shell(picture),
   };
 })();
 R.ballMesh = (() => { const g = sphereGeom(1, 32, 20); return makeMesh(g.pos, g.nrm, g.idx, g.uv); })();
@@ -1252,10 +1461,12 @@ function setCommonUniforms(u) {
   gl.uniform3fv(u.uCamPos, R.camPos);
   gl.uniform3fv(u.uLightDir, LIGHT_DIR);
   gl.uniform3fv(u.uLightCol, [2.5, 2.28, 2.0]);
-  gl.uniform3fv(u.uSkyCol, [0.34, 0.37, 0.43]);
-  gl.uniform3fv(u.uGroundCol, [0.21, 0.155, 0.115]);
+  gl.uniform3fv(u.uSkyCol, [0.38, 0.41, 0.47]);
+  gl.uniform3fv(u.uGroundCol, [0.26, 0.20, 0.145]);
   gl.uniform1f(u.uExposure, 0.64);
   gl.uniform3fv(u.uWinDir, WIN_DIR);
+  gl.uniform3fv(u.uLampPos, ROOM.lamp);
+  gl.uniform3fv(u.uLampCol, LAMP_COL);
   gl.uniform2f(u.uShadowTexel, 1 / R.shadow.size, 1 / R.shadow.size);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, R.shadow.tex); gl.uniform1i(u.uShadow, 1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_3D, R.noise); if (u.uNoise) gl.uniform1i(u.uNoise, 2);
@@ -1300,7 +1511,7 @@ function renderShadow() {
   gl.useProgram(R.depthProg.p);
   gl.uniformMatrix4fv(R.depthProg.u.uVP, false, R.shadowVP);
   gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.id());
-  drawMesh(R.room.sofa); drawMesh(R.room.legs);
+  for (const m of [R.room.wood, R.room.linen, R.room.duvet, R.room.books, R.room.ceramic, R.room.metal, R.room.shade, R.room.leaves]) drawMesh(m);
   const b = SCENE.ball;
   if (b.visible) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(b.rot, b.p, b.r)); drawMesh(R.ballMesh); }
   gl.disable(gl.POLYGON_OFFSET_FILL);
@@ -1322,7 +1533,9 @@ function renderScene(width, height) {
   gl.uniform3fv(rp.u.uCatPos, catContactPos());
   const b = SCENE.ball;
   gl.uniform4f(rp.u.uBall, b.p[0], b.p[1], b.p[2], b.visible ? b.r : 0.0001);
-  const mats = [[R.room.floor, 0], [R.room.walls, 1], [R.room.rug, 2], [R.room.sofa, 3], [R.room.window, 4], [R.room.legs, 6]];
+  const mats = [[R.room.floor, 0], [R.room.walls, 1], [R.room.rug, 2], [R.room.duvet, 3], [R.room.window, 4],
+    [R.room.wood, 10], [R.room.linen, 11], [R.room.books, 12], [R.room.ceramic, 13], [R.room.shade, 14],
+    [R.room.metal, 15], [R.room.picture, 16], [R.room.leaves, 7]];
   for (const [m, id] of mats) { gl.uniform1i(rp.u.uMat, id); drawMesh(m); }
   if (b.visible) {
     gl.uniform1i(rp.u.uMat, 5);
@@ -1706,12 +1919,8 @@ function homeContact(key, cat, off) {
 }
 
 // support surfaces --------------------------------------------------------
-function onSofa(x, z, m = 0) {
-  const S = ROOM.sofa;
-  return x > S.x0 + 0.17 - m && x < S.x1 - 0.17 + m && z > S.z0 + 0.22 - m && z < S.z1 + m;
-}
 function supportY(x, z, cat) {
-  if (cat && cat.level === 'sofa') return ROOM.sofa.seatY;
+  if (cat && cat.level === 'bed') return ROOM.bed.seatY;
   const R0 = ROOM.rug;
   if (Math.abs(x - R0.cx) < R0.hx && Math.abs(z - R0.cz) < R0.hz) return 0.012;
   return 0.0;
@@ -1772,7 +1981,7 @@ class Gait {
           // the paw has just touched down; a step that barely travelled is the
           // leg re-planting, not a footfall, and should stay silent
           if (v3.dist(l.from, l.to) > 0.025) {
-            SOUNDS.step(cat.level === 'sofa' ? 'Sofa' : (l.to[1] > 0.006 ? 'Rug' : 'Floor'), clamp(vv / 1.5, 0.12, 1), l.to);
+            SOUNDS.step(cat.level === 'bed' ? 'Sofa' : (l.to[1] > 0.006 ? 'Rug' : 'Floor'), clamp(vv / 1.5, 0.12, 1), l.to);
           }
           l.F = l.to;
         }
@@ -2435,13 +2644,22 @@ class CatSim {
 
 function constrainFloor(p, level) {
   const F = ROOM.floor;
-  const x = clamp(p[0], F.x0 + 0.35, F.x1 - 0.35);
-  let z = clamp(p[2], ROOM.backZ + 0.3, F.z1 - 0.35);
-  if (level !== 'sofa') {
-    const S = ROOM.sofa;
-    if (x > S.x0 - 0.2 && x < S.x1 + 0.2 && z < S.z1 + 0.22) z = S.z1 + 0.22;
-  } else {
-    return [clamp(p[0], ROOM.sofa.x0 + 0.3, ROOM.sofa.x1 - 0.3), p[1], clamp(p[2], ROOM.sofa.z0 + 0.42, ROOM.sofa.z1 - 0.12)];
+  if (level === 'bed') {
+    return [clamp(p[0], ROOM.bed.x0 + 0.3, ROOM.bed.x1 - 0.3), p[1], clamp(p[2], ROOM.bed.z0 + 0.42, ROOM.bed.z1 - 0.12)];
+  }
+  let x = clamp(p[0], F.x0 + 0.3, F.x1 - 0.3);
+  let z = clamp(p[2], ROOM.backZ + 0.28, F.z1 - 0.3);
+  const S = ROOM.bed;
+  if (x > S.x0 - 0.18 && x < S.x1 + 0.18 && z < S.z1 + 0.22) z = S.z1 + 0.22;
+  // the desk and the chair are solid: push out along whichever side is nearest
+  for (const [bx0, bx1, bz0, bz1] of BLOCKS) {
+    const m = 0.17;
+    if (x > bx0 - m && x < bx1 + m && z > bz0 - m && z < bz1 + m) {
+      const d = [x - (bx0 - m), (bx1 + m) - x, z - (bz0 - m), (bz1 + m) - z];
+      const k = d.indexOf(Math.min(...d));
+      if (k === 0) x = bx0 - m; else if (k === 1) x = bx1 + m;
+      else if (k === 2) z = bz0 - m; else z = bz1 + m;
+    }
   }
   return [x, p[1], z];
 }
@@ -2485,7 +2703,7 @@ function updateBall(dt) {
     BALL.v[1] -= G * h;
     BALL.p = v3.add(BALL.p, v3.mul(BALL.v, h));
     let floorY = supportY(BALL.p[0], BALL.p[2], null);
-    const S = ROOM.sofa;
+    const S = ROOM.bed;
     const overSeat = BALL.p[0] > S.x0 && BALL.p[0] < S.x1 && BALL.p[2] > S.z0 && BALL.p[2] < S.z1;
     if (overSeat && BALL.p[1] > S.seatY - 0.05) floorY = S.seatY;
     // sofa front & sides as walls when below the seat
@@ -2560,8 +2778,8 @@ const ACTIONS = {
       CAT.dilateT = 1.0; CAT.whiskerT = 0.9; CAT.ears.tYaw = [8, 8];
       CAT.lookFn = () => BALL.p;
       if (CAT.mode === 'pose' && ['side', 'bellyUp', 'curl'].includes(CAT.poseName)) await CAT.toPose('loaf', 0.4, tok);
-      if (CAT.level === 'sofa') {
-        const down = constrainFloor([CAT.pos[0], 0, ROOM.sofa.z1 + 0.5], 'floor');
+      if (CAT.level === 'bed') {
+        const down = constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor');
         await jumpTo(CAT, tok, down, 'floor', 0);
       }
       if (CAT.mode === 'pose' && ['loaf', 'sit', 'sitTall'].includes(CAT.poseName)) await CAT.toPose('stand', 0.35, tok);
@@ -2612,8 +2830,8 @@ const ACTIONS = {
       CAT.say('trill');
       CAT.setStatus('听到你在叫它');
       await CAT.wait(0.35, tok);
-      if (CAT.level === 'sofa') {
-        const down = constrainFloor(v3.add([CAT.pos[0], 0, ROOM.sofa.z1 + 0.45], [0, 0, 0]), 'floor');
+      if (CAT.level === 'bed') {
+        const down = constrainFloor(v3.add([CAT.pos[0], 0, ROOM.bed.z1 + 0.45], [0, 0, 0]), 'floor');
         await jumpTo(CAT, tok, down, 'floor', 0);
       }
       await CAT.standUp(tok);
@@ -2699,21 +2917,21 @@ const ACTIONS = {
       resetMood(CAT);
       if (wasSleeping) await wakeUp(CAT, tok);
       await CAT.standUp(tok);
-      const S = ROOM.sofa;
-      if (CAT.level !== 'sofa') {
-        CAT.setStatus('准备跳上沙发');
+      const S = ROOM.bed;
+      if (CAT.level !== 'bed') {
+        CAT.setStatus('准备跳上床');
         const lx = clamp(CAT.pos[0], S.x0 + 0.42, S.x1 - 0.42);
         const take = [lx + rand(-0.1, 0.1), 0, S.z1 + 0.42];
         await CAT.moveTo(take, 0.8, tok, 0.03, { face: [lx, 0.4, S.z0] });
         const land = [lx, 0, S.z1 - 0.32];
-        await jumpTo(CAT, tok, land, 'sofa', S.seatY);
-        CAT.setStatus('跳上了沙发');
+        await jumpTo(CAT, tok, land, 'bed', S.seatY);
+        CAT.setStatus('跳上了床');
         await CAT.wait(0.4, tok);
         await CAT.turnToward(R.camPos, tok);
         await CAT.toPose('sitTall', 0.6, tok);
         CAT.look.target = R.camPos.slice();
       } else {
-        CAT.setStatus('跳下沙发');
+        CAT.setStatus('跳下床');
         const land = constrainFloor([CAT.pos[0], 0, S.z1 + 0.55], 'floor');
         await jumpTo(CAT, tok, land, 'floor', supportY(land[0], land[2], null));
         CAT.setStatus('跳下来了');
@@ -3504,7 +3722,7 @@ bind('aSit', () => ACTIONS.sit());
 INPUT.onFirst = () => { UI.hint.classList.add('gone'); };
 document.addEventListener('visibilitychange', () => { if (!AUDIO.ctx) return; if (document.hidden) AUDIO.ctx.suspend(); else if (AUDIO.on) AUDIO.ctx.resume(); });
 function syncButtons() {
-  const jl = CAT.level === 'sofa' ? '跳下来' : '跳沙发';
+  const jl = CAT.level === 'bed' ? '跳下来' : '跳上床';
   if (UI.jumpLabel.textContent !== jl) UI.jumpLabel.textContent = jl;
   const sl = CAT.sleeping ? '叫醒' : '睡觉';
   if (UI.sleepLabel.textContent !== sl) UI.sleepLabel.textContent = sl;
