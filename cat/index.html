@@ -30,6 +30,9 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
 @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(122,163,107,0)}}
 .snd{pointer-events:auto;flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;background:var(--paper);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font:500 13px var(--sans);color:var(--ink);cursor:pointer}
 .snd svg{width:17px;height:17px}
+.tools{pointer-events:none;display:flex;gap:8px;align-items:flex-start;flex:none}
+.snd.icon{padding:8px;min-width:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 76px);background:rgba(30,22,17,.82);color:#f6efe7;font-size:13px;padding:8px 14px;border-radius:999px;pointer-events:none;z-index:6;letter-spacing:.02em;max-width:calc(100vw - 32px);text-align:center}
 .snd[aria-pressed="false"] .on{display:none}.snd[aria-pressed="true"] .off{display:none}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 16px);pointer-events:none}
 .dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(4,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
@@ -84,12 +87,18 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
     <p class="spec">美国短毛猫 · 银色经典虎斑 · 体长 34 cm · 尾长 27 cm</p>
     <div class="status" aria-live="polite"><i></i><span id="status">在看着你</span></div>
   </div>
+  <div class="tools">
+  <button class="snd icon" id="share" type="button" aria-label="分享这一页">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3.5"/><path d="M8.5 7L12 3.5 15.5 7"/><path d="M6 12.5H4.5v8h15v-8H18"/></svg>
+  </button>
   <button class="snd" id="snd" aria-pressed="false" type="button">
     <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
     <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
     <span id="sndLabel">声音关</span>
   </button>
+  </div>
 </div>
+<div class="toast" id="toast" hidden></div>
 <div class="hint" id="hint">拖动空白处转视角 · 在猫身上滑动抚摸 · 点地板丢球</div>
 <nav class="dock" aria-label="互动">
   <div class="dock-in">

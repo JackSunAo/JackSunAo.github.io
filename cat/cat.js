@@ -4174,7 +4174,30 @@ const UI = {
   mouse: document.getElementById('aMouse'),
   mouseLabel: document.getElementById('mouseLabel'),
   start: document.getElementById('start'),
+  share: document.getElementById('share'),
+  toast: document.getElementById('toast'),
 };
+let toastT = 0;
+function toast(msg) {
+  UI.toast.textContent = msg;
+  UI.toast.hidden = false;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { UI.toast.hidden = true; }, 2600);
+}
+// Being able to hand this to someone is the point of it, and on a phone that
+// means the system share sheet rather than a link the viewer has to copy by hand.
+UI.share.addEventListener('click', async () => {
+  const url = location.href.split('?')[0].split('#')[0];
+  try {
+    if (navigator.share) { await navigator.share({ title: '小银', text: '一只住在小房间里的美短猫，可以摸、可以逗', url }); return; }
+  } catch (e) { return; }                       // the sheet was dismissed; nothing to say
+  try {
+    await navigator.clipboard.writeText(url);
+    toast('链接已复制');
+  } catch (e) {
+    toast(url);
+  }
+});
 CAT.onStatus = (s) => { UI.status.textContent = s; };
 function hideHintSoon() { setTimeout(() => UI.hint.classList.add('gone'), 3500); }
 function setSoundUI(on) {
