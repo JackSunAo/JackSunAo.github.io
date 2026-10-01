@@ -341,7 +341,8 @@ uniform vec3 uWinCol;        // what the sky outside looks like right now
 uniform float uFill;         // how much daylight there is to bounce around
 // A real lamp falls off fast, which is what makes a room feel lit rather than
 // flooded, and is most of why the corner it stands in reads as warm.
-float lampFall(vec3 p) { vec3 d = uLampPos - p; return 1.0 / (1.0 + dot(d, d) * 2.2); }
+uniform float uLampFall;
+float lampFall(vec3 p) { vec3 d = uLampPos - p; return 1.0 / (1.0 + dot(d, d) * uLampFall); }
 vec3 lampDir(vec3 p) { return normalize(uLampPos - p + vec3(1e-5)); }
 const vec2 POISSON[12] = vec2[12](vec2(-0.326,-0.406),vec2(-0.840,-0.074),vec2(-0.696,0.457),vec2(-0.203,0.621),vec2(0.962,-0.195),vec2(0.473,-0.480),vec2(0.519,0.767),vec2(0.185,-0.893),vec2(0.507,0.064),vec2(0.896,0.412),vec2(-0.322,-0.933),vec2(-0.792,-0.598));
 float shadowAt(vec4 sc, float bias, float rad){
@@ -1334,7 +1335,7 @@ const SKY = (() => {
   const q = /[?&]hour=([\d.]+)/.exec(location.search);
   const now = new Date();
   const h = q ? parseFloat(q[1]) : now.getHours() + now.getMinutes() / 60;
-  const day = clamp((h - 6.1) / 1.5, 0, 1) * clamp((19.4 - h) / 1.8, 0, 1);
+  const day = clamp((h - 6.1) / 1.5, 0, 1) * clamp((20.1 - h) / 1.5, 0, 1);
   const u = clamp((h - 6.5) / 12.0, 0, 1);                 // 0 dawn .. 1 dusk
   const el = 0.18 + Math.sin(Math.PI * u) * 0.80;          // how high the sun sits
   const az = lerp(-0.62, 0.62, u);                         // and where it swings to
@@ -1349,10 +1350,14 @@ const SKY = (() => {
   const night = 1 - day;
   return {
     hour: h, day, dir, col,
-    lamp: [1.30 + 0.95 * night, 0.80 + 0.52 * night, 0.42 + 0.26 * night],
-    sky: [0.38 * day + 0.085, 0.41 * day + 0.090, 0.47 * day + 0.115],
-    ground: [0.26 * day + 0.055, 0.20 * day + 0.045, 0.145 * day + 0.040],
-    fill: 0.25 + 0.75 * day,
+    // As the sun goes the lamp has to take over, and one lamp cannot light a whole
+    // room from a desk: it reaches further after dark, and the ambient carries the
+    // warm bounce of a lamp-lit room so the evening reads as cosy rather than murky.
+    lamp: [1.28 + 1.15 * night, 0.78 + 0.62 * night, 0.41 + 0.30 * night],
+    lampFall: 2.2 - 1.15 * night,
+    sky: [0.33 * day + 0.150, 0.35 * day + 0.140, 0.42 * day + 0.150],
+    ground: [0.22 * day + 0.115, 0.17 * day + 0.090, 0.125 * day + 0.062],
+    fill: 0.42 + 0.58 * day,
     win: [(1.95 + 0.9 * warm) * day + 0.035, (2.05 - 0.3 * warm) * day + 0.040, (2.25 - 1.1 * warm) * day + 0.065],
   };
 })();
@@ -1649,6 +1654,7 @@ function setCommonUniforms(u) {
   gl.uniform3fv(u.uWinDir, WIN_DIR);
   gl.uniform3fv(u.uWinCol, SKY.win);
   gl.uniform1f(u.uFill, SKY.fill);
+  gl.uniform1f(u.uLampFall, SKY.lampFall);
   gl.uniform3fv(u.uLampPos, ROOM.lamp);
   gl.uniform3fv(u.uLampCol, LAMP_COL);
   gl.uniform4f(u.uLaser, LASER.p[0], LASER.p[1], LASER.p[2], LASER.shown);
