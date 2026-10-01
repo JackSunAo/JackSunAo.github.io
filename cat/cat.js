@@ -1767,7 +1767,15 @@ class Gait {
       const p = ((this.phase + P.off[k] + GAIT_JITTER[k]) % 1 + 1) % 1;
       if (!l.F) l.F = homeContact(k, cat);
       if (p < P.duty || vv < 0.01) {
-        if (l.swinging) { l.swinging = false; l.F = l.to; }
+        if (l.swinging) {
+          l.swinging = false;
+          // the paw has just touched down; a step that barely travelled is the
+          // leg re-planting, not a footfall, and should stay silent
+          if (v3.dist(l.from, l.to) > 0.025) {
+            SOUNDS.step(cat.level === 'sofa' ? 'Sofa' : (l.to[1] > 0.006 ? 'Rug' : 'Floor'), clamp(vv / 1.5, 0.12, 1), l.to);
+          }
+          l.F = l.to;
+        }
         l.flex = Math.max(0, l.flex - dt * 8);
         // re-plant if the leg got stretched too far (teleports, sharp turns)
         const h = homeContact(k, cat);
@@ -1905,7 +1913,7 @@ Object.assign(POSE_SPECS.groom.b, {
 });
 for (const k of ['run', 'leap', 'reach', 'sitTall', 'groom']) POSES[k] = poseFromSpec(POSE_SPECS[k]);
 
-const SOUNDS = { play() {}, purr() {}, ready: false };   // filled in by the audio module
+const SOUNDS = { play() {}, purr() {}, step() {}, ready: false };   // filled in by the audio module
 
 function poseFromSkeleton(rootLike) {
   const p = poseNew();
@@ -3320,7 +3328,28 @@ function synthJobs(sr) {
   variants('bounce', 2, (v) => thump(0.12, 190 + v * 25, 0.6, 51 + v * 9));
   variants('land', 2, (v) => thump(0.2, 85 + v * 10, 0.9, 53 + v * 9));
   variants('hop', 2, (v) => thump(0.1, 120 + v * 14, 1.4, 57 + v * 9));
-  const rank = { trill: 0, mew: 1, meowShort: 2, purr: 3, meow: 4, chirp: 5, land: 6, hop: 6, bounce: 6 };
+  // A paw landing is not a thump. It is a very short, soft, almost toneless
+  // contact, and the surface decides nearly all of it: boards give a little
+  // top end and a trace of claw, a wool rug swallows the lot.
+  const pawStep = (o) => {
+    const n = Math.floor(o.dur * sr), a = new Float32Array(n), r = mulberry(o.seed);
+    const k = 1 - Math.exp(-2 * Math.PI * o.cut / sr);
+    let lp1 = 0, lp2 = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const env = Math.exp(-t / o.decay) * Math.min(1, t / 0.0008);
+      lp1 += ((r() * 2 - 1) - lp1) * k; lp2 += (lp1 - lp2) * k;   // two poles, so it is properly dull
+      let y = lp2 * env;
+      if (o.body) y += Math.sin(2 * Math.PI * o.body * t) * Math.exp(-t / (o.decay * 0.5)) * 0.22;
+      if (o.tick) y += (r() * 2 - 1) * Math.exp(-t / 0.0022) * o.tick;
+      a[i] = y;
+    }
+    return normalise(a, 0.7);
+  };
+  variants('stepFloor', 3, (v) => pawStep({ dur: 0.09, decay: 0.012, cut: 1100, body: 150 + v * 18, tick: 0.18, seed: 211 + v * 13 }));
+  variants('stepRug', 3, (v) => pawStep({ dur: 0.10, decay: 0.020, cut: 520, seed: 231 + v * 13 }));
+  variants('stepSofa', 2, (v) => pawStep({ dur: 0.12, decay: 0.028, cut: 380, seed: 251 + v * 13 }));
+  const rank = { trill: 0, mew: 1, meowShort: 2, stepRug: 3, stepFloor: 3, purr: 4, meow: 5, chirp: 6, stepSofa: 6, land: 7, hop: 7, bounce: 7 };
   return J.map((j, i) => [j, (rank[j.name] === undefined ? 9 : rank[j.name]) * 100 + i])
     .sort((a, b) => a[1] - b[1]).map(([j]) => j);
 }
@@ -3379,6 +3408,16 @@ function setSound(on) {
   AUDIO.on = on;
   if (AUDIO.master) AUDIO.master.gain.setTargetAtTime(on ? 0.9 : 0, AUDIO.ctx.currentTime, 0.05);
 }
+// where a sound sits left to right, from where the camera is standing
+function panOf(p) {
+  const to = v3.sub(p, R.camPos);
+  const l = v3.len(to);
+  if (l < 1e-4) return 0;
+  const right = v3.cross(v3.norm(v3.sub(CAM.target, R.camPos)), [0, 1, 0]);
+  const rl = v3.len(right);
+  if (rl < 1e-4) return 0;
+  return clamp(v3.dot(v3.mul(to, 1 / l), v3.mul(right, 1 / rl)) * 1.6, -1, 1);
+}
 SOUNDS.play = function (kind, opts = {}) {
   if (!AUDIO.ctx || !AUDIO.on) return { scale: 1, stretch: 1 };
   let name = kind;
@@ -3388,22 +3427,34 @@ SOUNDS.play = function (kind, opts = {}) {
   const ctx = AUDIO.ctx;
   const src = ctx.createBufferSource();
   src.buffer = pick(set);                              // never the same take twice running
-  const rate = (['bounce', 'land', 'hop'].includes(kind) ? rand(0.95, 1.05) : rand(0.94, 1.07));
+  const rate = opts.rate || (['bounce', 'land', 'hop'].includes(kind) ? rand(0.95, 1.05) : rand(0.94, 1.07));
   src.playbackRate.value = rate;
   const g = ctx.createGain();
   const vol = { bounce: clamp((opts.v || 1) / 4, 0.1, 0.8), land: 0.5, hop: 0.3, growl: 0.55, chatter: 0.5, purr: 0 }[kind];
-  g.gain.value = vol === undefined ? 0.85 : vol;
-  // distance attenuation from the camera, and more of the room the further away it is
-  const d = v3.dist(R.camPos, CAT.pos);
+  g.gain.value = opts.gain !== undefined ? opts.gain : (vol === undefined ? 0.85 : vol);
+  // a footfall comes from the paw, everything else from the cat
+  const at = opts.pos || CAT.pos;
+  const d = v3.dist(R.camPos, at);
   g.gain.value *= clamp(1.4 / (0.6 + d), 0.25, 1.3);
-  src.connect(g); g.connect(AUDIO.master);
+  src.connect(g);
+  let out = g;
+  if (ctx.createStereoPanner) {
+    const p = ctx.createStereoPanner();
+    p.pan.value = panOf(at);
+    g.connect(p); out = p;
+  }
+  out.connect(AUDIO.master);
   if (AUDIO.verb) {
     const send = ctx.createGain();
+    // the further off it is, the more of what you hear is the room
     send.gain.value = g.gain.value * clamp(0.1 + d * 0.22, 0.1, 0.5);
-    g.connect(send); send.connect(AUDIO.verb);
+    out.connect(send); send.connect(AUDIO.verb);
   }
   src.start();
   return { scale: 1, stretch: 1 / rate };
+};
+SOUNDS.step = function (surface, strength, pos) {
+  SOUNDS.play('step' + surface, { gain: 0.30 * strength, pos, rate: rand(0.86, 1.16) });
 };
 SOUNDS.purr = function (level) {
   if (!AUDIO.ctx || !AUDIO.purrGain) return;
