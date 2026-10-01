@@ -82,20 +82,41 @@ room. The chase is deliberately unwinnable: stalk, pounce, miss, swat, repeat.
 Put the dot out of reach and the cat sits and chatters at it; hold it still for
 seven seconds and it loses interest.
 
+**Feather wand.** Drag anywhere and the feather follows — on a spring, behind
+where you are dragging, so it swings and overshoots and settles. That lag is the
+whole reason a cat goes for one. Height decides the answer: on the floor the cat
+flattens and swipes, at chest height it sits up and boxes, over its head it
+gathers and jumps. Aiming maps the pointer onto a vertical plane through the cat
+facing the camera, so sideways moves it around and up lifts it.
+
 **Wind-up mouse.** Bolts, stops, swivels, bolts again, bouncing off walls and
 furniture, with a spring that runs down over about ninety seconds. The cat
 freezes when it bolts, creeps while it is stopped, and can actually catch it —
 pinning it for a second or two before letting it go. Its parts overlap in space,
 so each carries its own id in the uv rather than being identified by position.
 
+## The room's own life
+
+- **Sunlight comes through the window, not the wall.** `sunGate` projects a point
+  back along the light onto the window plane and asks whether it lands in the
+  opening, which puts the window's shape and its glazing bars on the floor. The
+  rest of the room is carried by the area fill and the desk lamp.
+- **The cat finds the sun.** `sunSpot()` works out where that patch lands using
+  the same geometry the shader does — the two are checked against each other —
+  and the cat crosses the room to lie in it, both on command and on its own.
+- **The room is never silent.** A seamless room-tone loop under everything, and a
+  bird outside the window every ten to thirty seconds, panned and reverberated
+  from the window's position rather than played in the room.
+
 ## On a phone
 
 Checked at iPhone SE, 13 and 13 Pro Max widths. Things that matter and are easy
 to break:
 
-- The dock is four across in two rows, and drops its icons below 370 points.
-  Every button is at least 44 points. Adding another button needs re-checking
-  at 320 points wide.
+- The dock is five across in two rows, and drops its icons below 440 points.
+  Perch labels are one character on the button, because "跳上书桌" overflowed.
+  Every button is at least 44 points. Adding a tenth needs re-checking at 320,
+  390 and 428 points wide — 390 is the one that has broken twice.
 - `IS_MOBILE` caps the fur at 20 shells and the pixel ratio at 1.6, and `adapt()`
   lowers both further if frames run long.
 - The canvas is `touch-action: none` and the page cannot scroll; pinch, one-finger
@@ -117,7 +138,7 @@ __test.step1(dt)              // advance the simulation one frame, no rendering
 __test.draw()                 // render once — also what rebuilds the view matrix
 __test.fixCam(az, el, dist, tx, ty, tz)   // pin the camera
 __test.place(x, z, yaw)       // teleport the cat
-__test.act(name)              // fetch | call | roll | sleep | jump | sit | laser | mouse
+__test.act(name)              // fetch | call | roll | sleep | jump | sit | laser | mouse | wand
 __test.pet(region)            // head | cheek | chin | back | rump | tail | belly | leg
 __test.state()                // pose, mode, status, position, level, ball
 __test.worldOf()              // world positions of head, nose, eyes — for aiming a camera
@@ -156,6 +177,8 @@ call with nasality forced to 0 and to 1 to confirm the nasal zero lands at
 - Gaze only tracks the ball during `fetch`. The cat ignores it rolling past the
   rest of the time.
 - No toy uses the bed or the desk as cover; the cat will chase onto them but the
-  mouse stays on the floor.
+  mouse and the wand stay on the floor.
+- The sunbeam does not move. A slow drift over the session would be a cheap way
+  to make the room feel like it has a time of day.
 - `sheetPoses` and `sheetFrames` are the older contact-sheet helpers, kept only
   because they predate `sheetFrames2`; nothing uses them now.

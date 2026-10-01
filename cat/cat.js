@@ -4229,6 +4229,42 @@ function synthJobs(sr) {
   variants('stepFloor', 3, (v) => pawStep({ dur: 0.09, decay: 0.012, cut: 1100, body: 150 + v * 18, tick: 0.18, seed: 211 + v * 13 }));
   variants('stepRug', 3, (v) => pawStep({ dur: 0.10, decay: 0.020, cut: 520, seed: 231 + v * 13 }));
   variants('stepSofa', 2, (v) => pawStep({ dur: 0.12, decay: 0.028, cut: 380, seed: 251 + v * 13 }));
+  // Room tone. Real silence is never silent, and a scene with none at all reads
+  // as a recording that has been muted rather than a room you are standing in.
+  // Generated long and crossfaded into itself so the loop has no seam.
+  variants('roomTone', 1, () => {
+    const n = sr * 4, f = Math.floor(sr * 0.5), raw = new Float32Array(n + f), r = mulberry(707);
+    let lp1 = 0, lp2 = 0, lp3 = 0;
+    for (let i = 0; i < n + f; i++) {
+      const x = r() * 2 - 1;
+      lp1 += (x - lp1) * 0.010; lp2 += (lp1 - lp2) * 0.032; lp3 += (lp2 - lp3) * 0.12;
+      raw[i] = lp1 * 0.75 + lp2 * 0.3 + lp3 * 0.1;
+    }
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) a[i] = raw[i];
+    for (let i = 0; i < f; i++) { const k = i / f; a[i] = raw[i] * k + raw[n + i] * (1 - k); }
+    return normalise(a, 0.5);
+  });
+  // and something alive outside the window
+  variants('bird', 3, (v) => {
+    const dur = 0.55, n = Math.floor(dur * sr), a = new Float32Array(n);
+    const sets = [
+      [[0.00, 0.075, 2600, 4100], [0.13, 0.055, 3400, 2900], [0.24, 0.09, 2300, 3900]],
+      [[0.00, 0.10, 3100, 2400], [0.17, 0.10, 3000, 2300]],
+      [[0.00, 0.05, 4200, 3300], [0.08, 0.05, 4100, 3200], [0.16, 0.05, 4000, 3100], [0.25, 0.08, 2700, 3600]],
+    ][v];
+    for (const [t0, len, f0, f1] of sets) {
+      const i0 = Math.floor(t0 * sr), ln = Math.floor(len * sr);
+      let ph = 0;
+      for (let i = 0; i < ln && i0 + i < n; i++) {
+        const u = i / ln;
+        ph += lerp(f0, f1, u) * (1 + 0.015 * Math.sin(u * 55)) / sr;
+        const env = Math.pow(Math.sin(Math.PI * u), 0.7);
+        a[i0 + i] += (Math.sin(2 * Math.PI * ph) + 0.28 * Math.sin(4 * Math.PI * ph)) * env * 0.5;
+      }
+    }
+    return normalise(a, 0.5);
+  });
   // the clockwork: gear teeth at 46 Hz through the rattle of a plastic shell.
   // One second holds a whole number of teeth, so the loop does not click.
   variants('whirr', 1, () => {
@@ -4245,7 +4281,7 @@ function synthJobs(sr) {
     }
     return normalise(a, 0.55);
   });
-  const rank = { trill: 0, mew: 1, meowShort: 2, stepRug: 3, stepFloor: 3, whirr: 3, purr: 4, meow: 5, chirp: 6, stepSofa: 6, land: 7, hop: 7, bounce: 7 };
+  const rank = { trill: 0, mew: 1, meowShort: 2, stepRug: 3, stepFloor: 3, whirr: 3, roomTone: 2, bird: 6, purr: 4, meow: 5, chirp: 6, stepSofa: 6, land: 7, hop: 7, bounce: 7 };
   return J.map((j, i) => [j, (rank[j.name] === undefined ? 9 : rank[j.name]) * 100 + i])
     .sort((a, b) => a[1] - b[1]).map(([j]) => j);
 }
@@ -4288,6 +4324,7 @@ function initAudio() {
       const b = ctx.createBuffer(1, a.length, ctx.sampleRate);
       b.copyToChannel(a, 0);
       (AUDIO.bufs[j.name] = AUDIO.bufs[j.name] || []).push(b);
+      if (j.name === 'roomTone') SOUNDS.tone();
       if (j.name === 'purr' && !AUDIO.purrSrc) {
         const src = ctx.createBufferSource();
         src.buffer = b; src.loop = true; src.connect(AUDIO.purrGain); src.start();
@@ -4348,6 +4385,17 @@ SOUNDS.play = function (kind, opts = {}) {
   }
   src.start();
   return { scale: 1, stretch: 1 / rate };
+};
+SOUNDS.tone = function () {
+  if (!AUDIO.ctx || AUDIO.toneSrc) return;
+  const set = AUDIO.bufs.roomTone;
+  if (!set || !set.length) return;
+  const g = AUDIO.ctx.createGain();
+  g.gain.value = 0.055;
+  g.connect(AUDIO.master);
+  const src = AUDIO.ctx.createBufferSource();
+  src.buffer = set[0]; src.loop = true; src.connect(g); src.start();
+  AUDIO.toneSrc = src;
 };
 SOUNDS.whirr = function (level, pos) {
   if (!AUDIO.ctx) return;
@@ -4479,10 +4527,16 @@ function focusPoint() {
   const p = SK.wp[BI('spine2')];
   return [p[0], p[1] - 0.03, p[2]];
 }
+const AMBIENT = { nextBird: 6 };
 function step(dt) {
   FRAME_NO++;
   updateMouse(dt);
   updateWand(dt);
+  // a bird outside now and then, heard through the window rather than in the room
+  if (CAT.time > AMBIENT.nextBird) {
+    AMBIENT.nextBird = CAT.time + rand(11, 30);
+    SOUNDS.play('bird', { gain: rand(0.10, 0.19), pos: [ROOM.leftX - 0.8, 1.7, -0.2] });
+  }
   LASER.shown = expDecay(LASER.shown, LASER.on ? 1 : 0, 12, dt);
   if (LASER.on) {
     // no hand holds a laser perfectly still, and the shake is most of why a cat
