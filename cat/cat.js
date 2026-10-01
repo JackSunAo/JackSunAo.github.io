@@ -353,6 +353,18 @@ vec3 roomFill(vec3 n) {
   float down = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
   return vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down;
 }
+uniform vec4 uLaser;         // xyz where the dot is, w how bright
+// The dot is not a sprite pasted over the scene: it is light landing on
+// whatever is under it, so it bends over the edge of the bed, climbs the wall
+// and slides across the cat's own fur when you point it at them.
+vec3 laserOn(vec3 p) {
+  if (uLaser.w <= 0.0) return vec3(0.0);
+  float d2 = dot(p - uLaser.xyz, p - uLaser.xyz);
+  // a laser dot is far brighter than anything around it: the core clips to
+  // near-white and only the halo reads as red, which is how one actually looks
+  return (vec3(7.5, 0.70, 0.40) * exp(-d2 / (0.0085 * 0.0085))
+        + vec3(1.8, 0.07, 0.05) * exp(-d2 / (0.034 * 0.034))) * uLaser.w;
+}
 // soft room environment used for glossy reflections (eyes, nose, ball)
 vec3 envColor(vec3 r){
   vec3 room = mix(vec3(0.20,0.17,0.14), vec3(0.55,0.53,0.52), smoothstep(-0.4, 0.8, r.y));
@@ -790,6 +802,7 @@ void main(){
     col += uLightCol * pow(max(dot(N, H), 0.0), 60.0) * spec0 * 0.8 * sh;
   }
   if (mat > 1.5 && mat < 2.5) col *= mix(0.25, 1.0, uMouthOpen) * 0.7;
+  col += laserOn(vWorld) * (0.07 + 0.17 * h);   // split across the shells, so each takes a share
   float outA = alpha;
   if (uDither > 0.5) {
     float th = hash12(gl_FragCoord.xy + fract(vH * 7.13) * 31.0);
@@ -1055,6 +1068,7 @@ void main(){
     float fres = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
     col += envColor(R) * fres * 0.25;
   }
+  col += laserOn(p);
   oCol = vec4(outColor(col), 1.0);
 }`.replace('out vec4 oCol;\nfloat n3', 'out vec4 oCol;\nfloat band2(float m){ return smoothstep(0.86, 0.88, m) * (1.0 - smoothstep(0.92, 0.94, m)); }\nfloat n3');
 
@@ -1451,6 +1465,8 @@ R.shadow = (() => {
   return { tex, fb, size };
 })();
 
+// the red dot: where it is, and how strongly it is showing
+const LASER = { on: false, p: [0.4, 0.004, 0.9], shown: 0, lastMove: -10, idleFrom: 0 };
 const SCENE = {
   ball: { p: [0.9, 0.022, 0.6], v: [0, 0, 0], r: 0.022, rot: Q.id(), visible: true, held: false },
   pet: { p: [0, 0, 0], dir: [1, 0, 0], s: 0 },
@@ -1467,6 +1483,7 @@ function setCommonUniforms(u) {
   gl.uniform3fv(u.uWinDir, WIN_DIR);
   gl.uniform3fv(u.uLampPos, ROOM.lamp);
   gl.uniform3fv(u.uLampCol, LAMP_COL);
+  gl.uniform4f(u.uLaser, LASER.p[0], LASER.p[1], LASER.p[2], LASER.shown);
   gl.uniform2f(u.uShadowTexel, 1 / R.shadow.size, 1 / R.shadow.size);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, R.shadow.tex); gl.uniform1i(u.uShadow, 1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_3D, R.noise); if (u.uNoise) gl.uniform1i(u.uNoise, 2);
@@ -2761,8 +2778,103 @@ async function jumpTo(cat, tok, landing, level, y1) {
   await cat.toPose('stand', 0.35, tok);
 }
 
+// ---- the red dot -----------------------------------------------------------
+// Chasing a laser is not fetching. The cat never gets it, and that is the whole
+// point: it stalks flat to the floor, pounces, finds nothing under its paws,
+// swats at it, and goes back to stalking. Put the dot up a wall and it can only
+// sit and chatter at it; hold the dot still and it loses interest, the way a
+// real cat does.
+async function swatAt(cat, tok, at) {
+  const sd = Math.sin(yawTo(cat.pos, at) - cat.yaw) > 0 ? 'R' : 'L';
+  const t0 = cat.time;
+  cat.extra = (P) => {
+    const a = Math.sin(Math.PI * clamp((cat.time - t0) / 0.26, 0, 1));
+    poseAddBone(P, 'scap' + sd, 0, 0, a * 16);
+    poseAddBone(P, 'arm' + sd, 0, a * 14, a * 54);
+    poseAddBone(P, 'fore' + sd, 0, 0, -a * 32);
+    poseAddBone(P, 'hand' + sd, 0, 0, -a * 20);
+    poseAddBone(P, 'spine2', 0, a * 7, 0);
+    P.pitch += a * 4;
+  };
+  await cat.wait(0.3, tok);
+  cat.extra = null;
+}
+function laserChase() {
+  CAT.run('laser', async (tok) => {
+    resetMood(CAT);
+    CAT.lookFn = () => LASER.p;
+    CAT.dilateT = 1.0; CAT.whiskerT = 1.0; CAT.ears.tYaw = [12, 12]; CAT.lidBase = 0.0;
+    CAT.setStatus('盯上了那个红点');
+    if (CAT.level === 'bed') await jumpTo(CAT, tok, constrainFloor([CAT.pos[0], 0, ROOM.bed.z1 + 0.5], 'floor'), 'floor', 0);
+    await CAT.standUp(tok);
+    let misses = 0;
+    while (LASER.on) {
+      const flat = [LASER.p[0], 0, LASER.p[2]];
+      const d = v3.dist([CAT.pos[0], 0, CAT.pos[2]], flat);
+      if (CAT.time - LASER.lastMove > 7) {
+        CAT.setStatus('红点不动了，看腻了');
+        CAT.dilateT = 0.6;
+        await CAT.wait(1.4, tok);
+        continue;
+      }
+      CAT.dilateT = 1.0;
+      if (LASER.p[1] > 0.30) {
+        CAT.setStatus('够不着，只能盯着');
+        CAT.tail.lash = 0.7;
+        if (Math.random() < 0.22) CAT.say('chatter');
+        await CAT.wait(0.5, tok);
+      } else if (d > 0.85) {
+        CAT.setStatus('冲过去');
+        CAT.tail.lash = 0.4;
+        await CAT.moveTo(flat, 2.3, tok, 0.3, { track: () => [LASER.p[0], 0, LASER.p[2]] });
+      } else if (d > 0.32) {
+        CAT.setStatus('压低身子摸过去');
+        await CAT.toPose('crouch', 0.28, tok);
+        await CAT.moveTo(flat, 0.6, tok, 0.3, { track: () => [LASER.p[0], 0, LASER.p[2]] });
+      } else {
+        CAT.setStatus('屁股扭了扭…');
+        await CAT.toPose('crouch', 0.22, tok);
+        CAT.tail.quiver = 1.0;
+        await buttWiggle(CAT, tok, rand(0.35, 0.8));
+        const tgt = constrainFloor([LASER.p[0], 0, LASER.p[2]], 'floor');
+        SOUNDS.play('hop');
+        await new Promise((res) => { CAT.startJump(tgt, supportY(tgt[0], tgt[2], null), 'floor'); CAT.jump.done = res; });
+        CAT.check(tok);
+        misses++;
+        CAT.setStatus('扑了个空');
+        await CAT.wait(0.16, tok);
+        await swatAt(CAT, tok, LASER.p);
+        if (Math.random() < 0.45) await swatAt(CAT, tok, LASER.p);
+        if (misses % 5 === 0) { CAT.say('meowShort', { annoyed: true }); CAT.tail.lash = 1; }
+        await CAT.wait(rand(0.15, 0.45), tok);
+        await CAT.toPose('crouch', 0.25, tok);
+      }
+      await CAT.wait(0.04, tok);
+    }
+    CAT.lidBase = 0.15; CAT.lookFn = null;
+    await CAT.toPose('sit', 0.6, tok);
+    CAT.look.target = R.camPos.slice();
+    CAT.setStatus('还在想那个红点');
+  });
+}
+
 // ---- top-level actions ----------------------------------------------------------
 const ACTIONS = {
+  laser() {
+    LASER.on = !LASER.on;
+    CAT.lastInteraction = CAT.time;
+    if (LASER.on) { LASER.lastMove = CAT.time; laserChase(); return; }
+    if (CAT.busy === 'laser') {
+      CAT.run('laserOff', async (tok) => {
+        resetMood(CAT); CAT.lidBase = 0.15;
+        CAT.setStatus('红点呢？');
+        await CAT.toPose('sitTall', 0.6, tok);
+        CAT.look.target = R.camPos.slice();
+        await CAT.wait(1.5, tok);
+        CAT.setStatus('还在找那个红点');
+      });
+    }
+  },
   fetch(target) {
     const tgt = target || (() => {
       const dir = v3.norm(v3.sub([CAT.pos[0], 0, CAT.pos[2]], [R.camPos[0], 0, R.camPos[2]]));
@@ -3166,6 +3278,48 @@ function pickFloor(ray) {
   return { t, point: p };
 }
 
+// Where the dot lands. The floor is not the only thing in the room, and a laser
+// that stops at the edge of the rug is not worth chasing, so this also takes
+// the tops of the bed, the desk and the chair, and the two walls you can see.
+function pickSurface(ray) {
+  let best = null;
+  const F = ROOM.floor, B = ROOM.bed, D = ROOM.desk, C = ROOM.chair;
+  const hit = (t, p, kind) => { if (t > 0.02 && (!best || t < best.t)) best = { t, p, kind }; };
+  const planeY = (y, inside, kind) => {
+    if (Math.abs(ray.d[1]) < 1e-5) return;
+    const t = (y - ray.o[1]) / ray.d[1];
+    if (t <= 0) return;
+    const q = v3.add(ray.o, v3.mul(ray.d, t));
+    if (inside(q)) hit(t, [q[0], y + 0.004, q[2]], kind);
+  };
+  const planeAxis = (ax, v, inside, kind) => {
+    if (Math.abs(ray.d[ax]) < 1e-5) return;
+    const t = (v - ray.o[ax]) / ray.d[ax];
+    if (t <= 0) return;
+    const q = v3.add(ray.o, v3.mul(ray.d, t));
+    if (inside(q)) { q[ax] += ax === 0 ? 0.004 : 0.004; hit(t, q, kind); }
+  };
+  // the duvet stands proud of the mattress, so a dot aimed at the foot of the
+  // bed has to land on top of it rather than inside it
+  const duvZ0 = B.z1 - 0.75, duvZ1 = B.z1 - 0.03;
+  planeY(0.605, (q) => q[0] > B.x0 + 0.02 && q[0] < B.x1 - 0.02 && q[2] > duvZ0 && q[2] < duvZ1, 'bed');
+  planeY(B.seatY, (q) => q[0] > B.x0 && q[0] < B.x1 && q[2] > B.z0 && q[2] < duvZ0, 'bed');
+  planeY(D.topY, (q) => q[0] > D.x0 && q[0] < D.x1 && q[2] > D.z0 && q[2] < D.z1, 'high');
+  planeY(C.seatY, (q) => Math.hypot(q[0] - C.cx, q[2] - C.cz) < C.hw + 0.04, 'high');
+  planeY(0, (q) => q[0] > F.x0 && q[0] < F.x1 && q[2] > ROOM.backZ && q[2] < F.z1, 'floor');
+  planeAxis(2, ROOM.backZ, (q) => q[1] > 0.02 && q[1] < 1.9 && q[0] > F.x0 && q[0] < F.x1, 'wall');
+  planeAxis(0, ROOM.leftX, (q) => q[1] > 0.02 && q[1] < 1.9 && q[2] > ROOM.backZ && q[2] < F.z1, 'wall');
+  if (best && best.kind === 'floor') {
+    const R0 = ROOM.rug;
+    if (Math.abs(best.p[0] - R0.cx) < R0.hx && Math.abs(best.p[2] - R0.cz) < R0.hz) best.p[1] = 0.016;
+  }
+  return best;
+}
+function laserTo(cx, cy) {
+  const h = pickSurface(screenRay(cx, cy));
+  if (!h) return;
+  LASER.p = h.p; LASER.kind = h.kind; LASER.lastMove = CAT.time;
+}
 const INPUT = { pointers: new Map(), mode: null, startX: 0, startY: 0, startT: 0, moved: 0, lastPet: null, pinch: 0, onFirst: null };
 function onDown(e) {
   canvas.setPointerCapture(e.pointerId);
@@ -3179,6 +3333,7 @@ function onDown(e) {
     return;
   }
   INPUT.startX = e.clientX; INPUT.startY = e.clientY; INPUT.startT = performance.now(); INPUT.moved = 0;
+  if (LASER.on) { INPUT.mode = 'laser'; canvas.style.cursor = 'crosshair'; laserTo(e.clientX, e.clientY); return; }
   const hit = pickCat(screenRay(e.clientX, e.clientY));
   if (hit) {
     INPUT.mode = 'pet';
@@ -3198,6 +3353,7 @@ function onMove(e) {
       const nowT = performance.now();
       if (nowT - (INPUT.lastHover || 0) < 80) return;
       INPUT.lastHover = nowT;
+      if (LASER.on) { laserTo(e.clientX, e.clientY); canvas.style.cursor = 'crosshair'; return; }
       const hit = pickCat(screenRay(e.clientX, e.clientY));
       canvas.style.cursor = hit ? 'pointer' : 'grab';
     }
@@ -3213,6 +3369,7 @@ function onMove(e) {
     INPUT.pinch = d;
     return;
   }
+  if (INPUT.mode === 'laser') { laserTo(e.clientX, e.clientY); return; }
   if (INPUT.mode === 'orbit') {
     CAM.tAz += dx * 0.0085;
     CAM.tEl = clamp(CAM.tEl + dy * 0.006, 0.03, 1.25);
@@ -3239,6 +3396,10 @@ function onUp(e) {
   if (INPUT.mode === 'pinch') { if (INPUT.pointers.size === 0) INPUT.mode = null; return; }
   const dt = performance.now() - INPUT.startT;
   const tap = INPUT.moved < 9 && dt < 400;
+  if (INPUT.mode === 'laser') {
+    INPUT.mode = null; canvas.style.cursor = 'crosshair';
+    return;
+  }
   if (INPUT.mode === 'pet') {
     petEnd();
     if (tap) onTapCat(INPUT.lastPet);
@@ -3687,6 +3848,8 @@ const UI = {
   sndLabel: document.getElementById('sndLabel'),
   jumpLabel: document.getElementById('jumpLabel'),
   sleepLabel: document.getElementById('sleepLabel'),
+  laser: document.getElementById('aLaser'),
+  laserLabel: document.getElementById('laserLabel'),
   start: document.getElementById('start'),
 };
 CAT.onStatus = (s) => { UI.status.textContent = s; };
@@ -3719,9 +3882,13 @@ bind('aRoll', () => ACTIONS.roll());
 bind('aSleep', () => { if (CAT.sleeping) ACTIONS.call(); else ACTIONS.sleep(); });
 bind('aJump', () => ACTIONS.jump());
 bind('aSit', () => ACTIONS.sit());
+bind('aLaser', () => ACTIONS.laser());
 INPUT.onFirst = () => { UI.hint.classList.add('gone'); };
 document.addEventListener('visibilitychange', () => { if (!AUDIO.ctx) return; if (document.hidden) AUDIO.ctx.suspend(); else if (AUDIO.on) AUDIO.ctx.resume(); });
 function syncButtons() {
+  UI.laser.setAttribute('aria-pressed', LASER.on ? 'true' : 'false');
+  const ll = LASER.on ? '关激光' : '激光笔';
+  if (UI.laserLabel.textContent !== ll) UI.laserLabel.textContent = ll;
   const jl = CAT.level === 'bed' ? '跳下来' : '跳上床';
   if (UI.jumpLabel.textContent !== jl) UI.jumpLabel.textContent = jl;
   const sl = CAT.sleeping ? '叫醒' : '睡觉';
@@ -3744,6 +3911,13 @@ function focusPoint() {
 }
 function step(dt) {
   FRAME_NO++;
+  LASER.shown = expDecay(LASER.shown, LASER.on ? 1 : 0, 12, dt);
+  if (LASER.on) {
+    // no hand holds a laser perfectly still, and the shake is most of why a cat
+    // believes in it
+    LASER.p[0] += fnoise(CAT.time * 3.1, 301) * 0.0018;
+    LASER.p[2] += fnoise(CAT.time * 2.7, 302) * 0.0018;
+  }
   CAT.update(dt);
   updateBall(dt);
   CAM.update(dt, focusPoint());

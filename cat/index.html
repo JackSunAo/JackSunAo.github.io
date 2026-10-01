@@ -32,13 +32,14 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
 .snd svg{width:17px;height:17px}
 .snd[aria-pressed="false"] .on{display:none}.snd[aria-pressed="true"] .off{display:none}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 16px);pointer-events:none}
-.dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(6,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
+.dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(4,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
 .act{appearance:none;border:0;background:transparent;color:var(--ink);font:500 14px/1 var(--sans);padding:11px 14px;border-radius:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:7px;transition:background .15s}
 .act:hover{background:rgba(70,52,40,.08)}
 .act:active{transform:translateY(1px)}
 .act:focus-visible,.snd:focus-visible,.start button:focus-visible{outline:2px solid var(--yarn);outline-offset:2px}
 .act svg{width:18px;height:18px;flex:none}
 .act.primary{background:var(--yarn);color:var(--yarn-ink)}
+.act[aria-pressed="true"]{background:var(--yarn);color:var(--yarn-ink)}
 .act.primary:hover{background:#b23d27}
 .hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 92px);background:rgba(30,22,17,.62);color:#f6efe7;font-size:12.5px;padding:7px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;transition:opacity .6s;letter-spacing:.02em}
 .hint.gone{opacity:0}
@@ -55,7 +56,9 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
 .start .mute{background:rgba(70,52,40,.09);color:var(--ink)}
 .loading{position:fixed;inset:0;display:grid;place-items:center;color:#e9dfd4;font-size:14px;letter-spacing:.08em;pointer-events:none}
 @media (max-width:560px){
-  .dock-in{grid-template-columns:repeat(3,1fr);width:100%;max-width:420px}
+  .dock-in{grid-template-columns:repeat(4,1fr);width:100%;max-width:440px}
+  .act{font-size:13px;gap:4px}
+  .act svg{width:16px}
   .act{justify-content:center;padding:11px 8px}
   .hint{bottom:calc(env(safe-area-inset-bottom,0px) + 136px);font-size:12px;white-space:normal;text-align:center;width:max-content;max-width:calc(100vw - 32px)}
   .plate h1{font-size:18px}
@@ -86,6 +89,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
     <button class="act" id="aRoll" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5v3.2h-3.2"/></svg>打滚</button>
     <button class="act" id="aSleep" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M18.5 14.5A7.5 7.5 0 0 1 9.5 5.5a7.5 7.5 0 1 0 9 9z"/></svg><span id="sleepLabel">睡觉</span></button>
     <button class="act" id="aJump" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h6v-5h10"/><path d="M6 13c1-4 4-6 8-6"/><path d="M12 5l2 2-2 2"/></svg><span id="jumpLabel">跳上床</span></button>
+    <button class="act" id="aLaser" aria-pressed="false" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 21l7.5-7.5"/><circle cx="13" cy="11" r="2.2"/><path d="M17 7l4-4M15.5 4.5V2M20 9.5h2"/></svg><span id="laserLabel">激光笔</span></button>
     <button class="act" id="aSit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20v-6a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v6"/><circle cx="12" cy="6" r="2.4"/><path d="M6 20h12"/></svg>坐下</button>
   </div>
 </nav>
@@ -96,6 +100,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
     <ul>
       <li><b>抚摸</b>在它身上来回滑动：头、下巴、背、肚子反应都不一样</li>
       <li><b>丢球</b>点地板上任意一处，球就丢到那里</li>
+      <li><b>激光笔</b>打开后拖动，红点照到哪它扑到哪</li>
       <li><b>看它</b>拖动空白处转视角，双指或滚轮缩放</li>
     </ul>
     <div class="row"><button class="go" id="goSound" type="button">开始，打开声音</button><button class="mute" id="goMute" type="button">静音进入</button></div>
