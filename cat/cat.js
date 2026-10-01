@@ -155,6 +155,16 @@ if (!gl) {
   return;
 }
 const MSAA = gl.getParameter(gl.SAMPLES) || 0;
+// Phones, iOS above all, take the GL context back when memory gets tight or the
+// page sits in the background too long. Without this the scene simply freezes
+// on its last frame and looks broken.
+let GL_LOST = false;
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  GL_LOST = true;
+  SOUNDS.purr(0); SOUNDS.whirr(0);
+  fatal('画面断了', '浏览器收回了这个页面的显卡资源 —— 手机上内存紧张或页面在后台放久了就会这样。重新加载页面就能接着玩。');
+});
 
 function compile(type, src) {
   const s = gl.createShader(type);
@@ -3478,8 +3488,29 @@ function pickSurface(ray) {
   planeY(D.topY, (q) => q[0] > D.x0 && q[0] < D.x1 && q[2] > D.z0 && q[2] < D.z1, 'high');
   planeY(C.seatY, (q) => Math.hypot(q[0] - C.cx, q[2] - C.cz) < C.hw + 0.04, 'high');
   planeY(0, (q) => q[0] > F.x0 && q[0] < F.x1 && q[2] > ROOM.backZ && q[2] < F.z1, 'floor');
-  planeAxis(2, ROOM.backZ, (q) => q[1] > 0.02 && q[1] < 1.9 && q[0] > F.x0 && q[0] < F.x1, 'wall');
-  planeAxis(0, ROOM.leftX, (q) => q[1] > 0.02 && q[1] < 1.9 && q[2] > ROOM.backZ && q[2] < F.z1, 'wall');
+  const upZ = (q) => q[1] > 0.02 && q[1] < ROOM.wallY - 0.05 && q[0] > F.x0 && q[0] < F.x1;
+  const upX = (q) => q[1] > 0.02 && q[1] < ROOM.wallY - 0.05 && q[2] > ROOM.backZ && q[2] < F.z1;
+  planeAxis(2, ROOM.backZ, upZ, 'wall');
+  planeAxis(2, F.z1, upZ, 'wall');
+  planeAxis(0, ROOM.leftX, upX, 'wall');
+  planeAxis(0, F.x1, upX, 'wall');
+  // the ceiling faces down, so its dot has to sit just below it
+  if (Math.abs(ray.d[1]) > 1e-5) {
+    const t = (ROOM.wallY - ray.o[1]) / ray.d[1];
+    if (t > 0) {
+      const q = v3.add(ray.o, v3.mul(ray.d, t));
+      if (q[0] > F.x0 && q[0] < F.x1 && q[2] > ROOM.backZ && q[2] < F.z1) hit(t, [q[0], ROOM.wallY - 0.004, q[2]], 'wall');
+    }
+  }
+  // Aim out of a doorway and the ray leaves the room entirely. Rather than
+  // leaving the dot stuck where it was, drop it on the floor under the aim.
+  if (!best && Math.abs(ray.d[1]) > 1e-5) {
+    const t = -ray.o[1] / ray.d[1];
+    if (t > 0.02) {
+      const q = v3.add(ray.o, v3.mul(ray.d, t));
+      best = { t, p: [clamp(q[0], F.x0 + 0.1, F.x1 - 0.1), 0.004, clamp(q[2], ROOM.backZ + 0.1, F.z1 - 0.1)], kind: 'floor' };
+    }
+  }
   if (best && best.kind === 'floor') {
     const R0 = ROOM.rug;
     if (Math.abs(best.p[0] - R0.cx) < R0.hx && Math.abs(best.p[2] - R0.cz) < R0.hz) best.p[1] = 0.016;
@@ -3493,7 +3524,9 @@ function laserTo(cx, cy) {
 }
 const INPUT = { pointers: new Map(), mode: null, startX: 0, startY: 0, startT: 0, moved: 0, lastPet: null, pinch: 0, onFirst: null };
 function onDown(e) {
-  canvas.setPointerCapture(e.pointerId);
+  // capture can be refused (the pointer may already be gone), and on a phone
+  // that must not take the whole gesture down with it
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* keep going without it */ }
   INPUT.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (INPUT.onFirst) { INPUT.onFirst(); INPUT.onFirst = null; }
   if (INPUT.pointers.size === 2) {
@@ -4157,6 +4190,7 @@ function adapt(dt) {
 }
 let lastT = 0;
 function loop(now) {
+  if (GL_LOST) return;
   const dt = lastT ? Math.min((now - lastT) / 1000, 1 / 20) : 1 / 60;
   lastT = now;
   step(dt);
