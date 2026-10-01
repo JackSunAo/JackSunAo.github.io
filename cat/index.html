@@ -59,7 +59,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
 .start .mute{background:rgba(70,52,40,.09);color:var(--ink)}
 .loading{position:fixed;inset:0;display:grid;place-items:center;color:#e9dfd4;font-size:14px;letter-spacing:.08em;pointer-events:none}
 @media (max-width:560px){
-  .dock-in{grid-template-columns:repeat(4,1fr);width:100%;max-width:440px;gap:6px;padding:6px}
+  .dock-in{grid-template-columns:repeat(5,1fr);width:100%;max-width:460px;gap:5px;padding:5px}
   .act{font-size:13px;gap:4px;padding:11px 2px}
   .act svg{width:16px}
   .act{justify-content:center;padding:11px 8px}
@@ -67,8 +67,9 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
   .plate h1{font-size:18px}
 }
 /* the smallest iPhones cannot fit eight labelled buttons with icons as well */
-@media (max-width:370px){
-  .act{font-size:12.5px;padding:12px 1px}
+@media (max-width:440px){
+  .dock-in{grid-template-columns:repeat(5,1fr);gap:3px;padding:4px}
+  .act{font-size:11px;padding:12px 0}
   .act svg{display:none}
   .start .card{padding:18px 16px 16px}
   .start h2{font-size:20px}
@@ -107,6 +108,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
     <button class="act" id="aRoll" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M19 12a7 7 0 1 1-2.05-4.95"/><path d="M19 4.5v3.2h-3.2"/></svg>打滚</button>
     <button class="act" id="aSleep" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M18.5 14.5A7.5 7.5 0 0 1 9.5 5.5a7.5 7.5 0 1 0 9 9z"/></svg><span id="sleepLabel">睡觉</span></button>
     <button class="act" id="aJump" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18h6v-5h10"/><path d="M6 13c1-4 4-6 8-6"/><path d="M12 5l2 2-2 2"/></svg><span id="jumpLabel">跳上床</span></button>
+    <button class="act" id="aWand" aria-pressed="false" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7"/><path d="M12 10c-2.4 0-4 1.8-4 4.2S9.6 20 12 20s4-3.4 4-5.8S14.4 10 12 10z"/><path d="M12 11.5v7.5"/></svg><span id="wandLabel">逗猫棒</span></button>
     <button class="act" id="aMouse" aria-pressed="false" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="11" cy="14" rx="6.5" ry="4.5"/><circle cx="6" cy="10.5" r="2.1"/><path d="M17.5 14c2 0 3-1.2 3-2.8"/><circle cx="14.6" cy="13.2" r="0.9"/></svg><span id="mouseLabel">机械鼠</span></button>
     <button class="act" id="aLaser" aria-pressed="false" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 21l7.5-7.5"/><circle cx="13" cy="11" r="2.2"/><path d="M17 7l4-4M15.5 4.5V2M20 9.5h2"/></svg><span id="laserLabel">激光笔</span></button>
     <button class="act" id="aSit" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20v-6a4 4 0 0 1 4-4h0a4 4 0 0 1 4 4v6"/><circle cx="12" cy="6" r="2.4"/><path d="M6 20h12"/></svg>坐下</button>
@@ -121,6 +123,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
       <li><b>丢球</b>点地板上任意一处，球就丢到那里</li>
       <li><b>激光笔</b>打开后拖动，红点照到哪它扑到哪</li>
       <li><b>机械鼠</b>上好发条放出去，它会一路追捕</li>
+      <li><b>逗猫棒</b>打开后拖动，举高了它会跳起来够</li>
       <li><b>看它</b>拖动空白处转视角，双指或滚轮缩放</li>
     </ul>
     <div class="row"><button class="go" id="goSound" type="button">开始，打开声音</button><button class="mute" id="goMute" type="button">静音进入</button></div>

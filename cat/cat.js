@@ -1087,6 +1087,15 @@ void main(){
   } else if (uMat == 15) {   // brushed metal
     alb = vec3(0.30, 0.29, 0.28);
     spec = 0.45; gloss = 110.0;
+  } else if (uMat == 18) {   // the feather wand
+    float part = floor(vUV.x + 0.5);
+    if (part < 0.5) { alb = vec3(0.26, 0.24, 0.22); spec = 0.2; gloss = 60.0; }        // string
+    else if (part < 2.5) {
+      // barbs running out along each feather
+      float barb = 0.72 + 0.28 * sin(vLocal.x * 220.0);
+      alb = (part < 1.5 ? vec3(0.72, 0.30, 0.22) : vec3(0.86, 0.74, 0.46)) * barb;
+      spec = 0.06; gloss = 30.0;
+    } else { alb = vec3(0.45, 0.33, 0.20); spec = 0.1; gloss = 40.0; }                 // the knot
   } else if (uMat == 17) {   // the toy mouse; vUV.x says which part this is
     float part = floor(vUV.x + 0.5);
     float felt = n3(vLocal * 220.0) * 0.5 + n3(vLocal * 60.0) * 0.5;
@@ -1297,9 +1306,9 @@ const ROOM = {
 // patch it can actually stand on, clear of the pillows, the lamp and the books,
 // so it never ends up perched on a mug.
 const PERCHES = {
-  bed:   { b: [ROOM.bed.x0 + 0.30, ROOM.bed.x1 - 0.30, ROOM.bed.z0 + 0.45, ROOM.bed.z1 - 0.14], y: ROOM.bed.seatY, label: '床', soft: true },
-  desk:  { b: [-2.26, -1.30, -0.44, 0.16], y: ROOM.desk.topY, label: '书桌', soft: false },
-  chair: { b: [ROOM.chair.cx - 0.12, ROOM.chair.cx + 0.12, ROOM.chair.cz - 0.12, ROOM.chair.cz + 0.12], y: ROOM.chair.seatY, label: '椅子', soft: true },
+  bed:   { b: [ROOM.bed.x0 + 0.30, ROOM.bed.x1 - 0.30, ROOM.bed.z0 + 0.45, ROOM.bed.z1 - 0.14], y: ROOM.bed.seatY, label: '床', short: '床', soft: true },
+  desk:  { b: [-2.26, -1.30, -0.44, 0.16], y: ROOM.desk.topY, label: '书桌', short: '桌', soft: false },
+  chair: { b: [ROOM.chair.cx - 0.12, ROOM.chair.cx + 0.12, ROOM.chair.cz - 0.12, ROOM.chair.cz + 0.12], y: ROOM.chair.seatY, label: '椅子', short: '椅', soft: true },
 };
 // where the cat stands to jump up, and where it lands coming down
 const perchApproach = (k) => {
@@ -1518,6 +1527,20 @@ R.room = (() => {
   };
 })();
 R.ballMesh = (() => { const g = sphereGeom(1, 32, 20); return makeMesh(g.pos, g.nrm, g.idx, g.uv); })();
+// the feather, with its string running up out of the top of the view
+R.wandMesh = (() => {
+  const tag = (g, id) => { const n = g.pos.length / 3, uv = new Array(n * 2); for (let i = 0; i < n; i++) { uv[i * 2] = id; uv[i * 2 + 1] = 0; } return { pos: g.pos, nrm: g.nrm, idx: g.idx, uv }; };
+  const parts = [tag(transformGeom(cylGeom(0.0022, 1.6, 6), M4.fromQT(Q.id(), [0, 0.82, 0])), 0)];
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2 + 0.4, lean = 0.5 + (i % 2) * 0.22;
+    const q = Q.mul(Q.axis([0, 1, 0], a), Q.axis([0, 0, 1], lean));
+    const m = M4.mul(M4.fromQT(q, [0, 0.022, 0]), new Float32Array([0.044, 0, 0, 0, 0, 0.006, 0, 0, 0, 0, 0.015, 0, 0.037, 0, 0, 1]));
+    parts.push(tag(transformGeom(sphereGeom(1, 12, 8), m), 1 + (i % 2)));
+  }
+  parts.push(tag(transformGeom(sphereGeom(0.011, 10, 7), M4.fromQT(Q.id(), [0, 0.018, 0])), 3));
+  const g = mergeGeom(parts);
+  return makeMesh(g.pos, g.nrm, g.idx, g.uv);
+})();
 // the wind-up mouse, built nose-first along +X so it shares the cat's convention
 R.mouseMesh = (() => {
   const sq = (sx, sy, sz, t) => transformGeom(sphereGeom(1, 16, 11),
@@ -1572,6 +1595,10 @@ const LASER = { on: false, p: [0.4, 0.004, 0.9], shown: 0, lastMove: -10, idleFr
 // continuously: it bolts, stops dead, swivels and bolts again, which is exactly
 // the pattern that a cat cannot ignore. The spring runs down as it goes.
 const MOUSE = { out: false, p: [0.6, 0.03, 1.4], yaw: 1.2, yawT: 1.2, speed: 0, wind: 0, burst: 0, pinned: 0, bump: 0 };
+// A feather on a string. It hangs behind wherever you drag it rather than
+// tracking it exactly, and that lag — the swing, the overshoot, the settle — is
+// the whole reason a cat goes for one.
+const WAND = { out: false, p: [0.4, 0.55, 0.9], v: [0, 0, 0], t: [0.4, 0.55, 0.9], shake: 0 };
 const SCENE = {
   ball: { p: [0.9, 0.022, 0.6], v: [0, 0, 0], r: 0.022, rot: Q.id(), visible: true, held: false },
   pet: { p: [0, 0, 0], dir: [1, 0, 0], s: 0 },
@@ -1637,6 +1664,7 @@ function renderShadow() {
   const b = SCENE.ball;
   if (b.visible) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(b.rot, b.p, b.r)); drawMesh(R.ballMesh); }
   if (MOUSE.out) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(Q.axis([0, 1, 0], MOUSE.yaw), MOUSE.p)); drawMesh(R.mouseMesh); }
+  if (WAND.out) { gl.uniformMatrix4fv(R.depthProg.u.uModel, false, M4.fromQT(Q.id(), WAND.p)); drawMesh(R.wandMesh); }
   gl.disable(gl.POLYGON_OFFSET_FILL);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
@@ -1660,6 +1688,12 @@ function renderScene(width, height) {
     [R.room.wood, 10], [R.room.linen, 11], [R.room.books, 12], [R.room.ceramic, 13], [R.room.shade, 14],
     [R.room.metal, 15], [R.room.picture, 16], [R.room.leaves, 7]];
   for (const [m, id] of mats) { gl.uniform1i(rp.u.uMat, id); drawMesh(m); }
+  if (WAND.out) {
+    gl.uniform1i(rp.u.uMat, 18);
+    gl.uniformMatrix4fv(rp.u.uModel, false, M4.fromQT(Q.axis([0, 1, 0], SCENE.time * 0.6), WAND.p));
+    drawMesh(R.wandMesh);
+    gl.uniformMatrix4fv(rp.u.uModel, false, M4.id());
+  }
   if (MOUSE.out) {
     gl.uniform1i(rp.u.uMat, 17);
     const q = Q.mul(Q.axis([0, 1, 0], MOUSE.yaw), Q.axis([0, 0, 1], MOUSE.bump * 0.5));
@@ -2935,6 +2969,24 @@ function updateMouse(dt) {
 }
 const mouseFlat = () => [MOUSE.p[0], 0, MOUSE.p[2]];
 
+function updateWand(dt) {
+  if (!WAND.out) return;
+  const n = Math.max(1, Math.ceil(dt / 0.01)), h = dt / n;
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 3; k++) {
+      const a = (WAND.t[k] - WAND.p[k]) * 90 - WAND.v[k] * 9 - (k === 1 ? 1.4 : 0);
+      WAND.v[k] += a * h;
+      WAND.p[k] += WAND.v[k] * h;
+    }
+  }
+  WAND.p[1] = Math.max(WAND.p[1], 0.022);
+  WAND.shake = Math.max(0, WAND.shake - dt * 3);
+  // the flutter of the feathers themselves
+  WAND.p[0] += fnoise(CAT.time * 2.3, 411) * 0.004;
+  WAND.p[2] += fnoise(CAT.time * 2.1, 412) * 0.004;
+}
+const wandFlat = () => [WAND.p[0], 0, WAND.p[2]];
+
 // step off whatever it is standing on, onto the floor in front of it
 async function getDown(cat, tok) {
   if (!PERCHES[cat.level]) return;
@@ -3144,8 +3196,106 @@ function mouseHunt() {
   });
 }
 
+// A wand is played at three heights and the cat answers each differently: it
+// flattens and swipes at one on the floor, sits up and boxes one at chest
+// height, and jumps for one held over its head. Keep it still and it stops
+// caring, exactly as with the laser.
+async function batUp(cat, tok, high) {
+  const t0 = cat.time, dur = high ? 0.42 : 0.3;
+  cat.extra = (P) => {
+    const k = clamp((cat.time - t0) / dur, 0, 1);
+    const a = Math.sin(Math.PI * k);
+    P.dy += (high ? 0.055 : 0.016) * a;
+    P.pitch -= (high ? 16 : 7) * a;
+    for (const sd of ['L', 'R']) {
+      const w = sd === 'L' ? 1.0 : 0.78;
+      poseAddBone(P, 'scap' + sd, 0, 0, a * 18 * w);
+      poseAddBone(P, 'arm' + sd, 0, a * 10 * w, a * (high ? 74 : 54) * w);
+      poseAddBone(P, 'fore' + sd, 0, 0, -a * 34 * w);
+      poseAddBone(P, 'hand' + sd, 0, 0, -a * 22 * w);
+    }
+    poseAddBone(P, 'neck', 0, 0, -a * 14); poseAddBone(P, 'head', 0, 0, a * 10);
+  };
+  await cat.wait(dur, tok);
+  cat.extra = null;
+}
+function wandPlay() {
+  CAT.run('wand', async (tok) => {
+    resetMood(CAT);
+    CAT.lookFn = () => WAND.p;
+    CAT.dilateT = 1.0; CAT.whiskerT = 1.0; CAT.ears.tYaw = [10, 10]; CAT.lidBase = 0.02;
+    CAT.setStatus('盯住了那撮毛');
+    await getDown(CAT, tok);
+    await CAT.standUp(tok);
+    while (WAND.out) {
+      const d = v3.dist([CAT.pos[0], 0, CAT.pos[2]], wandFlat());
+      const y = WAND.p[1];
+      if (WAND.shake < 0.05) {
+        CAT.setStatus('不动的毛没意思');
+        CAT.dilateT = 0.6;
+        await CAT.wait(1.0, tok);
+        continue;
+      }
+      CAT.dilateT = 1.0;
+      if (d > 0.62) {
+        CAT.setStatus('凑过去');
+        await CAT.moveTo(wandFlat(), y > 0.5 ? 1.0 : 1.6, tok, 0.34, { track: wandFlat });
+      } else if (y < 0.26) {
+        CAT.setStatus('趴低了拍它');
+        await CAT.toPose('crouch', 0.25, tok);
+        CAT.tail.quiver = 0.9;
+        await swatAt(CAT, tok, WAND.p);
+        WAND.v = v3.madd(WAND.v, [rand(-1, 1), rand(0.4, 1.6), rand(-1, 1)], 1.1);
+        SOUNDS.play('chirp');
+        await CAT.wait(rand(0.1, 0.3), tok);
+      } else if (y < 0.62) {
+        CAT.setStatus('坐起来打');
+        await CAT.toPose('sitTall', 0.3, tok);
+        await batUp(CAT, tok, false);
+        WAND.v = v3.madd(WAND.v, [rand(-1.2, 1.2), rand(0.8, 2.2), rand(-1.2, 1.2)], 1.2);
+        SOUNDS.play('chirp');
+        await CAT.wait(rand(0.1, 0.3), tok);
+      } else {
+        CAT.setStatus('跳起来够');
+        await CAT.toPose('crouch', 0.2, tok);
+        await coil(CAT, tok, 0.12);
+        SOUNDS.play('hop');
+        await batUp(CAT, tok, true);
+        WAND.v = v3.madd(WAND.v, [rand(-1.4, 1.4), rand(1.2, 3.0), rand(-1.4, 1.4)], 1.3);
+        SOUNDS.play('land');
+        await CAT.toPose('stand', 0.25, tok);
+        await CAT.wait(rand(0.15, 0.4), tok);
+      }
+      await CAT.wait(0.04, tok);
+    }
+    CAT.lidBase = 0.15; CAT.lookFn = null;
+    await CAT.toPose('sit', 0.6, tok);
+    CAT.look.target = R.camPos.slice();
+    CAT.setStatus('还盯着你的手');
+  });
+}
+
 // ---- top-level actions ----------------------------------------------------------
 const ACTIONS = {
+  wand() {
+    CAT.lastInteraction = CAT.time;
+    WAND.out = !WAND.out;
+    if (WAND.out) {
+      const f = fwdOf(CAT.yaw);
+      WAND.p = constrainFloor([CAT.pos[0] + f[0] * 0.5, 0, CAT.pos[2] + f[2] * 0.5], 'floor');
+      WAND.p[1] = 0.45; WAND.t = WAND.p.slice(); WAND.v = [0, 0, 0]; WAND.shake = 1;
+      if (LASER.on) ACTIONS.laser();
+      wandPlay();
+      toast('拖动屏幕来逗它');
+      return;
+    }
+    if (CAT.busy === 'wand') CAT.run('wandOff', async (tok) => {
+      resetMood(CAT); CAT.lidBase = 0.15;
+      await CAT.toPose('sitTall', 0.6, tok);
+      CAT.look.target = R.camPos.slice();
+      CAT.setStatus('毛收起来了');
+    });
+  },
   mouse() {
     CAT.lastInteraction = CAT.time;
     if (!MOUSE.out) {
@@ -3175,7 +3325,7 @@ const ACTIONS = {
   laser() {
     LASER.on = !LASER.on;
     CAT.lastInteraction = CAT.time;
-    if (LASER.on) { LASER.lastMove = CAT.time; laserChase(); return; }
+    if (LASER.on) { if (WAND.out) { WAND.out = false; } LASER.lastMove = CAT.time; laserChase(); return; }
     if (CAT.busy === 'laser') {
       CAT.run('laserOff', async (tok) => {
         resetMood(CAT); CAT.lidBase = 0.15;
@@ -3647,6 +3797,22 @@ function pickSurface(ray) {
   }
   return best;
 }
+function wandTo(cx, cy) {
+  const ray = screenRay(cx, cy);
+  const c = [CAT.pos[0], 0, CAT.pos[2]];
+  let n = v3.sub(R.camPos, c); n[1] = 0;
+  const nl = v3.len(n);
+  if (nl < 1e-4) return;
+  n = v3.mul(n, 1 / nl);
+  const den = v3.dot(ray.d, n);
+  if (Math.abs(den) < 1e-4) return;
+  const t = v3.dot(v3.sub(c, ray.o), n) / den;
+  if (t < 0.05) return;
+  const p = v3.add(ray.o, v3.mul(ray.d, t));
+  const f = constrainFloor([p[0], 0, p[2]], 'floor');
+  WAND.t = [f[0], clamp(p[1], 0.03, 1.30), f[2]];
+  WAND.shake = 1;
+}
 function laserTo(cx, cy) {
   const h = pickSurface(screenRay(cx, cy));
   if (!h) return;
@@ -3668,6 +3834,7 @@ function onDown(e) {
   }
   INPUT.startX = e.clientX; INPUT.startY = e.clientY; INPUT.startT = performance.now(); INPUT.moved = 0;
   if (LASER.on) { INPUT.mode = 'laser'; canvas.style.cursor = 'crosshair'; laserTo(e.clientX, e.clientY); return; }
+  if (WAND.out) { INPUT.mode = 'wand'; canvas.style.cursor = 'grabbing'; wandTo(e.clientX, e.clientY); return; }
   const hit = pickCat(screenRay(e.clientX, e.clientY));
   if (hit) {
     INPUT.mode = 'pet';
@@ -3688,6 +3855,7 @@ function onMove(e) {
       if (nowT - (INPUT.lastHover || 0) < 80) return;
       INPUT.lastHover = nowT;
       if (LASER.on) { laserTo(e.clientX, e.clientY); canvas.style.cursor = 'crosshair'; return; }
+      if (WAND.out) { wandTo(e.clientX, e.clientY); canvas.style.cursor = 'grab'; return; }
       const hit = pickCat(screenRay(e.clientX, e.clientY));
       canvas.style.cursor = hit ? 'pointer' : 'grab';
     }
@@ -3704,6 +3872,7 @@ function onMove(e) {
     return;
   }
   if (INPUT.mode === 'laser') { laserTo(e.clientX, e.clientY); return; }
+  if (INPUT.mode === 'wand') { wandTo(e.clientX, e.clientY); return; }
   if (INPUT.mode === 'orbit') {
     CAM.tAz += dx * 0.0085;
     CAM.tEl = clamp(CAM.tEl + dy * 0.006, 0.03, 1.25);
@@ -3730,10 +3899,8 @@ function onUp(e) {
   if (INPUT.mode === 'pinch') { if (INPUT.pointers.size === 0) INPUT.mode = null; return; }
   const dt = performance.now() - INPUT.startT;
   const tap = INPUT.moved < 9 && dt < 400;
-  if (INPUT.mode === 'laser') {
-    INPUT.mode = null; canvas.style.cursor = 'crosshair';
-    return;
-  }
+  if (INPUT.mode === 'laser') { INPUT.mode = null; canvas.style.cursor = 'crosshair'; return; }
+  if (INPUT.mode === 'wand') { INPUT.mode = null; canvas.style.cursor = 'grab'; return; }
   if (INPUT.mode === 'pet') {
     petEnd();
     if (tap) onTapCat(INPUT.lastPet);
@@ -4220,6 +4387,8 @@ const UI = {
   laserLabel: document.getElementById('laserLabel'),
   mouse: document.getElementById('aMouse'),
   mouseLabel: document.getElementById('mouseLabel'),
+  wand: document.getElementById('aWand'),
+  wandLabel: document.getElementById('wandLabel'),
   start: document.getElementById('start'),
   share: document.getElementById('share'),
   toast: document.getElementById('toast'),
@@ -4277,16 +4446,20 @@ bind('aJump', () => ACTIONS.jump());
 bind('aSit', () => ACTIONS.sit());
 bind('aLaser', () => ACTIONS.laser());
 bind('aMouse', () => ACTIONS.mouse());
+bind('aWand', () => ACTIONS.wand());
 INPUT.onFirst = () => { UI.hint.classList.add('gone'); };
 document.addEventListener('visibilitychange', () => { if (!AUDIO.ctx) return; if (document.hidden) AUDIO.ctx.suspend(); else if (AUDIO.on) AUDIO.ctx.resume(); });
 function syncButtons() {
   UI.laser.setAttribute('aria-pressed', LASER.on ? 'true' : 'false');
   UI.mouse.setAttribute('aria-pressed', MOUSE.out ? 'true' : 'false');
+  UI.wand.setAttribute('aria-pressed', WAND.out ? 'true' : 'false');
+  const wl = WAND.out ? '收起来' : '逗猫棒';
+  if (UI.wandLabel.textContent !== wl) UI.wandLabel.textContent = wl;
   const ml = !MOUSE.out ? '机械鼠' : MOUSE.wind > 0.01 ? '收起来' : '再上弦';
   if (UI.mouseLabel.textContent !== ml) UI.mouseLabel.textContent = ml;
   const ll = LASER.on ? '关激光' : '激光笔';
   if (UI.laserLabel.textContent !== ll) UI.laserLabel.textContent = ll;
-  const jl = PERCHES[CAT.level] ? '跳下来' : '跳上' + PERCHES[nearestPerch()].label;
+  const jl = PERCHES[CAT.level] ? '跳下来' : '跳上' + PERCHES[nearestPerch()].short;
   if (UI.jumpLabel.textContent !== jl) UI.jumpLabel.textContent = jl;
   const sl = CAT.sleeping ? '叫醒' : '睡觉';
   if (UI.sleepLabel.textContent !== sl) UI.sleepLabel.textContent = sl;
@@ -4309,6 +4482,7 @@ function focusPoint() {
 function step(dt) {
   FRAME_NO++;
   updateMouse(dt);
+  updateWand(dt);
   LASER.shown = expDecay(LASER.shown, LASER.on ? 1 : 0, 12, dt);
   if (LASER.on) {
     // no hand holds a laser perfectly still, and the shake is most of why a cat
