@@ -100,11 +100,21 @@ so each carries its own id in the uv rather than being identified by position.
 - **The light follows the clock on the device.** `SKY` works out the sun's
   height, angle and colour once at load: high and slightly cool in the morning,
   swinging round and turning orange through the afternoon, gone after dark, when
-  the desk lamp carries the room on its own. The window, the ambient, the fill
-  and the lamp's own brightness all come from it. `?hour=19` overrides it, which
-  is how it was checked — including that the cat stays legible at night
-  (luminance 0.125 against a 0.146 background) and that it does not go looking
-  for a patch of sun that is not there.
+  the desk lamp carries the room on its own. The window, the ambient, the fill,
+  the floor bounce, the exposure and the lamp's own brightness all come from it.
+  `?hour=19` overrides it, which is how it was checked — including that the cat
+  stays legible at night (luminance 0.168 against a 0.176 background) and that
+  it does not go looking for a patch of sun that is not there.
+- **Night is lit by the lamp, not by a dimmer.** The hard part of a night room
+  is resisting the urge to raise the ambient until you can see: that turns the
+  room into a daylit one with the sun switched off, every surface some shade of
+  brown. So after dark the wash drops (`fill` 0.17), the sky half of the ambient
+  goes cool because the only thing left outside the window is sky, the floor
+  gives back less because one lamp is all that is reaching it (`bounce`), and
+  the exposure opens up instead — which is also what an eye does walking into a
+  dark room. Measured over the same frame, that took the warm/cool spread from
+  0.147 to 0.215 and the contrast from 0.103 to 0.128, and left every frame
+  before dusk bit-identical.
 - **Sunlight comes through the window, not the wall.** `sunGate` projects a point
   back along the light onto the window plane and asks whether it lands in the
   opening, which puts the window's shape and its glazing bars on the floor. The

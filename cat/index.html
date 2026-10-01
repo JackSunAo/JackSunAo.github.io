@@ -35,7 +35,7 @@ body{font-family:var(--sans);color:var(--ink);-webkit-user-select:none;user-sele
 .toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 76px);background:rgba(30,22,17,.82);color:#f6efe7;font-size:13px;padding:8px 14px;border-radius:999px;pointer-events:none;z-index:6;letter-spacing:.02em;max-width:calc(100vw - 32px);text-align:center}
 .snd[aria-pressed="false"] .on{display:none}.snd[aria-pressed="true"] .off{display:none}
 .dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 16px);pointer-events:none}
-.dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(4,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
+.dock-in{pointer-events:auto;display:grid;grid-template-columns:repeat(5,auto);gap:8px;background:var(--paper);-webkit-backdrop-filter:blur(12px) saturate(1.1);backdrop-filter:blur(12px) saturate(1.1);border:1px solid var(--line);border-radius:18px;padding:8px;box-shadow:0 10px 30px rgba(30,20,12,.18)}
 .act{appearance:none;border:0;background:transparent;color:var(--ink);font:500 14px/1 var(--sans);padding:11px 14px;min-height:44px;border-radius:12px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s}
 .act:hover{background:rgba(70,52,40,.08)}
 .act:active{transform:translateY(1px)}

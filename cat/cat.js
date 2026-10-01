@@ -339,6 +339,7 @@ uniform vec3 uLampPos;       // the warm lamp on the desk
 uniform vec3 uLampCol;
 uniform vec3 uWinCol;        // what the sky outside looks like right now
 uniform float uFill;         // how much daylight there is to bounce around
+uniform float uBounce;       // ...and how much of it comes back up off the floor
 // A real lamp falls off fast, which is what makes a room feel lit rather than
 // flooded, and is most of why the corner it stands in reads as warm.
 uniform float uLampFall;
@@ -371,7 +372,7 @@ float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yz
 vec3 roomFill(vec3 n) {
   float win = clamp(dot(n, uWinDir) * 0.5 + 0.55, 0.0, 1.0);
   float down = clamp(-n.y * 0.5 + 0.5, 0.0, 1.0);
-  return (vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down) * uFill;
+  return (vec3(0.27, 0.30, 0.36) * win + vec3(0.17, 0.125, 0.075) * down * uBounce) * uFill;
 }
 uniform vec4 uLaser;         // xyz where the dot is, w how bright
 // The dot is not a sprite pasted over the scene: it is light landing on
@@ -1353,11 +1354,23 @@ const SKY = (() => {
     // As the sun goes the lamp has to take over, and one lamp cannot light a whole
     // room from a desk: it reaches further after dark, and the ambient carries the
     // warm bounce of a lamp-lit room so the evening reads as cosy rather than murky.
-    lamp: [1.28 + 1.15 * night, 0.78 + 0.62 * night, 0.41 + 0.30 * night],
-    lampFall: 2.2 - 1.15 * night,
-    sky: [0.33 * day + 0.150, 0.35 * day + 0.140, 0.42 * day + 0.150],
-    ground: [0.22 * day + 0.115, 0.17 * day + 0.090, 0.125 * day + 0.062],
-    fill: 0.42 + 0.58 * day,
+    lamp: [1.28 + 1.35 * night, 0.78 + 0.72 * night, 0.41 + 0.34 * night],
+    lampFall: 2.2 - 0.80 * night,
+    // After dark the only thing left outside the window is the sky, and the sky
+    // is blue. That cool is what the lamp's warmth reads against: without it
+    // every surface in the room is some shade of brown and the picture is flat.
+    sky: [0.33 * day + 0.150 - 0.095 * night, 0.35 * day + 0.140 - 0.068 * night, 0.42 * day + 0.150 - 0.030 * night],
+    // The bounce off the oak is only ever as strong as the light reaching the
+    // oak, and at night that is one lamp on a desk.
+    ground: [0.22 * day + 0.115 - 0.075 * night, 0.17 * day + 0.090 - 0.059 * night, 0.125 * day + 0.062 - 0.040 * night],
+    bounce: 0.38 + 0.62 * day,
+    // A room reads as lamplit, rather than as a daylit room with the sun
+    // switched off, only if the ambient gets out of the lamp's way: it is the
+    // falloff from the desk into the far corners that says "night", and a big
+    // flat wash erases it. So the wash goes down and the eye opens up instead,
+    // which is also what a real one does walking into a dark room.
+    fill: 0.17 + 0.83 * day,
+    exposure: 0.64 + 0.62 * night,
     win: [(1.95 + 0.9 * warm) * day + 0.035, (2.05 - 0.3 * warm) * day + 0.040, (2.25 - 1.1 * warm) * day + 0.065],
   };
 })();
@@ -1650,10 +1663,11 @@ function setCommonUniforms(u) {
   gl.uniform3fv(u.uLightCol, SKY.col);
   gl.uniform3fv(u.uSkyCol, SKY.sky);
   gl.uniform3fv(u.uGroundCol, SKY.ground);
-  gl.uniform1f(u.uExposure, 0.64);
+  gl.uniform1f(u.uExposure, SKY.exposure);
   gl.uniform3fv(u.uWinDir, WIN_DIR);
   gl.uniform3fv(u.uWinCol, SKY.win);
   gl.uniform1f(u.uFill, SKY.fill);
+  gl.uniform1f(u.uBounce, SKY.bounce);
   gl.uniform1f(u.uLampFall, SKY.lampFall);
   gl.uniform3fv(u.uLampPos, ROOM.lamp);
   gl.uniform3fv(u.uLampCol, LAMP_COL);
