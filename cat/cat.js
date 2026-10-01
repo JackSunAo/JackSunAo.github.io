@@ -2367,6 +2367,17 @@ class CatSim {
     if (this.moveCb && this.moveCb.tok !== this.token) { const cb = this.moveCb; this.moveCb = null; cb.rej(CANCEL); }
 
     if (this.lookFn) this.look.target = this.lookFn().slice();
+    else if (!this.sleeping) {
+      // small, fast and nearby overrides whatever it was looking at
+      const fast = (SCENE.ball.visible && ballSpeed() > 0.30) ? SCENE.ball.p
+        : (MOUSE.out && MOUSE.speed > 0.10) ? MOUSE.p : null;
+      if (fast) {
+        this.look.target = fast.slice();
+        this.lookTimer = this.time + 0.35;
+        this.ears.tYaw = [6, 6];
+        this.whiskerT = Math.max(this.whiskerT, 0.5);
+      }
+    }
     // ---- base motion
     let P;
     if (this.mode === 'gait') P = this.updateGait(dt);
@@ -2911,12 +2922,31 @@ async function buttWiggle(cat, tok, dur) {
   await cat.wait(dur, tok); cat.check(tok);
   cat.extra = null;
 }
+// Before a body springs forward it gathers backward. Without this beat the cat
+// simply teleports into its launch, which is the most mechanical thing a jump
+// can do.
+async function coil(cat, tok, dur = 0.17) {
+  const t0 = cat.time;
+  cat.extra = (P) => {
+    const a = Math.sin(Math.PI * clamp((cat.time - t0) / dur, 0, 1));
+    P.dy -= 0.019 * a;
+    P.dx -= 0.017 * a;
+    P.pitch += 5 * a;
+    poseAddBone(P, 'thighL', 0, 0, 15 * a); poseAddBone(P, 'thighR', 0, 0, 13 * a);
+    poseAddBone(P, 'shinL', 0, 0, -19 * a); poseAddBone(P, 'shinR', 0, 0, -17 * a);
+    poseAddBone(P, 'neck', 0, 0, -7 * a); poseAddBone(P, 'head', 0, 0, 9 * a);
+    poseAddBone(P, 'spine1', 0, 0, -5 * a);
+  };
+  await cat.wait(dur, tok);
+  cat.extra = null;
+}
 async function jumpTo(cat, tok, landing, level, y1) {
   await cat.turnToward(landing, tok);
   cat.look.target = [landing[0], y1 + 0.1, landing[2]];
   cat.ears.tFlat = [0, 0]; cat.whiskerT = 0.6;
   await cat.toPose('crouch', 0.32, tok);
   await buttWiggle(cat, tok, 0.45);
+  await coil(cat, tok);
   SOUNDS.play('hop');
   await new Promise((res) => { cat.startJump(landing, y1, level); cat.jump.done = res; });
   cat.check(tok);
@@ -2983,6 +3013,7 @@ function laserChase() {
         CAT.tail.quiver = 1.0;
         await buttWiggle(CAT, tok, rand(0.35, 0.8));
         const tgt = constrainFloor([LASER.p[0], 0, LASER.p[2]], 'floor');
+        await coil(CAT, tok, 0.13);
         SOUNDS.play('hop');
         await new Promise((res) => { CAT.startJump(tgt, supportY(tgt[0], tgt[2], null), 'floor'); CAT.jump.done = res; });
         CAT.check(tok);
@@ -3043,6 +3074,7 @@ function mouseHunt() {
         await CAT.toPose('crouch', 0.2, tok);
         await buttWiggle(CAT, tok, rand(0.3, 0.7));
         const tgt = constrainFloor(mouseFlat(), 'floor');
+        await coil(CAT, tok, 0.13);
         SOUNDS.play('hop');
         await new Promise((res) => { CAT.startJump(tgt, 0, 'floor'); CAT.jump.done = res; });
         CAT.check(tok);
