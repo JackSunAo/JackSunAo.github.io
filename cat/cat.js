@@ -126,9 +126,34 @@ const M4 = {
 };
 
 // ---------------------------------------------------------------- GL helpers
+// Anything that goes wrong from here on leaves the viewer looking at a black
+// page under a "grooming…" caption forever, so say what happened instead.
+function fatal(title, detail) {
+  for (const id of ['start', 'hint']) { const e = document.getElementById(id); if (e) e.hidden = true; }
+  for (const e of document.querySelectorAll('.hud, .dock')) e.style.display = 'none';
+  const box = document.getElementById('loading');
+  if (!box) return;
+  box.hidden = false;
+  box.textContent = '';
+  const h = document.createElement('p'), p = document.createElement('p');
+  h.textContent = title; p.textContent = detail;
+  h.style.cssText = 'margin:0 0 8px;font:600 17px/1.4 var(--serif)';
+  p.style.cssText = 'margin:0;max-width:30em;font-size:13.5px;line-height:1.7;opacity:.8';
+  const card = document.createElement('div');
+  card.style.cssText = 'text-align:center;padding:0 24px';
+  card.append(h, p);
+  box.append(card);
+}
+window.addEventListener('error', (e) => {
+  if (window.__ready) return;             // only the failures that stop it starting
+  fatal('小银没能跑起来', '渲染初始化时出错了：' + (e.message || e.type) + '。换一个浏览器或重新加载页面也许可以。');
+});
 const canvas = document.getElementById('gl');
 const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
-if (!gl) throw new Error('WebGL2 不可用');
+if (!gl) {
+  fatal('这个浏览器打不开小银', '这只猫的毛发是用 WebGL2 实时算出来的，而当前浏览器没有提供 WebGL2。换用较新版本的 Chrome、Edge、Firefox 或 Safari，或者在设置里打开硬件加速，就能看到它了。');
+  return;
+}
 const MSAA = gl.getParameter(gl.SAMPLES) || 0;
 
 function compile(type, src) {
@@ -550,12 +575,22 @@ void main(){
     vec3 c = floor(q); vec3 f = fract(q);
     vec3 j = hash33(c + 17.0);
     sid = hash13(c);
-    float slen = mix(0.72, 1.0, sid);
+    // Real fur is not an even pile. Hairs gather into tufts that lean together
+    // as they rise, the tufts vary in length, and a sparse scatter of guard
+    // hairs stands clear of the rest and breaks the silhouette. Without this
+    // the coat reads as velvet however good the lighting is.
+    float tuft = fbm3(rp * 85.0);
+    float guard = step(0.94, hash13(c + 61.0));
+    float slen = mix(0.72, 1.0, sid) * (0.80 + 0.40 * tuft) * (1.0 + 0.75 * guard);
     float tt = h / slen;
     vec3 ctr = 0.2 + 0.6 * j;
+    vec3 cq = floor(q / 3.0);
+    vec3 clumpC = (cq + 0.5 + 0.44 * (hash33(cq + 41.0) - 0.5)) * 3.0 - c;
+    // clamped so a strand never wanders out of its own cell and leaves a hole
+    ctr = clamp(ctr + (clumpC - ctr) * (0.30 * h * h), 0.12, 0.88);
     vec3 dv = f - ctr;
     float d = length(dv - vRestN * dot(dv, vRestN));
-    float rad = 0.58 * (1.0 - tt * tt * 0.85);
+    float rad = 0.58 * (1.0 - tt * tt * 0.85) * (guard > 0.5 ? 0.6 : 1.0);
     vec3 fw = fwidth(q);
     float fp = max(max(fw.x, fw.y), fw.z);
     float aa = clamp(fp * 0.7, 0.02, 0.5);
