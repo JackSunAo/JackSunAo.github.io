@@ -43,7 +43,10 @@ export const COL = {
   k: [230, 194, 122], // pale gold – key
   v: [138, 169, 214], // slate blue – value
 };
-export const rgba = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+// global fade multiplier: a shot sets it so everything it draws fades together
+export let FADE = 1;
+export const setFade = (f) => { FADE = clamp(f); };
+export const rgba = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a * FADE})`;
 export const mix = (c1, c2, t) => [lerp(c1[0], c2[0], t), lerp(c1[1], c2[1], t), lerp(c1[2], c2[2], t)];
 
 // ---------- fonts ----------
@@ -98,6 +101,7 @@ export function text(ctx, str, x, y, o) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = Array.isArray(color) ? rgba(color, 1) : color;
+  ctx.globalAlpha = 1;
   ctx.globalAlpha = alpha;
   if (!tracking) ctx.fillText(str, x0, y);
   else for (let i = 0; i < L.chars.length; i++) ctx.fillText(L.chars[i], x0 + L.xs[i], y);

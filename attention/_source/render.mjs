@@ -7,10 +7,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerFonts } from './lib.mjs';
-import { drawFrame, samplesAt, W, H } from './scene.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 registerFonts(path.join(here, 'fonts'));
+const sceneMod = await import(process.env.SCENE ? path.resolve(process.env.SCENE) : path.join(here, 'scene.mjs'));
+const { drawFrame, W, H } = sceneMod;
+const samplesAt = sceneMod.samplesAt ?? (() => 4);
 const [mode, ...args] = process.argv.slice(2);
 
 if (mode === 'stills') {

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Attention Is All You Need · 30 秒</title>
-<meta name="description" content="用 30 秒动态影像看懂《Attention Is All You Need》：自注意力、Q/K/V、多头注意力与 Transformer。">
-<meta property="og:title" content="Attention Is All You Need · 30 秒">
-<meta property="og:description" content="用 30 秒动态影像看懂 Transformer 的起点。">
-<meta property="og:image" content="poster.jpg">
+<title>Attention Is All You Need · 2 分钟</title>
+<meta name="description" content="用 2 分钟动态影像讲清《Attention Is All You Need》：从论文第一页，到自注意力、Q/K/V、多头注意力与 Transformer。">
+<meta property="og:title" content="Attention Is All You Need · 2 分钟">
+<meta property="og:description" content="从论文第一页，到 Transformer 的每一个零件。">
+<meta property="og:image" content="poster-2min.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
@@ -70,6 +70,9 @@
     padding: 11px 16px; border: 1px solid var(--faint); border-radius: 3px; transition: border-color 0.2s;
   }
   .downloads a:hover { border-color: var(--accent); }
+  h2 { font: 400 clamp(28px, 4vw, 40px)/1.1 var(--serif); margin: 72px 0 8px; }
+  .teaser-note { color: var(--dim); font-size: 15px; margin: 0 0 22px; letter-spacing: 0.04em; }
+  .teaser { max-width: 720px; }
   footer {
     margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--faint);
     font-size: 14px; line-height: 1.9; color: var(--dim);
@@ -82,33 +85,49 @@
 <main>
   <div class="meta"><span>Attention Is All You Need</span><span>Vaswani et al. · NIPS 2017</span></div>
   <h1>Attention Is All You Need</h1>
-  <p class="lede">30 秒，看懂 <b>Transformer</b> 的起点 —— 开启大模型时代的那篇论文。</p>
+  <p class="lede">2 分钟，从论文第一页走到 <b>Transformer</b> 的每一个零件。</p>
 
   <div class="frame">
-    <video id="v" controls playsinline preload="metadata" poster="poster.jpg">
-      <source src="attention-is-all-you-need-1080p.mp4" type="video/mp4">
+    <video id="v" controls playsinline preload="metadata" poster="poster-2min.jpg">
+      <source src="attention-2min-1080p.mp4" type="video/mp4">
     </video>
   </div>
 
   <ol class="chapters" id="chapters">
-    <li><button data-t="0"><span class="t">00:00</span><span class="n">论文</span><span class="e">the paper</span></button></li>
-    <li><button data-t="3.2"><span class="t">00:03</span><span class="n">逐词阅读的 RNN</span><span class="e">recurrence</span></button></li>
-    <li><button data-t="7"><span class="t">00:07</span><span class="n">自注意力</span><span class="e">self-attention</span></button></li>
-    <li><button data-t="13.2"><span class="t">00:13</span><span class="n">Q · K · V 公式</span><span class="e">scaled dot-product</span></button></li>
-    <li><button data-t="17.8"><span class="t">00:18</span><span class="n">多头注意力</span><span class="e">multi-head</span></button></li>
-    <li><button data-t="21"><span class="t">00:21</span><span class="n">Transformer 与成绩</span><span class="e">architecture</span></button></li>
-    <li><button data-t="26.1"><span class="t">00:26</span><span class="n">此后的大模型</span><span class="e">legacy</span></button></li>
+    <li><button data-t="0"><span class="t">00:00</span><span class="n">论文第一页</span><span class="e">the first page</span></button></li>
+    <li><button data-t="10"><span class="t">00:10</span><span class="n">逐词阅读的 RNN</span><span class="e">recurrence</span></button></li>
+    <li><button data-t="20"><span class="t">00:20</span><span class="n">自注意力</span><span class="e">self-attention</span></button></li>
+    <li><button data-t="32"><span class="t">00:32</span><span class="n">Q · K · V</span><span class="e">query, key, value</span></button></li>
+    <li><button data-t="52"><span class="t">00:52</span><span class="n">为什么除以 √dk</span><span class="e">scaling</span></button></li>
+    <li><button data-t="60"><span class="t">01:00</span><span class="n">多头注意力</span><span class="e">multi-head</span></button></li>
+    <li><button data-t="70"><span class="t">01:10</span><span class="n">位置编码</span><span class="e">positional encoding</span></button></li>
+    <li><button data-t="78"><span class="t">01:18</span><span class="n">编码器与解码器</span><span class="e">the Transformer</span></button></li>
+    <li><button data-t="94"><span class="t">01:34</span><span class="n">为什么是注意力</span><span class="e">path length</span></button></li>
+    <li><button data-t="102"><span class="t">01:42</span><span class="n">成绩</span><span class="e">results</span></button></li>
+    <li><button data-t="110"><span class="t">01:50</span><span class="n">此后的大模型</span><span class="e">legacy</span></button></li>
   </ol>
 
   <div class="downloads">
-    <a href="attention-is-all-you-need-1080p.mp4" download>下载 1080p · 60fps</a>
-    <a href="attention-is-all-you-need-4k.mp4" download>下载 4K · 60fps</a>
+    <a href="attention-2min-1080p.mp4" download>下载 2 分钟版 · 1080p · 60fps</a>
+  </div>
+
+  <h2>30 秒预告版</h2>
+  <p class="teaser-note">同一套画面语言的精简版，适合先看个大概。</p>
+  <div class="frame teaser">
+    <video controls playsinline preload="none" poster="poster.jpg">
+      <source src="attention-is-all-you-need-1080p.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="downloads">
+    <a href="attention-is-all-you-need-1080p.mp4" download>下载 1080p</a>
+    <a href="attention-is-all-you-need-4k.mp4" download>下载 4K</a>
   </div>
 
   <footer>
     论文：Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin.
     <a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>, NIPS 2017.<br>
-    示例句 “The animal didn't cross the street because it was too tired / wide” 来自 Google Research 对 Transformer 的介绍；片中注意力权重为示意。动画与配乐均由代码逐帧生成。
+    示例句 “The animal didn't cross the street because it was too tired / wide” 来自 Google Research 对 Transformer 的介绍；片中的注意力权重、各个头的模式与交叉注意力的对齐均为示意，
+    softmax 缩放实验、位置编码热图则按公式实际计算。开场的论文第一页为排版重绘。动画与配乐均由代码逐帧生成，配乐为原创。
   </footer>
 </main>
 <script>
