@@ -1,0 +1,9 @@
+{
+  "name": "attention-is-all-you-need-30s",
+  "private": true,
+  "type": "module",
+  "description": "Frame-by-frame renderer for the 30 s 'Attention Is All You Need' explainer video.",
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.10"
+  }
+}

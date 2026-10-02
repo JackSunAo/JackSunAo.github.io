@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attention Is All You Need · 30 秒</title>
+<meta name="description" content="用 30 秒动态影像看懂《Attention Is All You Need》：自注意力、Q/K/V、多头注意力与 Transformer。">
+<meta property="og:title" content="Attention Is All You Need · 30 秒">
+<meta property="og:description" content="用 30 秒动态影像看懂 Transformer 的起点。">
+<meta property="og:image" content="poster.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0a09;
+    --ink: #eee8dc;
+    --dim: rgba(238, 232, 220, 0.56);
+    --faint: rgba(238, 232, 220, 0.14);
+    --accent: #ff6a3d;
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --zh: "Noto Serif SC", "Songti SC", serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: radial-gradient(ellipse at 50% 30%, #1b1713 0%, var(--bg) 62%) fixed, var(--bg);
+    color: var(--ink);
+    font-family: var(--zh);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 56px 16px 72px; }
+  .meta {
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    font: 12px/1.6 var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim);
+  }
+  h1 {
+    font: 400 clamp(44px, 8vw, 92px)/1 var(--serif);
+    letter-spacing: -0.01em; margin: 40px 0 14px;
+  }
+  .lede { font-size: clamp(17px, 2.2vw, 21px); color: var(--dim); margin: 0 0 36px; letter-spacing: 0.04em; }
+  .lede b { color: var(--ink); font-weight: 500; }
+  .frame {
+    position: relative; border-radius: 6px; overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--faint);
+    background: #000; aspect-ratio: 16 / 9;
+  }
+  video { display: block; width: 100%; height: 100%; }
+  .chapters {
+    list-style: none; padding: 0; margin: 28px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    border-top: 1px solid var(--faint); border-left: 1px solid var(--faint);
+  }
+  .chapters li { display: flex; border-right: 1px solid var(--faint); border-bottom: 1px solid var(--faint); }
+  .chapters button {
+    all: unset; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-start; flex: 1; box-sizing: border-box;
+    padding: 14px 16px 16px; background: var(--bg); transition: background 0.2s;
+  }
+  .chapters button:hover, .chapters button:focus-visible { background: #16130f; }
+  .chapters button:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  .chapters .t { font: 12px var(--mono); letter-spacing: 0.12em; color: var(--accent); }
+  .chapters .n { display: block; margin-top: 6px; font-size: 15px; }
+  .chapters .e { display: block; margin-top: 2px; font: italic 16px var(--serif); color: var(--dim); }
+  .chapters button.on { background: #1a1511; }
+  .downloads { margin-top: 32px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .downloads a {
+    color: var(--ink); text-decoration: none; font: 12px var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 11px 16px; border: 1px solid var(--faint); border-radius: 3px; transition: border-color 0.2s;
+  }
+  .downloads a:hover { border-color: var(--accent); }
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--faint);
+    font-size: 14px; line-height: 1.9; color: var(--dim);
+  }
+  footer a { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--faint); }
+  @media (max-width: 560px) { main { padding-top: 32px; } h1 { margin-top: 28px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="meta"><span>Attention Is All You Need</span><span>Vaswani et al. · NIPS 2017</span></div>
+  <h1>Attention Is All You Need</h1>
+  <p class="lede">30 秒，看懂 <b>Transformer</b> 的起点 —— 开启大模型时代的那篇论文。</p>
+
+  <div class="frame">
+    <video id="v" controls playsinline preload="metadata" poster="poster.jpg">
+      <source src="attention-is-all-you-need-1080p.mp4" type="video/mp4">
+    </video>
+  </div>
+
+  <ol class="chapters" id="chapters">
+    <li><button data-t="0"><span class="t">00:00</span><span class="n">论文</span><span class="e">the paper</span></button></li>
+    <li><button data-t="3.2"><span class="t">00:03</span><span class="n">逐词阅读的 RNN</span><span class="e">recurrence</span></button></li>
+    <li><button data-t="7"><span class="t">00:07</span><span class="n">自注意力</span><span class="e">self-attention</span></button></li>
+    <li><button data-t="13.2"><span class="t">00:13</span><span class="n">Q · K · V 公式</span><span class="e">scaled dot-product</span></button></li>
+    <li><button data-t="17.8"><span class="t">00:18</span><span class="n">多头注意力</span><span class="e">multi-head</span></button></li>
+    <li><button data-t="21"><span class="t">00:21</span><span class="n">Transformer 与成绩</span><span class="e">architecture</span></button></li>
+    <li><button data-t="26.1"><span class="t">00:26</span><span class="n">此后的大模型</span><span class="e">legacy</span></button></li>
+  </ol>
+
+  <div class="downloads">
+    <a href="attention-is-all-you-need-1080p.mp4" download>下载 1080p · 60fps</a>
+    <a href="attention-is-all-you-need-4k.mp4" download>下载 4K · 60fps</a>
+  </div>
+
+  <footer>
+    论文：Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, Illia Polosukhin.
+    <a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a>, NIPS 2017.<br>
+    示例句 “The animal didn't cross the street because it was too tired / wide” 来自 Google Research 对 Transformer 的介绍；片中注意力权重为示意。动画与配乐均由代码逐帧生成。
+  </footer>
+</main>
+<script>
+  const v = document.getElementById('v');
+  const buttons = [...document.querySelectorAll('#chapters button')];
+  buttons.forEach((b) => b.addEventListener('click', () => {
+    v.currentTime = parseFloat(b.dataset.t);
+    v.play().catch(() => {});
+  }));
+  v.addEventListener('timeupdate', () => {
+    let k = 0;
+    buttons.forEach((b, i) => { if (v.currentTime >= parseFloat(b.dataset.t) - 0.05) k = i; });
+    buttons.forEach((b, i) => b.classList.toggle('on', i === k));
+  });
+</script>
+</body>
+</html>
