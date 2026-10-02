@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#18333b"><meta name="description" content="实时海岸模拟：涌浪、破碎白浪、湿沙与可探索的海岸线。"><title>海岸浅滩 · Coastal Shallows</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2318333b'/%3E%3Cpath d='M5 12q5-7 11 0t11 0M5 19q5-7 11 0t11 0' fill='none' stroke='%23d7e6df' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./style.css"><script type="importmap">{"imports":{"three":"./vendor/three.webgpu.js","three/webgpu":"./vendor/three.webgpu.js","three/tsl":"./vendor/three.tsl.js","three/addons/":"./vendor/addons/"}}</script></head>
+<body><main id="viewport" aria-label="可交互的海岸。拖动环顾四周，用 W A S D 或方向键行走。"></main>
+<div id="loading" class="status-card"><svg viewBox="0 0 40 24" aria-hidden="true"><path d="M2 7q9-10 18 0t18 0M2 17q9-10 18 0t18 0"/></svg><span id="loading-text">正在生成海岸</span><div class="progress"><i id="progress"></i></div></div>
+<div id="error" class="status-card" hidden><strong>无法渲染此场景</strong><p id="error-text"></p><a href="?webgl=1">尝试 WebGL 2</a><details><summary>技术详情</summary><pre id="error-detail"></pre></details></div>
+<section id="interface" aria-label="海岸控制">
+ <div id="settings" class="panel" hidden>
+  <div class="panel-header"><span>环境</span><button id="close-settings" aria-label="关闭环境面板">×</button></div>
+  <label for="strength"><span>海况</span><output id="strength-value">适中</output></label><input id="strength" type="range" min="0.5" max="1.65" step="0.05" value="1">
+  <label for="wind"><span>风向</span><output id="wind-value">向岸风</output></label><input id="wind" type="range" min="-35" max="35" step="1" value="0">
+  <label for="tide"><span>潮位</span><output id="tide-value">平均</output></label><input id="tide" type="range" min="-0.25" max="0.3" step="0.01" value="0">
+  <label for="clouds"><span>云量</span><output id="clouds-value">25%</output></label><input id="clouds" type="range" min="0" max="1" step="0.05" value="0.25">
+  <div class="select-row"><label for="lighting">光照</label><select id="lighting"><option value="afternoon">傍晚</option><option value="daylight">日间</option><option value="overcast">柔和阴天</option></select></div>
+  <div class="select-row"><label for="quality">画质</label><select id="quality"><option value="balanced">均衡</option><option value="high">高</option><option value="low">节能</option></select></div>
+ </div>
+ <div id="help" class="panel help-panel" hidden><div class="panel-header"><span>探索海岸</span><button id="close-help" aria-label="关闭帮助">×</button></div><p>拖动环顾四周；<kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 或方向键行走；滚轮前进后退。</p><p><kbd>Space</kbd> 暂停 · <kbd>C</kbd> 切换视角 · <kbd>H</kbd> 界面</p><p>触屏设备：拖动环顾，使用移动按键行走。</p></div>
+ <div class="dock">
+ <div class="dock-primary">
+  <button id="pause" class="icon-button" aria-label="暂停模拟" title="暂停 · Space"><svg id="pause-icon" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+  <i class="separator"></i>
+  <select id="view" aria-label="相机视角" title="相机视角 · C">
+   <optgroup label="海面视角"><option value="ocean" selected>由海望岸</option><option value="behind">涌浪之后</option><option value="breaker">沿破浪线</option><option value="panorama">回流与湿沙</option></optgroup>
+   <optgroup label="海岸近观"><option value="shore">海岸线</option><option value="rock">岩石旁</option><option value="waterline">湿沙</option><option value="swell">面向大海</option></optgroup>
+  </select>
+  <button id="cinematic" class="icon-button" aria-label="开始电影镜头" aria-pressed="false" title="缓慢的离岸航线"><svg viewBox="0 0 24 24"><path d="M4 6h11v12H4zM15 10l5-3v10l-5-3"/></svg></button>
+  <i class="separator"></i>
+ </div><div class="dock-secondary">
+  <button id="settings-toggle" class="icon-button" aria-label="显示环境面板" aria-expanded="false" title="环境"><svg viewBox="0 0 24 24"><path d="M4 7h6m4 0h6M4 17h10m4 0h2M10 4v6m4 4v6"/></svg></button>
+  <button id="help-toggle" class="icon-button" aria-label="显示操作帮助" title="操作帮助"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M10 9a2 2 0 1 1 3 2c-1 1-1 1-1 3M12 17h.01"/></svg></button>
+  <button id="hide-ui" class="icon-button" aria-label="隐藏界面" title="隐藏界面 · H"><svg viewBox="0 0 24 24"><path d="M3 12s3-6 9-6 9 6 9 6-3 6-9 6-9-6-9-6zM4 4l16 16"/></svg></button>
+ </div></div>
+</section>
+<a id="back-home" href="../" title="返回首页">← 返回首页</a>
+<button id="restore-ui" class="restore" aria-label="显示界面" title="显示界面 · H" hidden><svg viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></svg></button>
+<div id="touch-pad" aria-label="移动控制"><button data-move="forward" aria-label="前进">↑</button><button data-move="left" aria-label="左移">←</button><button data-move="back" aria-label="后退">↓</button><button data-move="right" aria-label="右移">→</button></div>
+<script type="module" src="./src/main.js?v=1.3.0"></script></body></html>
