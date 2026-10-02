@@ -2507,6 +2507,10 @@ class CatSim {
       if (fast) {
         this.look.target = fast.slice();
         this.lookTimer = this.time + 0.35;
+        // and this one outranks looking where you are going, so the head stays
+        // on it while the legs carry on. It is its own timer because the one
+        // above is the idle brain's, which runs on a far longer cadence.
+        this.lookGrab = this.time + 0.35;
         this.ears.tYaw = [6, 6];
         this.whiskerT = Math.max(this.whiskerT, 0.5);
       }
@@ -2555,7 +2559,7 @@ class CatSim {
   // ---------- locomotion
   updateGait(dt) {
     if (this.moveTargetFn) this.moveTarget = this.moveTargetFn();
-    if (!this.lookFn && !this.moveFace) { const f0 = fwdOf(this.yaw + this.yawRate * 0.25); this.look.target = [this.pos[0] + f0[0], this.groundY + 0.12, this.pos[2] + f0[2]]; }
+    if (!this.lookFn && !this.moveFace && this.time >= (this.lookGrab || 0)) { const f0 = fwdOf(this.yaw + this.yawRate * 0.25); this.look.target = [this.pos[0] + f0[0], this.groundY + 0.12, this.pos[2] + f0[2]]; }
     const T = this.moveTarget;
     const dx = T[0] - this.pos[0], dz = T[2] - this.pos[2];
     const dist = Math.hypot(dx, dz);

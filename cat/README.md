@@ -60,6 +60,13 @@ These are the parts worth not regressing:
 - **Nothing holds still and nothing is symmetric.** `layerLife` adds postural
   sway, weight drifting between the legs and a permanent left/right difference,
   all from slow noise so it never repeats.
+- **Small, fast and nearby wins.** Anything darting about — the ball, the mouse —
+  takes the cat's eyes off whatever it was doing, and keeps them for a third of
+  a second after it stops. It holds through walking too, so the head stays on it
+  while the legs carry on, which is most of what makes a cat look like a cat.
+  That needs its own timer (`lookGrab`): `lookTimer` is the idle brain's, and it
+  runs on a cadence of seconds, so gating on that one instead would stop the cat
+  looking where it is going.
 - **The voice is a vocal tract, not a sample.** A Liljencrants-Fant glottal pulse
   through a formant cascade, with a pole-zero pair for the nasal cavity that
   opens and closes over each call — that notch is what makes the closed-mouth
@@ -199,10 +206,11 @@ call with nasality forced to 0 and to 1 to confirm the nasal zero lands at
 
 ## Things that would be worth doing next
 
-- Gaze only tracks the ball during `fetch`. The cat ignores it rolling past the
-  rest of the time.
 - No toy uses the bed or the desk as cover; the cat will chase onto them but the
   mouse and the wand stay on the floor.
+- The laser is not in the attention-grab, only the ball and the mouse. It has its
+  own behaviour script that takes the gaze when a chase starts, and the two would
+  have to be reconciled rather than simply both switched on.
 - The sun's position is worked out once at load, so the beam does not creep
   across the floor while you watch it.
 - The lamp's shadows are parallel, because the one shadow map is orthographic.
