@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1e26">
+<title>Coastal Shallows · 海岸浅滩实时模拟</title>
+<meta name="description" content="Three.js 实时海岸模拟：浅水透光、焦散、碎浪、湿沙、水下视角、鱼群与海鸥。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b3a46'/%3E%3Cpath d='M4 13q4-6 8 0t8 0 8 0M4 21q4-6 8 0t8 0 8 0' fill='none' stroke='%23bfeee6' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root{--glass:rgba(13,30,38,.58);--glass2:rgba(13,30,38,.78);--line:rgba(255,255,255,.14);--ink:#eaf6f4;--dim:rgba(234,246,244,.62);--acc:#7fe3d2;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1e26;color:var(--ink);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;outline:none;cursor:grab}
+canvas#c:active{cursor:grabbing}
+.glass{background:var(--glass);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border:1px solid var(--line);border-radius:14px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.ui{transition:opacity .35s}
+body.ui-hidden .ui{opacity:0;pointer-events:none;visibility:hidden}
+body.ui-hidden canvas#c{cursor:none}
+
+#title{position:fixed;left:16px;top:calc(14px + var(--safe-t));pointer-events:none;text-shadow:0 1px 8px rgba(0,0,0,.45)}
+#title h1{margin:0;font-size:12px;font-weight:600;letter-spacing:.34em;display:flex;align-items:center;gap:10px}
+#title h1:before{content:"";width:22px;height:1px;background:currentColor;opacity:.7}
+#title p{margin:4px 0 0 32px;font-size:11px;color:var(--dim);letter-spacing:.06em}
+#badge{display:inline-block;margin:8px 0 0 32px;padding:2px 8px;border-radius:5px;background:rgba(13,30,38,.6);border:1px solid var(--line);font-size:11px;letter-spacing:.04em;pointer-events:auto}
+#fps{margin-left:8px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+#tools{position:fixed;right:14px;top:calc(12px + var(--safe-t));display:flex;gap:2px;padding:5px;align-items:center}
+#tools button{height:36px;min-width:38px;padding:0 9px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--ink)}
+#tools button:hover,#presets button:hover,.chip:hover{background:rgba(255,255,255,.1)}
+#tools svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#tools .sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+#tools button.on{background:rgba(127,227,210,.2);color:var(--acc)}
+
+#bottom{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + var(--safe-b));width:min(1120px,calc(100% - 24px));display:flex;gap:8px;align-items:stretch}
+#presets{flex:1;min-width:0;display:flex;gap:2px;padding:5px;overflow-x:auto;scrollbar-width:none}
+#presets::-webkit-scrollbar{display:none}
+#presets button{flex:0 0 auto;min-width:72px;padding:7px 10px;border-radius:10px;text-align:left;color:var(--dim);transition:background .2s,color .2s}
+#presets button b{display:block;font-size:10px;font-weight:600;letter-spacing:.1em;opacity:.8}
+#presets button span{font-size:12px;white-space:nowrap}
+#presets button.on{background:rgba(255,255,255,.14);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.side{display:flex;gap:6px;padding:5px;flex:0 0 auto}
+.side button{height:100%;min-height:44px;padding:0 13px;border-radius:10px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.side button:hover{background:rgba(255,255,255,.1)}
+.side button.on{background:rgba(127,227,210,.2);color:var(--acc)}
+.side svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+#panel{position:fixed;right:14px;top:calc(64px + var(--safe-t));bottom:calc(86px + var(--safe-b));width:300px;max-width:calc(100% - 28px);overflow:auto;padding:14px 16px 18px;background:var(--glass2);transform:translateX(calc(100% + 24px));transition:transform .3s cubic-bezier(.2,.8,.2,1);scrollbar-width:thin}
+#panel.open{transform:none}
+#panel h2{font-size:11px;letter-spacing:.16em;margin:16px 0 8px;color:var(--acc);font-weight:600;text-transform:uppercase}
+#panel h2:first-child{margin-top:2px}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;margin:7px 0}
+.row label{color:var(--dim)}
+.row output{font-variant-numeric:tabular-nums;color:var(--ink);font-size:12px}
+.row input[type=range]{grid-column:1/3;width:100%;accent-color:var(--acc);height:22px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{padding:6px 10px;border-radius:8px;border:1px solid var(--line);color:var(--ink);min-height:32px}
+.chip.on{background:rgba(127,227,210,.22);border-color:rgba(127,227,210,.5);color:#fff}
+select{width:100%;background:rgba(0,0,0,.25);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit}
+.btnrow{display:flex;gap:8px;margin-top:14px}
+.btnrow .chip{flex:1;text-align:center}
+
+#about{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(3,10,14,.55);z-index:20;padding:18px}
+#about.open{display:flex}
+#about .card{max-width:520px;max-height:100%;overflow:auto;padding:22px 24px;background:var(--glass2);user-select:text;-webkit-user-select:text}
+#about h3{margin:0 0 10px;font-size:15px;letter-spacing:.12em}
+#about p,#about li{color:var(--dim);margin:.45em 0}
+#about b{color:var(--ink)}
+#about ul{padding-left:18px}
+#about .btnrow{justify-content:flex-end}
+#about .btnrow .chip{flex:0 0 auto;padding:7px 18px}
+
+#help{position:fixed;left:16px;bottom:calc(92px + var(--safe-b));padding:8px 12px;font-size:12px;color:var(--dim);display:none;pointer-events:none}
+body.explore:not(.touch) #help{display:block}
+#joy{position:fixed;left:22px;bottom:calc(110px + var(--safe-b));width:120px;height:120px;border-radius:50%;display:none;background:rgba(13,30,38,.35);border:1px solid var(--line);touch-action:none}
+#joy i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,255,255,.28);border:1px solid rgba(255,255,255,.4)}
+#vert{position:fixed;right:20px;bottom:calc(112px + var(--safe-b));display:none;flex-direction:column;gap:10px}
+#vert button{width:54px;height:54px;border-radius:50%;font-size:12px}
+body.explore.touch #joy{display:block}
+body.explore.touch #vert{display:flex}
+
+#toast{position:fixed;left:50%;top:calc(16px + var(--safe-t));transform:translate(-50%,-20px);padding:8px 14px;opacity:0;transition:all .35s;pointer-events:none;font-size:12px;z-index:30}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+
+#loader{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(120% 90% at 50% 100%,#14505a 0%,#0b1e26 62%);transition:opacity .6s}
+#loader.done{opacity:0;pointer-events:none}
+#loader h1{margin:0;font-size:13px;letter-spacing:.42em;font-weight:600}
+#loader .bar{width:min(300px,70vw);height:2px;background:rgba(255,255,255,.14);border-radius:2px;overflow:hidden}
+#loader .bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+#loader p{margin:0;color:var(--dim);font-size:12px;max-width:80vw;text-align:center}
+#loader.err p{color:#ffb4a8;user-select:text;-webkit-user-select:text}
+#loader.err .bar{display:none}
+
+@media (max-width:720px){
+  #title h1{font-size:11px;letter-spacing:.26em}
+  #title p{display:none}
+  #badge{margin-left:0;margin-top:6px}
+  #title h1:before{display:none}
+  #tools{right:8px;top:calc(8px + var(--safe-t))}
+  #tools button{min-width:42px;height:42px}
+  #tools .opt{display:none}
+  #bottom{width:calc(100% - 16px);flex-direction:column;gap:6px}
+  #presets button{min-width:80px;padding:8px 10px}
+  .side{justify-content:space-between}
+  .side button{flex:1;justify-content:center;min-height:46px}
+  #panel{top:calc(58px + var(--safe-t));bottom:calc(150px + var(--safe-b));right:8px;width:calc(100% - 16px)}
+  #help{bottom:calc(158px + var(--safe-b))}
+  #joy{bottom:calc(168px + var(--safe-b))}
+  #vert{bottom:calc(170px + var(--safe-b))}
+}
+@media (prefers-reduced-motion:reduce){.ui,#panel{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="海岸实时模拟画面"></canvas>
+
+<div id="title" class="ui">
+  <h1>COASTAL SHALLOWS</h1>
+  <p>实时海岸模拟 · リアルタイム海岸シミュレーション</p>
+  <span id="badge">画质 <span id="qlabel">High</span><span id="fps"></span></span>
+</div>
+
+<div id="tools" class="glass ui">
+  <button id="bFull" title="全屏" aria-label="全屏"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <button id="bScenery" title="只显示景观（Esc 恢复）" aria-label="只显示景观"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/></svg></button>
+  <button id="bShot" class="opt" title="保存截图" aria-label="保存截图"><svg viewBox="0 0 24 24"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg></button>
+  <button id="bInfo" title="说明" aria-label="说明"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg></button>
+  <span class="sep"></span>
+  <button id="bSet" title="设置" aria-label="设置"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="opt">设置</span></button>
+</div>
+
+<div id="bottom" class="ui">
+  <div id="presets" class="glass" role="toolbar" aria-label="相机视角"></div>
+  <div class="side glass">
+    <button id="bExplore" title="探索模式（WASD / 拖动）"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg><span>探索</span></button>
+    <button id="bPause" title="暂停 / 继续（空格）"><svg viewBox="0 0 24 24"><path d="M8 6v12M16 6v12"/></svg><span>暂停</span></button>
+  </div>
+</div>
+
+<div id="help" class="glass ui">WASD 移动 · 拖动环视 · Shift 加速 · Space 上浮 · C 下潜 · R 回到出发点</div>
+<div id="joy" class="ui"><i></i></div>
+<div id="vert" class="ui"><button class="glass" id="bUp">上浮</button><button class="glass" id="bDown">下潜</button></div>
+
+<aside id="panel" class="glass ui" aria-label="设置"></aside>
+
+<div id="about" role="dialog" aria-modal="true" aria-label="说明">
+  <div class="card glass">
+    <h3>COASTAL SHALLOWS</h3>
+    <p>这是一个完全在浏览器里实时运行的视觉模拟：浅水波由海底深度求解（折射、浅水变形、深度限制破碎），浪花、湿沙和焦散都读取同一套波场。</p>
+    <ul>
+      <li><b>视角 01–10</b>：点击底部按钮切换；拖动可环视。</li>
+      <li><b>探索</b>：WASD 行走 / 游泳，水深超过约 1.3 米自动切换为游泳，可上浮、下潜。</li>
+      <li><b>只显示景观</b>：隐藏全部界面，按 Esc 恢复（手机：三指轻点）。</li>
+    </ul>
+    <p><b>免责声明：</b>本作品是视觉模拟，「可游泳」仅指画面上的平缓、清澈的海滩气氛，<b>不代表任何真实海岸或海况的安全性</b>。实际下水前请查看当地天气、警报、救生员与管理方的指引。</p>
+    <p>规格思路来自 hajimetwi3/hajimetwi3-prompt-okiba（MIT）中公开的制作依赖文本；代码为独立实现，仅依赖 three.js（MIT），运行时无外部请求。</p>
+    <div class="btnrow"><button class="chip" id="aboutClose">关闭</button></div>
+  </div>
+</div>
+
+<div id="toast" class="glass"></div>
+
+<div id="loader">
+  <h1>COASTAL SHALLOWS</h1>
+  <div class="bar"><i id="lbar"></i></div>
+  <p id="lmsg">正在生成海岸地形…</p>
+</div>
+
+<script>
+/*__BUNDLE__*/
+</script>
+</body>
+</html>
