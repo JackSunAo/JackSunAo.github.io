@@ -340,6 +340,7 @@ uniform vec3 uLampCol;
 uniform vec3 uWinCol;        // what the sky outside looks like right now
 uniform float uFill;         // how much daylight there is to bounce around
 uniform float uBounce;       // ...and how much of it comes back up off the floor
+uniform float uLampShadow;   // 1 after dark, when the shadow map is the lamp's
 // A real lamp falls off fast, which is what makes a room feel lit rather than
 // flooded, and is most of why the corner it stands in reads as warm.
 uniform float uLampFall;
@@ -786,7 +787,8 @@ void main(){
   vec3 V = normalize(uCamPos - vWorld);
   vec3 T = normalize(vT);
   vec3 L = uLightDir;
-  float sh = (h > 0.0 ? shadowFast(vShadow, 0.0012, 2.4) : shadowAt(vShadow, 0.0012, 2.2)) * sunGate(vWorld);
+  float shRaw = h > 0.0 ? shadowFast(vShadow, 0.0012, 2.4) : shadowAt(vShadow, 0.0012, 2.2);
+  float sh = shRaw * sunGate(vWorld);
   float NoL = dot(N, L);
   float wrap = clamp((NoL + 0.25) / 1.25, 0.0, 1.0);
   float TL = dot(T, L);
@@ -809,7 +811,7 @@ void main(){
   // the desk lamp, wrapped the same way the key light is so the fur keeps its softness
   vec3 lampL = lampDir(vWorld);
   float lampWrap = clamp((dot(N, lampL) + 0.25) / 1.25, 0.0, 1.0);
-  col += alb * uLampCol * lampWrap * lampFall(vWorld) * occ * ao * 0.9;
+  col += alb * uLampCol * lampWrap * lampFall(vWorld) * occ * ao * 0.9 * mix(1.0, shRaw, uLampShadow);
   float NoV = abs(dot(N, V));
   // Forward scattering. Light that passes through a hair instead of bouncing
   // off it is what makes a backlit coat glow, and it is the thing that most
@@ -1141,7 +1143,7 @@ void main(){
   col += uLightCol * spec * pow(max(dot(N, H), 0.0), gloss) * sun * (uMat == 8 || uMat == 9 ? ao : 1.0);
   // and the lamp, which is the warm half of the room
   vec3 ld = lampDir(p);
-  float lf = lampFall(p) * ao;
+  float lf = lampFall(p) * ao * mix(1.0, sh, uLampShadow);
   col += alb * uLampCol * max(dot(N, ld), 0.0) * lf;
   col += uLampCol * spec * pow(max(dot(N, normalize(ld + V)), 0.0), gloss) * lf;
   if (uMat == 0) {
@@ -1364,6 +1366,9 @@ const SKY = (() => {
     // oak, and at night that is one lamp on a desk.
     ground: [0.22 * day + 0.115 - 0.075 * night, 0.17 * day + 0.090 - 0.059 * night, 0.125 * day + 0.062 - 0.040 * night],
     bounce: 0.38 + 0.62 * day,
+    // Once the sun is down it casts nothing, and the one shadow map the
+    // scene can afford is better spent on the only light left in the room.
+    lampShadow: day < 0.10,
     // A room reads as lamplit, rather than as a daylit room with the sun
     // switched off, only if the ambient gets out of the lamp's way: it is the
     // falloff from the desk into the far corners that says "night", and a big
@@ -1668,6 +1673,7 @@ function setCommonUniforms(u) {
   gl.uniform3fv(u.uWinCol, SKY.win);
   gl.uniform1f(u.uFill, SKY.fill);
   gl.uniform1f(u.uBounce, SKY.bounce);
+  gl.uniform1f(u.uLampShadow, SKY.lampShadow ? 1 : 0);
   gl.uniform1f(u.uLampFall, SKY.lampFall);
   gl.uniform3fv(u.uLampPos, ROOM.lamp);
   gl.uniform3fv(u.uLampCol, LAMP_COL);
@@ -1679,6 +1685,20 @@ function setCommonUniforms(u) {
 }
 
 function computeShadowVP() {
+  if (SKY.lampShadow) {
+    // The lamp is a point source, and this treats it as a directional one. It
+    // stands in a corner with the whole room out in front of it, so every
+    // shadow still falls away from that corner; what is lost is the way they
+    // should splay apart with distance. In exchange the depth range stays what
+    // the bias and the polygon offset were tuned against. The eye sits at the
+    // lamp rather than behind it, so the wall it stands against is in front of
+    // nothing and cannot shadow the room.
+    const L = ROOM.lamp;
+    const aim = v3.norm(v3.sub([0.1, 0.15, 0.25], L));
+    const view = M4.lookAt(L, v3.madd(L, aim, 3.0), [0, 1, 0]);
+    R.shadowVP = M4.mul(M4.ortho(-3.4, 3.4, -3.4, 3.4, 0.02, 8.0), view);
+    return;
+  }
   const c = [0.0, 0.0, 0.0];
   const eye = v3.add(c, v3.mul(LIGHT_DIR, 4.0));
   const view = M4.lookAt(eye, c, [0, 1, 0]);
@@ -4674,35 +4694,6 @@ window.__test = {
   async pose(name) { CAT.run('test', async (tok) => { await CAT.toPose(name, 0.01, tok); }); for (let i = 0; i < 3; i++) { step(1 / 30); await new Promise((r) => setTimeout(r, 0)); } return name; },
   state() { return { pos: CAT.pos, yaw: CAT.yaw, mode: CAT.mode, pose: CAT.poseName, busy: CAT.busy, status: CAT.status, level: CAT.level, ball: BALL.p, held: BALL.held }; },
   pet(region) { const hit = { region, point: SK.wp[BI(region === 'belly' ? 'spine1' : 'head')], side: 1 }; petBegin(hit); return 'pet'; },
-  async sheetPoses(items, cols, w, h) {
-    noResize = true;
-    const rows = Math.ceil(items.length / cols);
-    const sheet = document.createElement('canvas'); sheet.width = w * cols; sheet.height = h * rows;
-    const ctx = sheet.getContext('2d');
-    canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; canvas.width = w; canvas.height = h;
-    CAM.update = function () {};
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      CAT.run('test', async (tok) => { await CAT.toPose(it.pose, 0.01, tok); });
-      CAT.lookFn = null; CAT.look.target = null; CAT.look.w = 0; CAT.look.yaw = 0; CAT.look.pitch = 0;
-      CAT.tail.ph = 0;
-      for (let k = 0; k < 4; k++) { step(1 / 30); await new Promise((r) => setTimeout(r, 0)); }
-      const f = focusPoint();
-      CAM.az = it.cam[0]; CAM.el = it.cam[1]; CAM.dist = it.cam[2]; CAM.target = [f[0], it.cam[3] !== undefined ? it.cam[3] : f[1], f[2]];
-      draw();
-      const px = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      const img = ctx.createImageData(w, h);
-      for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
-      ctx.putImageData(img, (i % cols) * w, Math.floor(i / cols) * h);
-      ctx.fillStyle = '#fff'; ctx.font = '15px sans-serif'; ctx.fillText(it.pose + ' ' + it.cam.join(','), (i % cols) * w + 8, Math.floor(i / cols) * h + 20);
-    }
-    canvas.style.display = 'none';
-    for (const el of document.querySelectorAll('.hud,.dock,.hint,.start')) el.style.display = 'none';
-    sheet.style.position = 'fixed'; sheet.style.left = '0'; sheet.style.top = '0'; sheet.style.zIndex = '20';
-    document.body.appendChild(sheet);
-    return 'sheet';
-  },
   // contact strip driven by a spec object: run the sim, fire events at given
   // cells, grab one frame per cell and composite them into a single canvas
   async sheetFrames2(spec) {
@@ -4727,31 +4718,6 @@ window.__test = {
       ctx.fillText(((i + 1) * stepsPerCell * dt).toFixed(2) + 's', (i % cols) * w + 6, Math.floor(i / cols) * h + 15);
     }
     return sheet.toDataURL('image/png');
-  },
-  async sheetFrames(steps, cols, w, h, camFn) {
-    // run the sim, capture frames every `steps[i]` sim steps
-    noResize = true;
-    const rows = Math.ceil(steps.length / cols);
-    const sheet = document.createElement('canvas'); sheet.width = w * cols; sheet.height = h * rows;
-    const ctx = sheet.getContext('2d');
-    canvas.style.width = w + 'px'; canvas.style.height = h + 'px'; canvas.width = w; canvas.height = h;
-    for (let i = 0; i < steps.length; i++) {
-      const n = steps[i];
-      for (let k = 0; k < n; k++) { step(1 / 30); await new Promise((r) => setTimeout(r, 0)); }
-      if (camFn) camFn(i);
-      draw();
-      const px = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      const img = ctx.createImageData(w, h);
-      for (let y = 0; y < h; y++) img.data.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
-      ctx.putImageData(img, (i % cols) * w, Math.floor(i / cols) * h);
-      ctx.fillStyle = '#fff'; ctx.font = '15px sans-serif'; ctx.fillText((i + 1) + ': ' + CAT.status + ' [' + CAT.poseName + '/' + CAT.mode + ']', (i % cols) * w + 8, Math.floor(i / cols) * h + 20);
-    }
-    canvas.style.display = 'none';
-    for (const el of document.querySelectorAll('.hud,.dock,.hint,.start')) el.style.display = 'none';
-    sheet.style.position = 'fixed'; sheet.style.left = '0'; sheet.style.top = '0'; sheet.style.zIndex = '20';
-    document.body.appendChild(sheet);
-    return 'sheet';
   },
 };
 }

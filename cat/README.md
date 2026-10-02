@@ -119,6 +119,15 @@ so each carries its own id in the uv rather than being identified by position.
   back along the light onto the window plane and asks whether it lands in the
   opening, which puts the window's shape and its glazing bars on the floor. The
   rest of the room is carried by the area fill and the desk lamp.
+- **The shadow map belongs to whichever light is actually lighting the room.**
+  There is only one, and after dark the sun casts nothing, so `computeShadowVP`
+  re-aims it at the lamp and `uLampShadow` moves the shadow term off the sun's
+  contribution and onto the lamp's. The chair, the desk, the plant and the cat
+  all get shadows at night for no extra cost at all. It treats the lamp as
+  directional, which is a lie about a point source — but it stands in a corner
+  with the whole room in front of it, so the shadows still fall away from that
+  corner, and the depth range stays the one the bias was tuned against. What is
+  lost is the way they should splay apart with distance.
 - **The cat finds the sun.** `sunSpot()` works out where that patch lands using
   the same geometry the shader does — the two are checked against each other —
   and the cat crosses the room to lie in it, both on command and on its own.
@@ -190,11 +199,12 @@ call with nasality forced to 0 and to 1 to confirm the nasal zero lands at
 
 ## Things that would be worth doing next
 
-- There is no anticipation before a big move: a cat gathers slightly backwards
-  before it springs forwards, and nothing here does.
 - Gaze only tracks the ball during `fetch`. The cat ignores it rolling past the
   rest of the time.
 - No toy uses the bed or the desk as cover; the cat will chase onto them but the
   mouse and the wand stay on the floor.
-- `sheetPoses` and `sheetFrames` are the older contact-sheet helpers, kept only
-  because they predate `sheetFrames2`; nothing uses them now.
+- The sun's position is worked out once at load, so the beam does not creep
+  across the floor while you watch it.
+- The lamp's shadows are parallel, because the one shadow map is orthographic.
+  A perspective frustum from the lamp would splay them correctly, but the depth
+  bias is tuned for a linear depth range and would have to be re-tuned with it.
