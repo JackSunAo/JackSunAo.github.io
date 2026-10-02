@@ -11,7 +11,7 @@ import {registerAgentTools} from './agent-tools.js?v=1.3.0';
 const profile=new URLSearchParams(location.search).has('profile')?new FrameProfile():null;
 const $=id=>document.getElementById(id);
 const diagnostics={ready:false,revision:THREE.REVISION,errors:[],metrics:null,frameTimes:[],backend:null};
-function fail(error){diagnostics.ready=false;diagnostics.errors.push(String(error?.stack||error));$('loading').hidden=true;$('error').hidden=false;$('error-text').textContent='This experience needs a browser with WebGPU or WebGL 2. Try the alternate renderer below, or open it in a recent desktop browser.';$('error-detail').textContent=String(error?.message||error);}
+function fail(error){diagnostics.ready=false;diagnostics.errors.push(String(error?.stack||error));$('loading').hidden=true;$('error').hidden=false;$('error-text').textContent='此场景需要支持 WebGPU 或 WebGL 2 的浏览器。请尝试下方的备用渲染器，或使用新版桌面浏览器打开。';$('error-detail').textContent=String(error?.message||error);}
 window.addEventListener('error',e=>{diagnostics.errors.push(e.message);if(!diagnostics.ready)fail(e.error||e.message);});window.addEventListener('unhandledrejection',e=>fail(e.reason));
 let renderer,worker,world,shaders,navigation,camera,spray,paused=false,last=performance.now(),busy=false,accumulator=0,simTime=36,previousTime=36,packetAt=0,frameCount=0,currentQuality='balanced',pending=null,pauseAt=0,renderClock=36-.06;
 let previousConditions={strength:1,wind:0,tide:0},currentConditions={...previousConditions};
@@ -22,7 +22,7 @@ const scene=new THREE.Scene();
 const makeField=()=>{const t=new THREE.DataTexture(new Float32Array(GRID.nx*GRID.nz*4),GRID.nx,GRID.nz,THREE.RGBAFormat,THREE.FloatType);t.minFilter=t.magFilter=THREE.LinearFilter;t.needsUpdate=true;return t;};
 const fields={surface:makeField(),previous:makeField(),material:makeField(),previousMaterial:makeField(),flow:makeField(),previousFlow:makeField()};
 const qa=document.createElement('output');qa.id='qa-state';qa.hidden=true;document.body.appendChild(qa);
-function setPause(value){value=!!value;if(value===paused)return;if(value!==paused){if(value)pauseAt=performance.now();else{packetAt+=performance.now()-pauseAt;last=performance.now();}}paused=value;$('pause').setAttribute('aria-label',paused?'Resume simulation':'Pause simulation');$('pause').title=paused?'Resume · Space':'Pause · Space';$('pause-icon').innerHTML=paused?'<path d="M8 5l11 7-11 7z"/>':'<path d="M8 5v14M16 5v14"/>';worker?.postMessage({type:'pause',value:paused});}
+function setPause(value){value=!!value;if(value===paused)return;if(value!==paused){if(value)pauseAt=performance.now();else{packetAt+=performance.now()-pauseAt;last=performance.now();}}paused=value;$('pause').setAttribute('aria-label',paused?'继续模拟':'暂停模拟');$('pause').title=paused?'继续 · Space':'暂停 · Space';$('pause-icon').innerHTML=paused?'<path d="M8 5l11 7-11 7z"/>':'<path d="M8 5v14M16 5v14"/>';worker?.postMessage({type:'pause',value:paused});}
 function setView(name){navigation.setView(name);$('view').value=name;$('cinematic').setAttribute('aria-pressed','false');return (navigation.transition?.duration||0)*1000;}
 function toggleUI(){const hidden=$('interface').hidden;$('interface').hidden=!hidden;$('restore-ui').hidden=hidden;$('touch-pad').style.visibility=hidden?'':'hidden';}
 function configure(value){worker.postMessage({type:'configure',value});}
@@ -38,9 +38,9 @@ function bindUI(){
  $('settings-toggle').onclick=()=>{$('settings').hidden=!$('settings').hidden;$('settings-toggle').setAttribute('aria-expanded',String(!$('settings').hidden));$('help').hidden=true;};$('close-settings').onclick=()=>{$('settings').hidden=true;$('settings-toggle').setAttribute('aria-expanded','false');$('settings-toggle').focus();};
  $('help-toggle').onclick=()=>{$('help').hidden=!$('help').hidden;$('settings').hidden=true;$('settings-toggle').setAttribute('aria-expanded','false');};$('close-help').onclick=()=>{$('help').hidden=true;$('help-toggle').focus();};
  $('hide-ui').onclick=$('restore-ui').onclick=toggleUI;
- $('strength').oninput=e=>{const v=+e.target.value;configure({strength:v});$('strength-value').textContent=v<.8?'Gentle':v>1.25?'Lively':'Moderate';};
- $('wind').oninput=e=>{const v=+e.target.value;configure({wind:v});$('wind-value').textContent=v===0?'Onshore':`${Math.abs(v)}° ${v<0?'left':'right'}`;};
- $('tide').oninput=e=>{const v=+e.target.value;configure({tide:v});$('tide-value').textContent=Math.abs(v)<.01?'Mean':`${v>0?'+':''}${v.toFixed(2)} m`;};
+ $('strength').oninput=e=>{const v=+e.target.value;configure({strength:v});$('strength-value').textContent=v<.8?'平缓':v>1.25?'汹涌':'适中';};
+ $('wind').oninput=e=>{const v=+e.target.value;configure({wind:v});$('wind-value').textContent=v===0?'向岸风':`${Math.abs(v)}° ${v<0?'偏左':'偏右'}`;};
+ $('tide').oninput=e=>{const v=+e.target.value;configure({tide:v});$('tide-value').textContent=Math.abs(v)<.01?'平均':`${v>0?'+':''}${v.toFixed(2)} m`;};
  $('clouds').oninput=e=>setClouds(+e.target.value);$('lighting').onchange=e=>{setLighting(e.target.value);if(e.target.value==='overcast')setClouds(.95);};$('quality').onchange=e=>setQuality(e.target.value);
  window.addEventListener('keydown',e=>{if(isInterfaceEvent(e))return;if(e.code==='Space'){e.preventDefault();setPause(!paused);}if(e.code==='KeyH')toggleUI();if(e.code==='KeyC'){const keys=Object.keys(VIEWS);setView(keys[(keys.indexOf(navigation.view)+1)%keys.length]);}if(e.code==='Escape'){$('settings').hidden=$('help').hidden=true;}});
  $('interface').addEventListener('keydown',e=>{if(e.key==='Escape'&&e.target.tagName!=='SELECT'){const settings=!$('settings').hidden;$('settings').hidden=$('help').hidden=true;$('settings-toggle').setAttribute('aria-expanded','false');(settings?$('settings-toggle'):$('help-toggle')).focus();}e.stopPropagation();});$('interface').addEventListener('wheel',e=>e.stopPropagation(),{passive:true});$('interface').addEventListener('pointerdown',e=>e.stopPropagation());
@@ -65,7 +65,7 @@ async function init(){
    if(data.type==='ready'||data.type==='qa-frame'){if(pending)recyclePacket(pending);pending=null;installPacket(data,true);}
    else{if(pending)recyclePacket(pending);pending=data;return;}
    if(data.type==='ready'){
-    camera.updateMatrixWorld();shaders.updateCamera(camera);$('loading-text').textContent='Resolving light and water';$('progress').style.width='92%';
+    camera.updateMatrixWorld();shaders.updateCamera(camera);$('loading-text').textContent='正在解算光与水';$('progress').style.width='92%';
     try{await renderer.compileAsync(scene,camera);renderer.render(scene,camera);diagnostics.ready=true;diagnostics.startupMilliseconds=performance.now()-bootAt;$('loading').hidden=true;last=performance.now();renderer.setAnimationLoop(frame);worker.postMessage({type:'pause',value:paused});}catch(e){fail(e);}
    }
   };

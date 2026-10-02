@@ -14,3 +14,5 @@
  select option:focus-visible{outline:3px solid #e5f6bb;outline-offset:-3px}
  select option::checkmark{color:#fff;order:1;margin-left:auto}
 }
+
+#back-home{position:fixed;top:16px;left:16px;z-index:12;padding:10px 14px;border:1px solid #8ba3aa;border-radius:10px;background:#102b36e8;color:#f3f7f6;text-decoration:none;font-size:14px}#back-home:hover{background:#304c59}
