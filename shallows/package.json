@@ -1,0 +1,8 @@
+{
+  "name": "coastal-shallows",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Real-time coastal shallows simulation (Three.js). Source for the single-file build in index.html.",
+  "scripts": { "build": "node build.mjs" },
+  "devDependencies": { "esbuild": "^0.25.0", "three": "^0.186.0" }
+}
