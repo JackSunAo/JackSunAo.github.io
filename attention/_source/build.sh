@@ -16,7 +16,7 @@ SCENE=./scene-long.mjs node make.mjs 2 60 "${WORKERS:-4}" out/long 60
 if [ -n "$MUSIC" ]; then ffmpeg -y -hide_banner -loglevel error -i "$MUSIC" -t 120 -ar 48000 -ac 2 out/long_norm.wav
 else python3 audio_long.py out/long_raw.wav && norm out/long_raw.wav -14 out/long_norm.wav; fi
 ./encode-long.sh 1080
-[ "$4K" = "1" ] && ./encode-long.sh 4k
+[ "$FOURK" = "1" ] && ./encode-long.sh 4k
 
 # ---- 30-second teaser
 node make.mjs 2 60 "${WORKERS:-4}" out/master 60
