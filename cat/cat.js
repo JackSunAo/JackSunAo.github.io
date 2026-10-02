@@ -4534,7 +4534,13 @@ UI.share.addEventListener('click', async () => {
   const url = location.href.split('?')[0].split('#')[0];
   try {
     if (navigator.share) { await navigator.share({ title: '小银', text: '一只住在小房间里的美短猫，可以摸、可以逗', url }); return; }
-  } catch (e) { return; }                       // the sheet was dismissed; nothing to say
+  } catch (e) {
+    // Two very different things land here. A dismissed sheet is the viewer's
+    // answer, so say nothing. Anything else means the browser would not open
+    // one at all — an embedded frame is the common case — and swallowing that
+    // leaves a button that does nothing, so fall through to the link instead.
+    if (e && e.name === 'AbortError') return;
+  }
   try {
     await navigator.clipboard.writeText(url);
     toast('链接已复制');
