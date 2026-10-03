@@ -74,7 +74,7 @@ def apply_materials(M):
                 put(M["lawn"])
             elif n in ("Walkway",):
                 put(M["aggregate"])
-            elif n in ("Driveway", "MotorCourt", "HangarApron", "TowPath", "BoatPath", "GardenSidePath"):
+            elif n in ("Driveway", "MotorCourt", "HangarApron", "TowPath", "BoatPath"):
                 put(M["drive"])
             elif n in ("Lake",):
                 put(M["lake"])

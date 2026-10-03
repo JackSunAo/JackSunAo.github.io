@@ -28,7 +28,7 @@ Y_MAIN = 13.5       # front wall of the west wing / stone gable (porch in front)
 Y_BRICK = 10.5      # brick wing front, flush with the porch
 Y_EGABLE = 9.0      # east gable, projecting furthest
 LAKE = -5.0
-SHORE = 62.0
+SHORE = 100.0       # lake shore (was 62; pushed back for a deeper rear lawn)
 
 
 def ground(x, y):
@@ -256,7 +256,7 @@ def collection(name):
 def build_site():
     c = collection("Site")
     # terrain grid (lot + neighbours), lake bed beyond the shore
-    x1, x2, y1, y2, step = -160.0, 240.0, -80.0, 62.0, 2.0
+    x1, x2, y1, y2, step = -160.0, 240.0, -80.0, SHORE, 2.0
     nx, ny = int((x2 - x1) / step), int((y2 - y1) / step)
     bm = bmesh.new()
     rows = []
@@ -273,7 +273,8 @@ def build_site():
     t.data.materials.append(MATS["lawn"])
     link(t, c)
     box("LakeBed", -300, 420, SHORE, 900, -9, -7, "farshore", c)
-    box("Bulkhead", -160, 240, SHORE - 0.4, SHORE + 0.2, -7.5, ground(0, SHORE) + 0.25, "paving", c)
+    for k, (a, b) in enumerate(((-160, 15.5), (26.5, 240))):     # gap for the sand beach
+        box(f"Bulkhead{k}", a, b, SHORE - 0.4, SHORE + 0.2, -7.5, ground(0, SHORE) + 0.25, "paving", c)
     box("FarGround", -900, 900, -900, -79.9, -3.0, ground(0, -80), "lawn", c)
     for side, (a, b) in (("W", (-900, -159.9)), ("E", (239.9, 900))):
         terrain_strip("Ground" + side, a, b, -80, SHORE, "lawn", c, dz=0.0, step=20.0)
@@ -305,49 +306,12 @@ def build_site():
             tree(f"Screen{i}_{k}", x + (1.5 if y == 8 else 0), y, 7.5, 1.9, c)
     for i, y in enumerate(range(18, 34, 3)):
         tree(f"East{i}", 80.8, y, 7, 1.6, c)
-    for i, y in enumerate(range(2, 60, 4)):
+    for i, y in enumerate(range(2, int(SHORE) - 2, 4)):
         tree(f"West{i}", -2.5, y, 8, 2.0, c)
 
-    # garden (west): side path + arbor, rose parterres + fountain, pergola, raised beds, greenhouse
-    terrain_strip("GardenSidePath", 0.8, 7.2, 16.5, 29, "paving", c)
-    terrain_strip("GardenLawn", 0, 12.5, 29, 59.5, "garden", c, dz=0.02)
-    for x in (1.5, 6.5):
-        box(f"ArborPost{x}", x - 0.1, x + 0.1, 15.9, 16.1, -0.5, 2.4, "wood", c)
-    box("ArborTop", 1.3, 6.7, 15.8, 16.2, 2.4, 2.6, "wood", c)
-    for i, (x, y) in enumerate([(1.5, 30.5), (7, 30.5), (1.5, 35.5), (7, 35.5)]):
-        g = ground(x + 2, y + 1.75)
-        box(f"Parterre{i}", x, x + 4, y, y + 3.5, g - 0.3, g + 0.6, "hedge", c)
-    g = ground(6.25, 34.75)
-    cylinder("Fountain", 6.25, 34.75, g - 0.2, g + 0.5, 0.9, "paving", c)
-    cylinder("FountainTier", 6.25, 34.75, g + 0.5, g + 1.3, 0.3, "paving", c)
-    g = ground(6, 42.75)
-    for x in range(1, 12, 2):
-        for y in (41.2, 44.3):
-            box(f"PergolaPost{x}_{y}", x + 0.4, x + 0.6, y - 0.1, y + 0.1, g - 0.3, g + 2.8, "wood", c)
-    for x in range(1, 12, 1):
-        box(f"PergolaBeam{x}", x + 0.45, x + 0.55, 40.8, 44.7, g + 2.8, g + 3.0, "wood", c)
-    for i, y in enumerate([46, 49.5, 53]):
-        for x in (1.5, 7):
-            gg = ground(x + 2, y + 1.1)
-            box(f"RaisedBed{i}_{x}", x, x + 4, y, y + 2.2, gg - 0.3, gg + 0.55, "wood", c)
-    gg = ground(5, 58)
-    box("Greenhouse", 2, 8, 56.8, 59, gg - 0.2, gg + 2.6, "glass", c)
-    gable("GreenhouseRoof", 2, 8, 56.8, 59, gg + 2.6, "x", 0.8, 0.1, "glass", "glass", c)
-    for i, (x, y) in enumerate([(11, 50), (11, 57.5), (11.2, 53.7)]):
-        tree(f"Fruit{i}", x, y, 4.0, 1.4, c)
-
-    # rear lawn: fire pit, boathouse path, pier
-    g = ground(20, 57.5)
-    cylinder("FirePit", 20, 57.5, g - 0.2, g + 0.45, 1.0, "paving", c)
-    terrain_strip("FirePitPad", 16.5, 23.5, 54.5, 60.5, "paving", c, dz=0.03)
-    terrain_strip("BoatPath", 44.5, 47.5, 31, SHORE, "paving", c)
-    zp = -4.1
-    box("Pier", 22.5, 24.5, SHORE - 0.5, 70, zp - 0.3, zp, "wood", c)
-    box("PierT", 18, 29, 70, 72, zp - 0.3, zp, "wood", c)
-    for x in (18.3, 22.7, 24.3, 28.7):
-        for y in (64, 67, 70.3, 71.7):
-            if 18 <= x <= 29 and (y > 69.9 or 22.5 <= x <= 24.5):
-                cylinder(f"Piling{x}_{y}", x, y, -8, zp + 0.6, 0.15, "wood", c, 8)
+    # rear landscape: garden rooms, framed activity lawn, shoreline, pier, meadow
+    import landscape
+    landscape.build(sys.modules[__name__], c)
     return c
 
 
@@ -559,7 +523,7 @@ def build_lake():
     zw = -4.0            # walkway level, ~1 m above the normal lake level
     for (a, b, y1, y2) in [(36, 37, 63, 77), (44, 45, 63, 77), (49, 50, 63, 77), (36, 50, 63, 64)]:
         box(f"BH_Walk{a}_{y1}", a, b, y1, y2, zw - 0.3, zw, "wood", c)
-    box("BH_Link", 44.5, 47.5, SHORE - 0.5, 63, zw - 0.3, zw, "wood", c)
+    box("BH_Link", 48.0, 50.0, 61.5, 63, zw - 0.3, zw, "wood", c)
     for x in (36.2, 44.5, 49.8):
         for y in (63.3, 67.8, 72.3, 76.7):
             cylinder(f"BH_Pile{x}_{y}", x, y, -8, zw + 3.2, 0.18, "wood", c, 8)
@@ -574,6 +538,10 @@ def build_lake():
     yacht(40.5, 70.0, LAKE + 0.45, c)
     for x in (46.0, 48.0):     # personal watercraft on lifts
         blob(f"JetSki{x}", x, 66.2, LAKE + 0.9, 0.6, 1.6, 0.4, "hull", c, 2)
+    # laid out against a shore at y = 62; move everything to the current shore
+    for o in c.objects:
+        if o.parent is None:
+            o.location.y += SHORE - 62.0
     return c
 
 
@@ -642,9 +610,11 @@ def aim(sun_obj, azimuth, elevation):
 VIEWS = {
     # name: (camera location, target, focal mm, resolution, sun azimuth, sun elevation[, lens shift y])
     "front": ((22.0, -2.5, 1.3), (18.0, 13.5, 1.3), 20, (1200, 1200), 235, 32, 0.10),
-    "lake":  ((26.0, 135.0, -3.2), (27.0, 35.0, 1.0), 40, (1600, 900), 300, 18),
-    "pool":  ((19.5, 37.6, 1.7), (33.0, 62.0, -2.0), 20, (1600, 900), 290, 22),
-    "aerial": ((-32.0, -26.0, 52.0), (40.0, 42.0, -2.0), 30, (1600, 900), 235, 38),
+    "lake":  ((28.0, 175.0, -3.0), (28.0, 50.0, 1.0), 38, (1600, 900), 300, 18),
+    "pool":  ((19.5, 37.6, 1.7), (31.0, 80.0, -3.5), 22, (1600, 900), 290, 22),
+    "lawn":  ((31.5, 98.6, -2.9), (26.0, 40.0, 1.0), 24, (1600, 900), 235, 28),
+    "garden": ((7.5, 45.0, -1.2), (7.0, 70.0, -3.5), 22, (1600, 900), 250, 30),
+    "aerial": ((-30.0, -22.0, 66.0), (40.0, 60.0, -3.0), 28, (1600, 900), 235, 38),
 }
 
 

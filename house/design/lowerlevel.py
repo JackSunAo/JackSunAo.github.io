@@ -10,21 +10,23 @@ def R(x1, y1, x2, y2, fill, stroke="#444", sw=1, extra=""):
     out.append(f'<rect x="{min(x1,x2):.1f}" y="{min(y1,y2):.1f}" width="{abs(x2-x1):.1f}" height="{abs(y2-y1):.1f}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" {extra}/>')
 
 # ---------------- section ----------------
-SS, SX0, SY0 = 14, 40, 70          # px per m, left margin, top margin
+SS, SX0, SY0 = 10, 40, 70          # px per m, left margin, top margin
 D0, ZTOP = 6, 17                  # first d shown, highest z shown
 def sx(d): return SX0 + (d - D0) * SS
 def sy(z): return SY0 + (ZTOP - z) * SS
 T(SX0, 34, "示意剖面（从街道到湖，竖向不夸张，真实比例）", 18, weight="bold", anchor="start")
-T(SX0, 54, "← 街道　　标高：±0.0 主层 · −3.3 地下层/湖景露台 · −5.0 湖常水位", 11, "#666", anchor="start"); T(sx(80), 54, "湖 →", 11, "#666", anchor="end")
+T(SX0, 54, "← 街道　　标高：±0.0 主层 · −3.3 地下层/湖景露台 · −5.0 湖常水位", 11, "#666", anchor="start"); T(sx(118), 54, "湖 →", 11, "#666", anchor="end")
 # sky / lake / ground
-R(sx(D0), sy(ZTOP), sx(80), sy(-9), "#f4f8fb", "none")
-lake = [(sx(60), sy(-5.0)), (sx(80), sy(-5.0)), (sx(80), sy(-9)), (sx(64), sy(-9)), (sx(62), sy(-7.5)), (sx(62), sy(-5.0))]
+R(sx(D0), sy(ZTOP), sx(118), sy(-9), "#f4f8fb", "none")
+lake = [(sx(98), sy(-5.0)), (sx(118), sy(-5.0)), (sx(118), sy(-9)), (sx(102), sy(-9)), (sx(100), sy(-7.5)), (sx(100), sy(-5.0))]
 poly(lake, "#6fa8c8", "none")
 ground = [(sx(D0), sy(-0.7)), (sx(13.5), sy(-0.4)), (sx(13.5), sy(-3.6)), (sx(46.6), sy(-3.6)),
-          (sx(50), sy(-3.2)), (sx(62), sy(-4.4)), (sx(62), sy(-7.5)), (sx(64), sy(-9)), (sx(D0), sy(-9))]
+          (sx(50), sy(-3.2)), (sx(100), sy(-4.4)), (sx(100), sy(-7.5)), (sx(102), sy(-9)), (sx(D0), sy(-9))]
 poly(ground, "#cdbb9a", "#8a7a62")
 # lawn slope surface
-out.append(f'<polyline points="{sx(50)},{sy(-3.0)} {sx(62)},{sy(-4.2)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
+out.append(f'<polyline points="{sx(50)},{sy(-3.0)} {sx(100)},{sy(-4.2)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
+T(sx(75), sy(-2.2), "大活动草坪 · 缓坡约 50 m 到湖岸", 11, "#2f4a22", "bold")
+T(sx(75), sy(-3.0), "野餐 · 秋千 · 烧烤亭 · 儿童游乐", 9, "#2f4a22")
 out.append(f'<polyline points="{sx(D0)},{sy(-0.5)} {sx(13.5)},{sy(-0.3)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
 # basement under house + corridor + bar (lower level, floor z = -3.3)
 R(sx(13.5), sy(0), sx(29), sy(-3.3), "#efe4cf", "#333", 2)
@@ -71,15 +73,15 @@ out.append(f'<line x1="{sx(45.5)}" y1="{sy(-0.05)}" x2="{sx(46.6)}" y2="{sy(-2.9
 R(sx(46.2), sy(-2.9), sx(47.0), sy(-3.3), "#5ec2da", "#1f6f87")
 T(sx(48.6), sy(-1.0), "无边际溢流", 9, "#1f6f87", anchor="start"); T(sx(48.6), sy(-1.9), "→ 集水槽", 9, "#1f6f87", anchor="start")
 # bulkhead, boathouse, yacht
-R(sx(61.6), sy(-4.2), sx(62.2), sy(-7.5), "#a89a82", "none")
-R(sx(63), sy(-1.0), sx(77), sy(-5.0), "none", "#555", 1.5)
-poly([(sx(62.5), sy(-0.9)), (sx(70), sy(1.6)), (sx(77.5), sy(-0.9))], "#3a3a3c", "#222")
-R(sx(63), sy(-0.9), sx(77), sy(-1.2), "#e9dfcb", "#555")
-T(sx(70), sy(-1.9), "船屋 · 顶层观景台", 10)
-poly([(sx(64.5), sy(-4.6)), (sx(75.5), sy(-4.6)), (sx(74.5), sy(-5.5)), (sx(65.5), sy(-5.4))], "#fafafa", "#444")
-poly([(sx(67), sy(-4.6)), (sx(68.5), sy(-3.6)), (sx(72), sy(-3.6)), (sx(72.5), sy(-4.6))], "#2c3e50", "#444")
-T(sx(70), sy(-6.4), "游艇（升降机吊起）", 9, "#fff")
-T(sx(70), sy(-8.2), "湖", 14, "#fff", "bold")
+R(sx(99.6), sy(-4.2), sx(100.2), sy(-7.5), "#a89a82", "none")
+R(sx(101), sy(-1.0), sx(115), sy(-5.0), "none", "#555", 1.5)
+poly([(sx(100.5), sy(-0.9)), (sx(108), sy(1.6)), (sx(115.5), sy(-0.9))], "#3a3a3c", "#222")
+R(sx(101), sy(-0.9), sx(115), sy(-1.2), "#e9dfcb", "#555")
+T(sx(108), sy(-1.9), "船屋 · 顶层观景台", 10)
+poly([(sx(102.5), sy(-4.6)), (sx(113.5), sy(-4.6)), (sx(112.5), sy(-5.5)), (sx(103.5), sy(-5.4))], "#fafafa", "#444")
+poly([(sx(105), sy(-4.6)), (sx(106.5), sy(-3.6)), (sx(110), sy(-3.6)), (sx(110.5), sy(-4.6))], "#2c3e50", "#444")
+T(sx(108), sy(-6.4), "游艇（升降机吊起）", 9, "#fff")
+T(sx(108), sy(-8.2), "湖", 14, "#fff", "bold")
 # levels
 for z, lab in [(0, "±0.0"), (-3.3, "−3.3"), (-5.0, "−5.0")]:
     out.append(f'<line x1="{sx(D0)}" y1="{sy(z)}" x2="{sx(D0)+14}" y2="{sy(z)}" stroke="#c0392b" stroke-width="1.5"/>')
@@ -138,7 +140,7 @@ yb = py(DA) + 26
 out.append(f'<line x1="{PX0}" y1="{yb}" x2="{PX0 + 5*PS}" y2="{yb}" stroke="#333" stroke-width="3"/>')
 T(PX0 + 2.5*PS, yb + 16, "5 m", 11)
 
-W = max(sx(80), px(40)) + 40
+W = max(sx(118), px(40)) + 40
 H = yb + 40
 svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H:.0f}" viewBox="0 0 {W:.0f} {H:.0f}"><rect width="100%" height="100%" fill="#fbfaf7"/>' + "".join(out) + "</svg>"
 open(__file__.rsplit("/", 1)[0] + "/lower-level.svg", "w").write(svg)

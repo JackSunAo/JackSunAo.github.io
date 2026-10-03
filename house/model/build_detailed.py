@@ -22,7 +22,7 @@ OUT_BLEND = os.path.join(HERE, "detailed.blend")
 
 # per-view lighting: dusk = reference look (low warm sun, lit interiors); day = clear afternoon
 LIGHT = {
-    "front": "dusk", "lake": "dusk", "pool": "day", "aerial": "day",
+    "front": "dusk", "lake": "dusk", "pool": "day", "lawn": "day", "garden": "day", "aerial": "day",
 }
 
 
