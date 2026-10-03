@@ -20,6 +20,7 @@ import details  # noqa: E402
 import facade  # noqa: E402
 import front_yard  # noqa: E402
 import interiors  # noqa: E402
+import rear_yard  # noqa: E402
 import house_real  # noqa: E402
 import materials_pbr  # noqa: E402
 
@@ -174,6 +175,7 @@ def build(opt):
         interiors.build(M, bm.collection("Interiors"))
     if "--no-plants" not in sys.argv:
         front_yard.build(bm, M, bm.collection("FrontYard"))
+        rear_yard.build(bm, M, bm.collection("RearYard"))
     lights = bm.collection("Lights")
     room_lights(info["rooms"], lights)
     porch_lights(lights)

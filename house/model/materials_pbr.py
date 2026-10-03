@@ -124,9 +124,9 @@ def build_all(dusk=True):
         "paver": pbr("LimestonePavers", "paver", 2.0, "#efe4cf", 0.3, value=1.0, sat=0.8, rough_mul=1.4, bump=0.4),
         "limestone_paver": pbr("DeckPavers", "paver", 2.0, "#efe4cf", 0.3, value=1.0, sat=0.8, rough_mul=1.4, bump=0.4),
         "aggregate": pbr("ExposedAggregate", "gravel", 0.9, "#f0e3cb", 0.6, value=1.3, sat=0.8, bump=0.7),
-        "gravel": pbr("DGGravel", "gravel", 1.5, None, 0.0, bump=0.8),
+        "gravel": pbr("DGGravel", "gravel", 1.5, "#c2a98a", 0.6, value=0.85, bump=0.8),
         "drive": pbr("DriveConcrete", "concrete", 3.0, "#e4ded2", 0.3, value=1.05, sat=0.6),
-        "lawn_ground": pbr("LawnGround", "lawn_ground", 4.0, "#5f9a3a", 0.55, value=0.95, sat=1.3, bump=0.4),
+        "lawn_ground": pbr("LawnGround", "lawn_ground", 4.0, "#4f9a35", 0.7, value=0.95, sat=1.4, bump=0.4),
         "sand": pbr("BeachSand", "sand", 3.0, None, 0.0, bump=0.6),
         "mulch": pbr("Mulch", "mulch", 1.5, "#6a4a32", 0.3, value=0.8, bump=0.8),
         # interiors

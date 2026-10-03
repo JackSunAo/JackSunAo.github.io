@@ -168,7 +168,7 @@ def build(bm, M, coll):
     far = lambda x, y: lawn_keep(x, y) and math.hypot(x - 22.0, y + 2.5) >= 16.0
     blades = V.sample_poly(region, 900.0, rnd, near) + V.sample_poly(region, 330.0, rnd, far)
     for m in V.coll_materials(lawn) + V.coll_materials(tufts):
-        V.tweak_material(m, 0.47, 1.4, 2.3)
+        V.tweak_material(m, 0.52, 1.5, 2.8)
     V.scatter("FY_Lawn", lawn, [(x, y, g(x, y) - 0.01) for x, y in blades], coll, 14, (1.1, 1.6), tilt=0.25)
     tu = V.sample_poly(region, 4.0, rnd, lawn_keep)
     V.scatter("FY_LawnTufts", tufts, [(x, y, g(x, y) - 0.02) for x, y in tu], coll, 15, (0.5, 0.8), tilt=0.2)

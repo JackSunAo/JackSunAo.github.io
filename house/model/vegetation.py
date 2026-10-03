@@ -430,3 +430,70 @@ def cone_core(name, x, y, z, r, h, coll, segs=24):
     o.data.materials.append(_mat("HedgeCore", "#1f3a16", 0.9, var=0.1))
     coll.objects.link(o)
     return o
+
+
+def bloom_bush(name, seed, radius=0.45, height=0.8, n_leaf=160, n_bloom=24, bloom="#d9476b", bloom_r=0.035,
+               leaf="#3f6b2a", petals=True, ball=False):
+    """Rose / hydrangea style shrub: leafy mound with blooms on the surface (cupped roses or flower balls)."""
+    rnd = random.Random(seed)
+    lm = _mat(f"Leaf_{leaf}", leaf, 0.55, sss=0.12, var=0.18)
+    bmat = _mat(f"Bloom_{bloom}", bloom, 0.5, sss=0.35, var=0.15)
+    bmm = bmesh.new()
+    for k in range(n_leaf):
+        u, v = rnd.uniform(0, 2 * math.pi), rnd.uniform(0.05, 1.0)
+        r = radius * math.sqrt(v) * rnd.uniform(0.75, 1.05)
+        p = Vector((math.cos(u) * r, math.sin(u) * r, height * (0.15 + 0.85 * math.sqrt(max(0.0, 1 - (r / radius) ** 2)) * rnd.uniform(0.7, 1.0))))
+        lf = bmesh.ops.create_icosphere(bmm, subdivisions=1, radius=rnd.uniform(0.035, 0.06))
+        bmesh.ops.scale(bmm, vec=(1, 0.45, 0.12), verts=lf["verts"])
+        bmesh.ops.rotate(bmm, cent=(0, 0, 0), matrix=Matrix.Rotation(rnd.uniform(0, 6.28), 3, "Z") @ Matrix.Rotation(rnd.uniform(-0.6, 0.6), 3, "X"), verts=lf["verts"])
+        bmesh.ops.translate(bmm, vec=p, verts=lf["verts"])
+    for k in range(n_bloom):
+        u = rnd.uniform(0, 2 * math.pi)
+        r = radius * rnd.uniform(0.1, 0.95)
+        p = Vector((math.cos(u) * r, math.sin(u) * r, height * (0.25 + 0.8 * math.sqrt(max(0.0, 1 - (r / radius) ** 2)))))
+        if ball:
+            fl = bmesh.ops.create_icosphere(bmm, subdivisions=2, radius=bloom_r * rnd.uniform(0.85, 1.2))
+            for vv in fl["verts"]:
+                vv.co *= 1 + 0.12 * math.sin(vv.co.x * 120) * math.sin(vv.co.y * 130)
+            geo = fl["verts"]
+        else:
+            fl = bmesh.ops.create_cone(bmm, cap_ends=True, segments=10, radius1=bloom_r * 0.45, radius2=bloom_r, depth=bloom_r * 1.2)
+            geo = fl["verts"]
+        bmesh.ops.translate(bmm, vec=p, verts=geo)
+        for f in {f for vv in geo for f in vv.link_faces}:
+            f.material_index = 1
+    return _mesh_obj(name, bmm, [lm, bmat])
+
+
+def willow(name, seed, height=9.0, crown=4.2, strands=2400):
+    """Weeping willow: forked trunk and a curtain of long hanging leaf strands."""
+    rnd = random.Random(seed)
+    bark = _mat("WillowBark", "#5a4a3a", 0.85, var=0.2)
+    leaf = _mat("WillowLeaf", "#5e7a3a", 0.65, sss=0.2, var=0.4)
+    bmm = bmesh.new()
+    tr = bmesh.ops.create_cone(bmm, cap_ends=True, segments=12, radius1=0.38, radius2=0.22, depth=height * 0.45)
+    bmesh.ops.translate(bmm, vec=(0, 0, height * 0.225), verts=tr["verts"])
+    for k in range(5):
+        a = k * 2 * math.pi / 5 + rnd.uniform(-0.3, 0.3)
+        d = Vector((math.cos(a) * 0.7, math.sin(a) * 0.7, 1.0)).normalized()
+        L = height * 0.45
+        br = bmesh.ops.create_cone(bmm, cap_ends=True, segments=8, radius1=0.16, radius2=0.05, depth=L)
+        mtx = Matrix.Translation(Vector((0, 0, height * 0.42)) + d * L / 2) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        bmesh.ops.transform(bmm, matrix=mtx, verts=br["verts"])
+    nbark = len(bmm.faces)
+    for s in range(strands):
+        u = rnd.uniform(0, 2 * math.pi)
+        r = crown * math.sqrt(rnd.uniform(0.15, 1.0))
+        top = Vector((math.cos(u) * r, math.sin(u) * r, height * (0.75 + 0.25 * math.sqrt(max(0.0, 1 - (r / crown) ** 2)))))
+        L = rnd.uniform(0.35, 0.8) * top.z
+        side = Vector((-math.sin(u), math.cos(u), 0)) * rnd.uniform(0.008, 0.016)
+        out = Vector((math.cos(u), math.sin(u), 0)) * 0.08
+        rows = []
+        for i in range(6):
+            t = i / 5
+            p = top + out * t - Vector((0, 0, L * t))
+            rows.append((bmm.verts.new(p - side), bmm.verts.new(p + side)))
+        for i in range(5):
+            f = bmm.faces.new((rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]))
+            f.material_index = 1
+    return _mesh_obj(name, bmm, [bark, leaf])
