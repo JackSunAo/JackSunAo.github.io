@@ -21,8 +21,10 @@ import facade  # noqa: E402
 import front_yard  # noqa: E402
 import interiors  # noqa: E402
 import armory  # noqa: E402
+import lowerlevel  # noqa: E402
 import rear_yard  # noqa: E402
 import outdoor  # noqa: E402
+import outdoor2  # noqa: E402
 import house_real  # noqa: E402
 import materials_pbr  # noqa: E402
 
@@ -37,6 +39,7 @@ LIGHT = {
     "int_great": ("inside", 235), "int_loft": ("inside", 235), "int_stair": ("inside", 160),
     "int_game": ("inside", 235), "int_kitchen": ("inside", 235), "int_media": ("inside", 160),
     "int_armory": ("inside", 235), "int_secret": ("inside", 235),
+    "int_cinema": ("inside", 0, 0.8), "int_wine": ("inside", 0, 0.6), "int_gym": ("inside", 0, 0.6),
 }
 EXTRA_VIEWS = {
     # name: (location, target, lens, resolution, shift_y)
@@ -46,14 +49,17 @@ EXTRA_VIEWS = {
     "int_loft": ((18.2, 19.9, 5.65), (29.5, 27.3, 5.3), 16, (1600, 1100), 0.0),
     "int_stair": ((16.0, 13.85, 1.5), (19.6, 17.0, 4.6), 14, (1200, 1600), 0.0),
     "int_game": ((25.9, 22.35, 5.6), (31.5, 29.3, 6.2), 14, (1600, 1100), 0.0),
-    "int_kitchen": ((25.95, 22.45, 1.65), (31.5, 27.8, 1.1), 16, (1600, 1100), 0.0),
+    "int_kitchen": ((26.05, 28.95, 1.6), (33.0, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
-    "int_armory": ((12.55, 19.45, 1.65), (8.6, 22.5, 1.25), 14, (1600, 1100), 0.0),
-    "int_secret": ((13.2, 14.6, 1.55), (10.3, 19.4, 1.3), 18, (1200, 1500), 0.0),
+    "int_armory": ((12.55, 19.95, 1.65), (8.6, 22.6, 1.2), 14, (1600, 1100), 0.0),
+    "int_secret": ((11.0, 14.9, 1.5), (10.45, 21.5, 1.3), 20, (1200, 1500), 0.0),
+    "int_cinema": ((15.5, 22.45, -2.15), (11.3, 14.0, -2.6), 16, (1600, 1100), 0.0),
+    "int_wine": ((25.1, 21.95, -2.3), (17.4, 16.2, -2.35), 15, (1600, 1100), 0.0),
+    "int_gym": ((26.25, 9.95, -2.2), (32.5, 21.0, -2.6), 16, (1600, 1100), 0.0),
 }
 
 REPLACED_PREFIX = ("Main_", "StoneGable_", "BrickWing_", "EastGable_", "RearGable_", "Dormer2", "Dormer3")
-KEEP = {"DormerWin0", "DormerWin1"}      # dormer glass stays until the dormers get real windows
+KEEP = {"DormerWin0", "DormerWin1"}      # replaced by dormer_windows() once the facade is built
 
 
 def parse():
@@ -68,7 +74,7 @@ def parse():
 # ---------------------------------------------------------------- lighting
 def hdri_sun_angle(key):
     """Equirect column of the brightest sky pixel -> angle (rad, from +X toward +Y) in HDRI space."""
-    img = bpy.data.images.load(assets.hdri(key, "1k"), check_existing=True)
+    img = bpy.data.images.load(assets.hdri(key, "1k"), check_existing=False)    # private copy: removed below
     w, h = img.size
     px = img.pixels[:]
     best, bu = -1.0, 0
@@ -155,6 +161,58 @@ def porch_lights(coll):
         coll.objects.link(o)
 
 
+def dormer_windows(M, coll):
+    """Real windows in the two west-wing dormers (cream casing, black frame, 2x2 lites, dark room behind)."""
+    for i, x in enumerate((9.2, 12.2)):
+        o = bpy.data.objects.get(f"DormerWin{i}")
+        if o:
+            bpy.data.objects.remove(o, do_unlink=True)
+        a, b = x + 0.3, x + 1.7 - 0.3
+        y = 14.6 - 0.2
+        z1 = bm.EAVE + (14.6 - bm.Y_MAIN) * 1.1
+        z2 = z1 + 1.3
+        room = interiors.mat("DormerRoom", "#2a241f", 0.9)
+        def bx(n, u1, u2, d1, d2, za, zb, m):
+            house_real._box(n, u1, u2, y - d2, y - d1, za, zb, m, coll)
+        bx(f"Dormer{i}_room", a, b, 0.0, 0.004, z1, z2, room)
+        bx(f"Dormer{i}_glass", a, b, 0.03, 0.036, z1, z2, M["glass"])
+        for k, (u1, u2, za, zb) in enumerate(((a, a + 0.06, z1, z2), (b - 0.06, b, z1, z2), (a, b, z1, z1 + 0.06), (a, b, z2 - 0.06, z2))):
+            bx(f"Dormer{i}_f{k}", u1, u2, 0.0, 0.06, za, zb, M["frame"])
+        bx(f"Dormer{i}_mv", (a + b) / 2 - 0.022, (a + b) / 2 + 0.022, 0.02, 0.05, z1, z2, M["frame"])
+        bx(f"Dormer{i}_mh", a, b, 0.02, 0.05, (z1 + z2) / 2 - 0.022, (z1 + z2) / 2 + 0.022, M["frame"])
+        for k, (u1, u2, za, zb) in enumerate(((a - 0.11, a, z1 - 0.05, z2 + 0.12), (b, b + 0.11, z1 - 0.05, z2 + 0.12),
+                                               (a - 0.11, b + 0.11, z2, z2 + 0.14))):
+            bx(f"Dormer{i}_casing{k}", u1, u2, 0.0, 0.035, za, zb, M["trim"])
+        bx(f"Dormer{i}_sill", a - 0.16, b + 0.16, 0.0, 0.08, z1 - 0.1, z1 - 0.03, M["trim"])
+
+
+def trim_roofs_inside(coll):
+    """Eave overhangs that run into the house (where one roof meets a taller part of the building) would hang
+    below the ceilings inside; cut every roof slab with the footprint prism below the eave line."""
+    bmesh_ = __import__("bmesh")
+    b = bmesh_.new()
+    pts = house_real.FOOTPRINT
+    lo = [b.verts.new((x, y, -2.0)) for x, y in pts]
+    hi = [b.verts.new((x, y, house_real.EAVE - 0.005)) for x, y in pts]
+    b.faces.new(list(reversed(lo)))
+    b.faces.new(hi)
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        b.faces.new((lo[i], lo[j], hi[j], hi[i]))
+    b.normal_update()
+    me = bpy.data.meshes.new("RoofTrimCutter")
+    b.to_mesh(me)
+    b.free()
+    cutter = bpy.data.objects.new("RoofTrimCutter", me)
+    coll.objects.link(cutter)
+    cutter.hide_render = True
+    cutter.display_type = "WIRE"
+    for o in coll.objects:
+        if o.name.endswith(("_roofS", "_roofN", "_roofW", "_roofE")):
+            m = o.modifiers.new("trim_inside", "BOOLEAN")
+            m.operation, m.solver, m.object = "DIFFERENCE", "EXACT", cutter
+
+
 # ---------------------------------------------------------------- scene assembly
 def build(opt):
     bm.reset()
@@ -183,16 +241,20 @@ def build(opt):
             for mod in o.modifiers:
                 if mod.type == "SOLIDIFY":
                     mod.material_offset_rim = 1
+    trim_roofs_inside(coll)
     facade.build(M, bm.collection("Windows"))
+    dormer_windows(M, bm.collection("Windows"))
     details.build_landscape(M, bm.collection("Hardscape"))
     if "--no-interior" not in sys.argv:
         interiors.build(M, bm.collection("Interiors"))
         armory.build(M, bm.collection("Interiors"))
-        armory.secret_door(hinge_xy=(10.97, 18.565))
+        armory.secret_door(hinge_xy=(10.03, 18.565), angle_deg=-72.0)
+        lowerlevel.build(M, bm.collection("LowerLevel"))
     if "--no-plants" not in sys.argv:
         front_yard.build(bm, M, bm.collection("FrontYard"))
         rear_yard.build(bm, M, bm.collection("RearYard"))
     outdoor.build(bm, M, bm.collection("Outdoor"))
+    outdoor2.build(bm, M, bm.collection("Outdoor2"))
     lights = bm.collection("Lights")
     room_lights(info["rooms"], lights)
     porch_lights(lights)
@@ -224,18 +286,25 @@ def render(opt, M):
         v = views[name]
         scn.camera = bpy.data.objects["Cam_" + name]
         scn.render.resolution_x, scn.render.resolution_y = int(v[3][0] * scale), int(v[3][1] * scale)
-        mode, az = LIGHT.get(name, ("dusk", 20))
+        spec = LIGHT.get(name, ("dusk", 20))
+        mode, az = spec[:2]
+        expo = spec[2] if len(spec) > 2 else float(os.environ.get("INSIDE_EXPOSURE", "0.3"))
         if mode == "dusk":
             set_world(os.environ.get("DUSK_HDRI", "dusk"), int(os.environ.get("DUSK_AZ", az)), 1.0,
                       float(os.environ.get("DUSK_EXPOSURE", "-0.2")))
         elif mode == "inside":          # daylight through the windows, house lights on (as in the video)
-            set_world("day", az, 1.0, float(os.environ.get("INSIDE_EXPOSURE", "1.3")))
+            set_world("day", az, 1.0, expo)
         else:
             set_world("day", az, 1.0, 0.0)
         dusk_sun(mode == "dusk", int(os.environ.get("SUN_AZ", az)), float(os.environ.get("SUN_EL", 7)))
         for o in bpy.data.objects:
             if o.type == "LIGHT" and (o.name.startswith(("RL_", "LanternL", "PorchCan")) or o.get("dusk_only")):
                 o.hide_render = (mode == "day") or (mode == "inside" and bool(o.get("dusk_only")))
+            if o.type == "LIGHT" and o.name.startswith("RL_") and o.data.type == "AREA":
+                if "base_energy" not in o:
+                    o["base_energy"] = o.data.energy
+                # by day the room fill is only a bounce stand-in: windows must stay the brightest thing
+                o.data.energy = o["base_energy"] * (float(os.environ.get("INSIDE_RL", "0.3")) if mode == "inside" else 1.0)
         scn.render.filepath = os.path.join(OUT_DIR, f"{name}{'_preview' if opt['preview'] else ''}.png")
         bpy.ops.render.render(write_still=True)
         print("rendered", scn.render.filepath, flush=True)

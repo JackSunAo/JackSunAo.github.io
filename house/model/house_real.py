@@ -236,9 +236,20 @@ def _assign_facade_materials(o, M):
         o.data.materials.append(zones[k])
     idx = {"brick": 0, "plaster": 1, "siding": 2, "stone": 3}
     me = o.data
+    inner = _poly_offset(FOOTPRINT, T_EXT)
+
+    def inside(x, y, poly):
+        hit = False
+        for i in range(len(poly)):
+            (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % len(poly)]
+            if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
+                hit = not hit
+        return hit
     for p in me.polygons:
         c, nrm = p.center, p.normal
-        if p.material_index == 1:          # interior / top / bottom faces from the ring
+        # interior faces (the boolean does not keep the ring's slot indices): a step along the normal lands
+        # inside the inner contour; tops and bottoms are hidden in the slabs
+        if abs(nrm.z) > 0.5 or inside(c.x + nrm.x * 0.03, c.y + nrm.y * 0.03, inner):
             p.material_index = idx["plaster"]
             continue
         zone = "brick"

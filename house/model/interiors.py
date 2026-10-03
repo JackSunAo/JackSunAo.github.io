@@ -182,11 +182,13 @@ def bookcase(name, axis, plane, u1, u2, z1, z2, inward, depth=0.36, books=True):
     """Built-in bookcase against a wall; books from the Poly Haven decorative set."""
     wood = mat("BookcasePaint", "#2f3b36", 0.45)
     d0, d1 = plane, plane + inward * depth
-    def bx(n, a1, a2, za, zb):
+    def bx(n, a1, a2, za, zb, dd=(d0, d1)):
         if axis == "y":
-            return box(n, a1, a2, min(d0, d1), max(d0, d1), za, zb, wood)
-        return box(n, min(d0, d1), max(d0, d1), a1, a2, za, zb, wood)
-    bx(name + "_back", u1, u2, z1, z2)
+            return box(n, a1, a2, min(dd), max(dd), za, zb, wood)
+        return box(n, min(dd), max(dd), a1, a2, za, zb, wood)
+    bx(name + "_back", u1, u2, z1, z2, (d0, d0 + inward * 0.02))       # thin back panel against the wall
+    bx(name + "_plinth", u1, u2, z1, z1 + 0.1)
+    bx(name + "_top", u1, u2, z2 - 0.04, z2)
     nshel = int((z2 - z1 - 0.3) / 0.38)
     for k in range(nshel + 1):
         zz = z1 + 0.25 + k * 0.38
@@ -526,12 +528,16 @@ def fireplace(x1, x2, y_wall, inward=-1):
 def great_room():
     z = 0.0
     fireplace(20.05, 21.55, 28.7, -1)
-    rug("GreatRug", 16.6, 21.4, 22.4, 27.2, z, "#d3cab9", "#2c2c2c")
-    P.place("sofa_03", (18.7, 23.2, z), 0, coll=COLL, name="GreatSofa")
-    P.place("sofa_02", (16.9, 25.4, z), 270, coll=COLL, name="GreatSofa2")
-    P.place("modern_arm_chair_01", (20.9, 25.6, z), 120, coll=COLL, name="GreatChair")
-    P.place("modern_coffee_table_02", (18.9, 25.3, z), 0, coll=COLL, name="GreatTable")
-    P.place("throw_pillows_01", (18.3, 23.1, 0.45), 0, coll=COLL, name="GreatPillows")
+    # floor-to-ceiling limestone chimney breast above the firebox (lines up with the chimney outside)
+    box("FireBreast", 19.75, 21.85, 28.4, 28.7, 2.6, EAVE, M["stone"])
+    rug("GreatRug", 16.7, 21.6, 23.2, 27.6, z, "#d3cab9", "#2c2c2c")
+    P.place("sofa_03", (19.3, 24.1, z), 0, coll=COLL, name="GreatSofa")
+    P.place("sofa_03", (17.1, 26.1, z), 270, coll=COLL, name="GreatSofa2")
+    P.place("modern_arm_chair_01", (21.5, 25.4, z), 120, coll=COLL, name="GreatChair")
+    P.place("modern_coffee_table_02", (19.3, 25.9, z), 0, coll=COLL, name="GreatTable")
+    P.place("throw_pillows_01", (18.9, 24.0, 0.45), 0, coll=COLL, name="GreatPillows")
+    P.place("side_table_01", (17.0, 24.5, z), 0, coll=COLL, name="GreatSide")
+    table_lamp("GreatLamp", 17.0, 24.5, 0.55, 0.6)
     # dining in front of the windows, geometric rug, ring pendants (as in the video)
     rug("GreatDiningRug", 21.9, 25.2, 22.3, 27.6, z, "#e9e4d8", "#1d1d1d")
     walnut = mat("DiningWalnut", "#3e2c20", 0.35)
@@ -546,29 +552,209 @@ def great_room():
     P.place("potted_plant_01", (25.0, 28.2, z), 60, coll=COLL, name="GreatPlant2")
 
 
+def marble_mat(name="CalacattaMarble"):
+    """Polished white marble with soft grey veining (noise-distorted waves)."""
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m = mat(name, "#f2f0eb", 0.1)
+    nt = m.node_tree
+    p = nt.nodes["Principled BSDF"]
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    wv = nt.nodes.new("ShaderNodeTexWave")
+    wv.inputs["Scale"].default_value = 1.6
+    wv.inputs["Distortion"].default_value = 14.0
+    wv.inputs["Detail"].default_value = 6.0
+    wv.inputs["Detail Scale"].default_value = 2.0
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.elements[0].position = 0.0
+    ramp.color_ramp.elements[0].color = (0.42, 0.42, 0.43, 1)
+    ramp.color_ramp.elements[1].position = 0.12
+    ramp.color_ramp.elements[1].color = (0.88, 0.87, 0.85, 1)
+    nt.links.new(tc.outputs["Object"], wv.inputs["Vector"])
+    nt.links.new(wv.outputs["Fac"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], p.inputs["Base Color"])
+    p.inputs["Coat Weight"].default_value = 0.4
+    return m
+
+
+def _front(axis, plane, out):
+    """Box builder in a cabinet-front frame: u along the run, d outward from the front plane."""
+    def fb(n, u1, u2, d1, d2, z1, z2, m, bev=0.0):
+        if axis == "x":
+            return box(n, plane + out * d1, plane + out * d2, u1, u2, z1, z2, m, bev)
+        return box(n, u1, u2, plane + out * d1, plane + out * d2, z1, z2, m, bev)
+    return fb
+
+
+def shaker(name, axis, plane, out, u1, u2, z1, z2, n, paint, pull, horizontal_pull=False):
+    """Row of shaker doors/drawers: slab + raised frame + brass pull, 3 mm reveals."""
+    fb = _front(axis, plane, out)
+    w = (u2 - u1) / n
+    for k in range(n):
+        a, b = u1 + k * w + 0.0015, u1 + (k + 1) * w - 0.0015
+        fb(f"{name}{k}_slab", a, b, 0.0, 0.018, z1 + 0.0015, z2 - 0.0015, paint)
+        fw = min(0.065, (z2 - z1) * 0.22)
+        for j, (ua, ub, za, zb) in enumerate(((a, a + fw, z1, z2), (b - fw, b, z1, z2), (a, b, z1, z1 + fw), (a, b, z2 - fw, z2))):
+            fb(f"{name}{k}_fr{j}", ua, ub, 0.018, 0.03, za + 0.0015, zb - 0.0015, paint)
+        if horizontal_pull:
+            m = (a + b) / 2
+            fb(f"{name}{k}_pull", m - 0.08, m + 0.08, 0.03, 0.05, (z1 + z2) / 2 - 0.007, (z1 + z2) / 2 + 0.007, pull)
+        else:
+            uu = b - 0.05 if k % 2 == 0 else a + 0.05
+            zz = z2 - 0.18 if z2 < 1.2 else (z1 + 0.15 if z2 - z1 < 1.5 else 1.05)
+            fb(f"{name}{k}_pull", uu - 0.007, uu + 0.007, 0.03, 0.05, zz - 0.08, zz + 0.08, pull)
+
+
+def xz_prism(name, pts, y1, y2, m):
+    bmm = bmesh.new()
+    a = [bmm.verts.new((x, y1, zz)) for x, zz in pts]
+    b = [bmm.verts.new((x, y2, zz)) for x, zz in pts]
+    bmm.faces.new(a)
+    bmm.faces.new(list(reversed(b)))
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bmm.faces.new((a[i], a[j], b[j], b[i]))
+    bmesh.ops.recalc_face_normals(bmm, faces=bmm.faces)
+    me = bpy.data.meshes.new(name)
+    bmm.to_mesh(me)
+    bmm.free()
+    o = bpy.data.objects.new(name, me)
+    o.data.materials.append(m)
+    COLL.objects.link(o)
+    return o
+
+
+def cone_pendant(name, x, y, z_ceiling, z_bottom, r=0.2):
+    black = mat("PendantBlack", "#151515", 0.45, 0.3)
+    brass = mat("Brass", "#b08d57", 0.3, 1.0)
+    bmm = bmesh.new()
+    seg = 40
+    rings = []
+    for rr, zz in ((r, z_bottom), (r * 0.25, z_bottom + 0.26), (0.03, z_bottom + 0.3)):
+        rings.append([bmm.verts.new((x + rr * math.cos(2 * math.pi * k / seg), y + rr * math.sin(2 * math.pi * k / seg), zz)) for k in range(seg)])
+    for ra, rb in zip(rings, rings[1:]):
+        for k in range(seg):
+            bmm.faces.new((ra[k], ra[(k + 1) % seg], rb[(k + 1) % seg], rb[k]))
+    me = bpy.data.meshes.new(name)
+    bmm.to_mesh(me)
+    bmm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    o = bpy.data.objects.new(name, me)
+    o.data.materials.append(black)
+    sol = o.modifiers.new("shell", "SOLIDIFY")
+    sol.thickness = 0.004
+    COLL.objects.link(o)
+    cyl(name + "_rim", x, y, z_bottom - 0.004, z_bottom + 0.006, r + 0.003, brass, 40)
+    cyl(name + "_rod", x, y, z_bottom + 0.3, z_ceiling, 0.005, brass, 8)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.055, location=(x, y, z_bottom + 0.12))
+    b = bpy.context.active_object
+    b.name = name + "_bulb"
+    b.data.materials.append(mat("BulbWarm", "#fff3e0", 0.3, emit=((1.0, 0.78, 0.5), 25.0)))
+    for c in b.users_collection:
+        c.objects.unlink(b)
+    COLL.objects.link(b)
+    point_light(name + "_L", (x, y, z_bottom + 0.05), 45, 0.06)
+
+
 def kitchen():
     z = 0.0
     white = mat("CabinetWhite", "#f1eee7", 0.35)
-    marble = mat("CalacattaTop", "#f3f1ec", 0.12)
+    marble = marble_mat()
     brass = mat("Brass", "#b08d57", 0.3, 1.0)
-    # island
-    box("IslandBase", 28.0, 31.6, 24.6, 25.8, z, z + 0.9, white, 0.01)
-    box("IslandTop", 27.9, 31.7, 24.5, 25.9, z + 0.9, z + 0.95, marble, 0.01)
+    steel = mat("Stainless", "#b8bcc0", 0.25, 1.0)
+    kick = mat("ToeKick", "#3a3632", 0.6)
+    # east wall: base runs either side of a 48" range, marble counter + full-height splash, uppers, plaster hood
+    xe = 33.7
+    for k, (ya, yb) in enumerate(((22.15, 24.92), (26.18, 29.25))):
+        box(f"KBaseE{k}", 33.1, xe, ya, yb, 0.1, 0.9, white)
+        box(f"KKickE{k}", 33.16, xe, ya, yb, 0.0, 0.1, kick)
+        nd = max(2, round((yb - ya) / 0.6))
+        shaker(f"KDrawE{k}", "x", 33.1, -1, ya, yb, 0.7, 0.9, nd, white, brass, True)
+        shaker(f"KDoorE{k}", "x", 33.1, -1, ya, yb, 0.1, 0.7, nd, white, brass)
+        box(f"KTopE{k}", 33.04, xe, ya, yb, 0.9, 0.94, marble)
+        box(f"KUpperE{k}", 33.36, xe, ya, yb if k else 24.75, 1.5, 2.45, white)
+        shaker(f"KUpDoorE{k}", "x", 33.36, -1, ya, yb if k else 24.75, 1.5, 2.45, nd, white, brass)
+        box(f"KCrownE{k}", 33.32, xe, ya, yb if k else 24.75, 2.45, 2.53, white)
+        box(f"KUnderLED{k}", 33.4, 33.44, ya + 0.05, (yb if k else 24.75) - 0.05, 1.49, 1.5,
+            mat("UnderCabLED", "#fff3e0", 0.4, emit=((1.0, 0.8, 0.55), 8.0)))
+    box("KSplashE", xe - 0.02, xe, 22.15, 29.25, 0.94, 1.5, marble)
+    box("KSplashRange", xe - 0.02, xe, 24.75, 26.35, 1.5, 1.95, marble)
+    box("KRangeBody", 33.06, xe, 24.95, 26.15, 0.0, 0.92, steel, 0.004)
+    box("KRangeTop", 33.06, xe, 24.95, 26.15, 0.92, 0.935, mat("CooktopBlack", "#121212", 0.35))
+    for k in range(6):
+        y = 25.0 + k * 0.2
+        box(f"KGrate{k}", 33.1, xe - 0.04, y, y + 0.018, 0.935, 0.95, mat("CastIron", "#1b1b1b", 0.6, 0.5))
+    for k, (ya, yb) in enumerate(((24.98, 25.54), (25.56, 26.12))):
+        box(f"KOvenDoor{k}", 33.05, 33.065, ya, yb, 0.12, 0.72, steel)
+        box(f"KOvenWin{k}", 33.045, 33.05, ya + 0.08, yb - 0.08, 0.3, 0.58, mat("OvenGlass", "#0c0c0d", 0.05))
+        box(f"KOvenBar{k}", 32.99, 33.01, ya + 0.04, yb - 0.04, 0.66, 0.68, steel)
+    for k in range(6):
+        y = 25.05 + k * 0.2
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.022, depth=0.03, location=(33.03, y, 0.82), rotation=(0, math.pi / 2, 0))
+        kb = bpy.context.active_object
+        kb.name = f"KKnob{k}"
+        kb.data.materials.append(mat("KnobBlack", "#161616", 0.4, 0.6))
+        for c in kb.users_collection:
+            c.objects.unlink(kb)
+        COLL.objects.link(kb)
+    box("KHoodBand", 33.0, xe, 24.8, 26.3, 1.95, 2.2, white, 0.005)
+    box("KHoodStrap", 32.995, 33.0, 24.8, 26.3, 1.98, 2.02, brass)
+    xz_prism("KHoodTaper", [(33.0, 2.2), (xe, 2.2), (xe, 3.65), (33.3, 3.65)], 24.8, 26.3, white)
+    # south wall: pantry tower between the two doors, stainless fridge column by the east run
+    shaker("KPantry", "y", 22.75, 1, 27.75, 30.2, 0.1, 2.6, 4, white, brass)
+    box("KPantryBox", 27.75, 30.2, 22.1, 22.75, 0.0, 2.6, white)
+    box("KPantryCrown", 27.72, 30.23, 22.1, 22.8, 2.6, 2.7, white)
+    box("KFridge", 32.0, 33.04, 22.1, 22.8, 0.0, 2.15, steel, 0.004)
+    box("KFridgeSplit", 32.515, 32.525, 22.8, 22.805, 0.05, 2.1, mat("FridgeSeam", "#2a2a2a", 0.5))
+    for x in (32.45, 32.59):
+        box(f"KFridgeHandle{x}", x - 0.012, x + 0.012, 22.84, 22.87, 0.6, 1.6, steel)
+        box(f"KFridgeHandleS{x}a", x - 0.008, x + 0.008, 22.8, 22.84, 0.62, 0.66, steel)
+        box(f"KFridgeHandleS{x}b", x - 0.008, x + 0.008, 22.8, 22.84, 1.54, 1.58, steel)
+    box("KFridgeCab", 32.0, 33.04, 22.1, 22.75, 2.15, 2.6, white)
+    # north wall: base run under the windows (counter at the sill line)
+    box("KBaseN", 25.95, 30.1, 28.68, 29.3, 0.1, 0.86, white)
+    box("KKickN", 25.95, 30.1, 28.74, 29.3, 0.0, 0.1, kick)
+    shaker("KDoorN", "y", 28.68, -1, 25.95, 30.1, 0.1, 0.86, 7, white, brass)
+    box("KTopN", 25.95, 30.1, 28.62, 29.3, 0.86, 0.9, marble)
+    # island: marble waterfall, sink + brass faucet, panelled fronts, stools on the south side
+    box("IslandBase", 28.05, 31.55, 24.75, 25.8, 0.1, 0.9, white)
+    box("IslandKick", 28.1, 31.5, 24.8, 25.75, 0.0, 0.1, kick)
+    shaker("IslandFrontN", "y", 25.8, 1, 28.05, 31.55, 0.1, 0.9, 6, white, brass)
+    shaker("IslandBackS", "y", 24.75, -1, 28.05, 31.55, 0.1, 0.9, 4, white, brass, True)
+    box("IslandTop", 27.95, 31.65, 24.45, 25.9, 0.9, 0.95, marble)
+    for x in (27.9, 31.65):
+        box(f"IslandWaterfall{x}", x, x + 0.05, 24.45, 25.9, 0.0, 0.95, marble)
+    box("IslandSink", 29.4, 30.2, 25.25, 25.7, 0.93, 0.951, mat("SinkSteel", "#3a3b3d", 0.25, 1.0))
+    cyl("FaucetBody", 29.8, 25.8, 0.95, 1.36, 0.016, brass, 16)
+    box("FaucetSpout", 29.785, 29.815, 25.5, 25.81, 1.33, 1.36, brass)
+    cyl("FaucetHead", 29.8, 25.5, 1.27, 1.36, 0.017, brass, 16)
     for k, x in enumerate((28.6, 29.8, 31.0)):
         P.place("bar_chair_round_01", (x, 24.05, z), 0, coll=COLL, name=f"IslandStool{k}")
-        cyl(f"IslandPendant{k}", x, 25.2, 2.55, 2.85, 0.16, mat("PendantGlass", "#f6e7c8", 0.2, emit=((1.0, 0.7, 0.4), 6.0)), 24)
-        cyl(f"IslandPendantRod{k}", x, 25.2, 2.85, 3.7, 0.006, brass, 8)
-        point_light(f"IslandPendantL{k}", (x, 25.2, 2.5), 40, 0.1)
-    # perimeter: base + upper cabinets along the east wall, range and hood, south wall pantry wall
-    box("KBaseE", 33.05, 33.7, 22.3, 28.9, z, z + 0.9, white, 0.01)
-    box("KTopE", 32.95, 33.7, 22.3, 28.9, z + 0.9, z + 0.94, marble)
-    box("KUpperE", 33.35, 33.7, 22.3, 28.9, 1.5, 2.4, white, 0.01)
-    box("KHood", 33.0, 33.7, 24.9, 26.3, 1.9, 3.0, white, 0.02)
-    box("KRange", 33.05, 33.7, 25.0, 26.2, z + 0.9, z + 0.95, mat("Stainless", "#b8bcc0", 0.25, 1.0))
-    box("KTallSouth", 25.9, 30.2, 22.1, 22.75, z, 3.0, white, 0.01)
-    box("KFridge", 30.2, 31.6, 22.1, 22.75, z, 2.2, mat("Stainless", "#b8bcc0", 0.25, 1.0), 0.01)
-    for k, x in enumerate(range(26, 30)):
-        box(f"KPull{k}", x + 0.45, x + 0.5, 22.76, 22.78, 1.0, 1.4, brass)
+        cone_pendant(f"IslandPendant{k}", x, 25.15, F1 - H.SLAB, 2.35)
+    # a few lived-in things: bowl of lemons, vase with olive branches, board, cookbooks, coffee machine
+    bowl = mat("BowlCeramic", "#e9e4da", 0.3)
+    cyl("IslandBowl", 30.75, 25.3, 0.95, 1.03, 0.16, bowl, 32)
+    lemon = mat("Lemon", "#e3c23a", 0.45)
+    rnd = random.Random(4)
+    for k in range(7):
+        a = k * 0.9
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.04, segments=16, ring_count=10,
+                                             location=(30.75 + 0.08 * math.cos(a), 25.3 + 0.08 * math.sin(a), 1.06 + 0.02 * (k % 2)))
+        l = bpy.context.active_object
+        l.name = f"Lemon{k}"
+        l.scale = (1, 1, 0.85)
+        l.data.materials.append(lemon)
+        for c in l.users_collection:
+            c.objects.unlink(l)
+        COLL.objects.link(l)
+    P.place("ceramic_vase_02", (28.5, 25.4, 0.95), 0, 1.1, coll=COLL, name="IslandVase")
+    box("CuttingBoard", 33.15, 33.6, 27.6, 28.05, 0.94, 0.965, mat("BoardOak", "#a77a4c", 0.5), 0.004)
+    box("CoffeeMachine", 33.3, 33.66, 22.5, 22.85, 0.94, 1.36, steel, 0.01)
+    for k, c in enumerate(("#7a2b22", "#2a3f5a", "#d9cdb4")):
+        box(f"Cookbook{k}", 33.45, 33.68, 28.4 + k * 0.045, 28.44 + k * 0.045, 0.94, 1.2, mat("Book_" + c, c, 0.6))
+    P.place("potted_plant_04", (26.3, 28.95, 0.9), 0, 0.6, coll=COLL, name="KitchenHerb")
 
 
 def game_room():

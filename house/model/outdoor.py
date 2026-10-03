@@ -181,6 +181,18 @@ def build(bm, materials, coll):
                 cut = mod.object
                 cut.data.materials.clear()
                 cut.data.materials.append(tile if "Lounge" not in cut.name else M["plaster_int"])
+    spa = bpy.data.objects.get("Spa")
+    if spa:                                              # hollow the spa shell: tiled basin, water below the rim
+        sc = bm.cylinder("SpaCut", 14.4, 43, 0.0, 0.7, 1.07, "pool", COLL, 48)
+        sc.data.materials.clear()
+        sc.data.materials.append(tile)
+        md = spa.modifiers.new("basin", "BOOLEAN")
+        md.operation, md.solver, md.object, md.material_mode = "DIFFERENCE", "EXACT", sc, "TRANSFER"
+        sc.hide_render = sc.hide_viewport = True
+        spa.data.materials.clear()
+        spa.data.materials.append(M["limestone_paver"] if "limestone_paver" in M else M["paver"])
+        Ls = I.point_light("SpaLight", (14.4, 43, 0.15), 25, 0.1, (0.75, 0.95, 1.0))
+        Ls["dusk_only"] = 1
     for k in range(3):                                   # underwater lights
         L = I.point_light(f"PoolLight{k}", (17.5 + k * 4.5, 41.5, -1.2), 60, 0.1, (0.75, 0.95, 1.0))
         L["dusk_only"] = 1

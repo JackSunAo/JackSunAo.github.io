@@ -465,35 +465,98 @@ def bloom_bush(name, seed, radius=0.45, height=0.8, n_leaf=160, n_bloom=24, bloo
     return _mesh_obj(name, bmm, [lm, bmat])
 
 
-def willow(name, seed, height=9.0, crown=4.2, strands=2400):
-    """Weeping willow: forked trunk and a curtain of long hanging leaf strands."""
+def willow(name, seed, height=9.5, crown=4.8, strands=1500):
+    """Weeping willow: leaning trunk, arching scaffold limbs, and a dome of long hanging branchlets
+    clothed in narrow leaves (each strand is a curved twig with alternate lanceolate leaves)."""
     rnd = random.Random(seed)
-    bark = _mat("WillowBark", "#5a4a3a", 0.85, var=0.2)
-    leaf = _mat("WillowLeaf", "#5e7a3a", 0.65, sss=0.2, var=0.4)
+    bark = _mat("WillowBark", "#4f4234", 0.85, var=0.2)
+    leaf = _mat("WillowLeaf2", "#7a9341", 0.6, sss=0.25, var=0.35)
     bmm = bmesh.new()
-    tr = bmesh.ops.create_cone(bmm, cap_ends=True, segments=12, radius1=0.38, radius2=0.22, depth=height * 0.45)
-    bmesh.ops.translate(bmm, vec=(0, 0, height * 0.225), verts=tr["verts"])
-    for k in range(5):
-        a = k * 2 * math.pi / 5 + rnd.uniform(-0.3, 0.3)
-        d = Vector((math.cos(a) * 0.7, math.sin(a) * 0.7, 1.0)).normalized()
-        L = height * 0.45
-        br = bmesh.ops.create_cone(bmm, cap_ends=True, segments=8, radius1=0.16, radius2=0.05, depth=L)
-        mtx = Matrix.Translation(Vector((0, 0, height * 0.42)) + d * L / 2) @ d.to_track_quat("Z", "Y").to_matrix().to_4x4()
-        bmesh.ops.transform(bmm, matrix=mtx, verts=br["verts"])
-    nbark = len(bmm.faces)
-    for s in range(strands):
-        u = rnd.uniform(0, 2 * math.pi)
-        r = crown * math.sqrt(rnd.uniform(0.15, 1.0))
-        top = Vector((math.cos(u) * r, math.sin(u) * r, height * (0.75 + 0.25 * math.sqrt(max(0.0, 1 - (r / crown) ** 2)))))
-        L = rnd.uniform(0.35, 0.8) * top.z
-        side = Vector((-math.sin(u), math.cos(u), 0)) * rnd.uniform(0.008, 0.016)
-        out = Vector((math.cos(u), math.sin(u), 0)) * 0.08
-        rows = []
-        for i in range(6):
-            t = i / 5
-            p = top + out * t - Vector((0, 0, L * t))
-            rows.append((bmm.verts.new(p - side), bmm.verts.new(p + side)))
+    up = Vector((0, 0, 1))
+
+    def seg(p, q, r0, r1, sides=8):
+        d = q - p
+        c = bmesh.ops.create_cone(bmm, cap_ends=False, segments=sides, radius1=r0, radius2=r1, depth=d.length)
+        mtx = Matrix.Translation((p + q) / 2) @ d.normalized().to_track_quat("Z", "Y").to_matrix().to_4x4()
+        bmesh.ops.transform(bmm, matrix=mtx, verts=c["verts"])
+
+    lean = Vector((rnd.uniform(-0.35, 0.35), rnd.uniform(-0.35, 0.35), 0))
+    knee = Vector((0, 0, 0.6)) + lean * 0.2
+    fork = Vector((0, 0, 2.9)) + lean
+    seg(Vector((0, 0, -0.25)), knee, 0.66, 0.44, 14)
+    seg(knee, fork, 0.44, 0.31, 14)
+    tips = []
+    for k in range(6):
+        a = k * math.pi / 3 + rnd.uniform(-0.35, 0.35)
+        out = Vector((math.cos(a), math.sin(a), 0))
+        p, r = fork.copy(), 0.24
+        d = (out * 0.55 + up).normalized()
+        L = rnd.uniform(4.0, 5.0)
+        pts = [p]
         for i in range(5):
-            f = bmm.faces.new((rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]))
+            q = p + d * (L / 5)
+            seg(p, q, r, r * 0.78)
+            p, r = q, r * 0.78
+            d = (d + out * 0.25 - up * (0.05 + 0.06 * i)).normalized()
+            pts.append(p)
+        for j in range(2, 6):
+            for _ in range(2):
+                ang = a + rnd.uniform(-0.9, 0.9)
+                o2 = Vector((math.cos(ang), math.sin(ang), 0))
+                p2, rr = pts[j].copy(), r * 0.9
+                d2 = (o2 * 0.9 + up * 0.5).normalized()
+                L2 = rnd.uniform(1.2, 2.2)
+                for i in range(3):
+                    q2 = p2 + d2 * (L2 / 3)
+                    seg(p2, q2, max(0.012, rr), max(0.01, rr * 0.7), 5)
+                    p2, rr = q2, rr * 0.7
+                    d2 = (d2 + o2 * 0.3 - up * 0.35).normalized()
+                    tips.append(p2.copy())
+    nbark = len(bmm.faces)
+    centre = Vector((lean.x, lean.y, height * 0.6))
+    for s in range(strands):
+        if rnd.random() < 0.4 and tips:
+            o = rnd.choice(tips) + Vector((rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(-0.3, 0.4)))
+        else:
+            u = rnd.uniform(0, 2 * math.pi)
+            cphi = rnd.uniform(-0.2, 1.0)
+            sphi = math.sqrt(1 - cphi * cphi)
+            f = rnd.uniform(0.8, 1.0)
+            o = centre + Vector((crown * sphi * math.cos(u), crown * sphi * math.sin(u), height * 0.4 * cphi)) * f
+        flat = Vector((o.x - lean.x, o.y - lean.y, 0))
+        outv = flat.normalized() if flat.length > 0.3 else Vector((math.cos(s), math.sin(s), 0))
+        outer = flat.length / crown
+        bottom = rnd.uniform(0.5, 2.0) if outer > 0.55 else o.z - rnd.uniform(1.5, 3.5)
+        L = max(0.8, o.z - max(0.4, bottom))
+        side = Vector((-outv.y, outv.x, 0)) * rnd.uniform(-0.25, 0.25)
+        P0 = o
+        P1 = o + outv * rnd.uniform(0.2, 0.5) + up * rnd.uniform(0.05, 0.3)
+        P2 = o + outv * rnd.uniform(0.35, 0.8) + side - up * L
+        bez = lambda t: P0 * (1 - t) ** 2 + P1 * (2 * (1 - t) * t) + P2 * (t * t)
+        tan = lambda t: ((P1 - P0) * (2 * (1 - t)) + (P2 - P1) * (2 * t)).normalized()
+        n = max(8, int(L / 0.06))
+        prev = None
+        for i in range(7):                                        # thin twig ribbon
+            t = i / 6
+            b = bez(t)
+            w = Vector((-outv.y, outv.x, 0)) * 0.0025
+            pair = (bmm.verts.new(b - w), bmm.verts.new(b + w))
+            if prev:
+                bmm.faces.new((prev[0], prev[1], pair[1], pair[0]))
+            prev = pair
+        for i in range(n):
+            t = (i + 0.5) / n
+            b, T = bez(t), tan(t)
+            n1 = T.cross(up if abs(T.z) < 0.95 else Vector((1, 0, 0))).normalized()
+            n2 = T.cross(n1)
+            th = i * 2.39996 + rnd.uniform(-0.4, 0.4)
+            perp = n1 * math.cos(th) + n2 * math.sin(th)
+            beta = math.radians(rnd.uniform(28, 50))
+            lv = (T * math.cos(beta) + perp * math.sin(beta)).normalized()
+            ell = rnd.uniform(0.07, 0.11) * (1.0 - 0.35 * t)
+            sd = lv.cross(perp).normalized() * ell * 0.09
+            v = (bmm.verts.new(b), bmm.verts.new(b + lv * ell * 0.45 + sd), bmm.verts.new(b + lv * ell),
+                 bmm.verts.new(b + lv * ell * 0.45 - sd))
+            f = bmm.faces.new(v)
             f.material_index = 1
     return _mesh_obj(name, bmm, [bark, leaf])

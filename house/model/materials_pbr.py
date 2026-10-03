@@ -131,7 +131,7 @@ def build_all(dusk=True):
         "mulch": pbr("Mulch", "mulch", 1.5, "#6a4a32", 0.3, value=0.8, bump=0.8),
         # interiors
         "floor_oak": pbr("WhiteOakFloor", "floor_oak", 2.0, "#e2c9a4", 0.35, value=1.05, sat=0.8, rough_mul=0.9, bump=0.3),
-        "plaster_int": pbr("InteriorPlaster", "plaster", 2.0, "#eadfcb", 0.75, value=1.05, sat=0.3, bump=0.15),
+        "plaster_int": paint("InteriorPaint", "#ebe5d9", 0.72),          # smooth painted drywall
         "ceiling": paint("CeilingPaint", "#f4f1ea", 0.85),
         "teal": paint("TealAccentWall", "#24495a", 0.75),
         "lawn": None,
