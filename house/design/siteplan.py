@@ -1,5 +1,5 @@
 # Site plan generator: x = meters from left lot line, d = meters from street.
-S, M, W, D = 12, 50, 52, 80
+S, M, W, D = 12, 50, 82, 80
 LOT = 62  # lot depth; lake beyond
 TOP = 0
 out = []
@@ -17,7 +17,8 @@ rect(0, 0, W, LOT, "#b9d99a", "#333", 2)
 # lake
 rect(-4, LOT, W + 4, D, "#6fa8c8", "none")
 for i, d in enumerate(range(66, 80, 3)):
-    out.append(f'<path d="M {X(2 + i % 2 * 3)} {Y(d)} q 12 -5 24 0 t 24 0" fill="none" stroke="#9cc6dc" stroke-width="1.5"/>')
+  for xo in (0, 54):
+    out.append(f'<path d="M {X(xo + 2 + i % 2 * 3)} {Y(d)} q 12 -5 24 0 t 24 0" fill="none" stroke="#9cc6dc" stroke-width="1.5"/>')
 text(10, 74, "大  湖", 22, "#fff", "bold")
 text(10, 71.6, "湖景正对后立面", 11, "#eaf4f9")
 # shoreline bulkhead
@@ -26,7 +27,10 @@ out.append(f'<line x1="{X(0)}" y1="{Y(LOT)}" x2="{X(W)}" y2="{Y(LOT)}" stroke="#
 out.append(f'<rect x="{M-20}" y="{Y(0)}" width="{W*S+40}" height="34" fill="#9a9a9a"/>')
 text(W/2, -2.0, "街 道", 15, "#fff", "bold")
 # right side buffer (rear kept open for lake view)
-for d in range(3, 30, 3): circle(50.8, d, 1.0, "#5f8f4e", "#4a7a3b")
+# tree screen hiding the hangar from the street
+for x in range(52, 81, 3):
+    for d in (4, 8, 12): circle(x + (1.5 if d == 8 else 0), d, 1.3, "#5f8f4e", "#4a7a3b")
+for d in range(18, 34, 3): circle(80.8, d, 1.0, "#5f8f4e", "#4a7a3b")
 
 # driveway, motor court
 rect(45, 0, 49, 17, "#d8d2c6", "#999")
@@ -123,12 +127,43 @@ rect(22.5, LOT, 24.5, 70, "#b08a5a", "#6b4f2e")
 rect(18, 70, 29, 72, "#b08a5a", "#6b4f2e")
 text(23.5, 72.8, "T 型码头 · 下水梯", 10, "#fff")
 
+
+# helicopter zone (right strip): hangar + tow path + helipad, approach over the lake
+rect(49.5, 17, 53, 31, "#d8d2c6", "#999")
+rect(53, 17, 69, 31, "#e9dfcb", "#333", 2)
+out.append(f'<line x1="{X(54)}" y1="{Y(31)}" x2="{X(68)}" y2="{Y(31)}" stroke="#8a5a2b" stroke-width="5"/>')
+# helicopter parked in the hangar (top view): fuselage, tail boom, rotor disc
+out.append(f'<circle cx="{X(61)}" cy="{Y(26.5)}" r="{5.35*S}" fill="none" stroke="#999" stroke-dasharray="4,3"/>')
+out.append(f'<ellipse cx="{X(61)}" cy="{Y(27.2)}" rx="{1.2*S}" ry="{2.2*S}" fill="#f3ead8" stroke="#333"/>')
+out.append(f'<line x1="{X(61)}" y1="{Y(25)}" x2="{X(61)}" y2="{Y(20.6)}" stroke="#333" stroke-width="3"/>')
+out.append(f'<line x1="{X(57)}" y1="{Y(30.2)}" x2="{X(65)}" y2="{Y(22.8)}" stroke="#555" stroke-width="2"/>')
+out.append(f'<line x1="{X(57)}" y1="{Y(22.8)}" x2="{X(65)}" y2="{Y(30.2)}" stroke="#555" stroke-width="2"/>')
+text(66.5, 27.5, "直升机", 11, "#222", "bold", "start"); text(66.5, 26.0, "单发轻型", 9, "#666", "start"); text(66.5, 24.8, "5–7 座", 9, "#666", "start")
+text(55.5, 29.2, "机库", 11, "#222", "bold", "start")
+text(61, 18.2, "16×14 m · 外观同主屋", 9, "#666")
+rect(59.5, 31, 62.5, 41, "#d8d2c6", "#999"); text(61, 35.5, "牵引道", 9, "#555")
+out.append(f'<circle cx="{X(66)}" cy="{Y(51)}" r="{15*S}" fill="none" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="8,5"/>')
+circle(66, 51, 10, "#a9c98f", "#7a9a63")
+rect(60, 45, 72, 57, "#c8c4bc", "#666", 1.5)
+out.append(f'<circle cx="{X(66)}" cy="{Y(51)}" r="{5.2*S}" fill="none" stroke="#f4f4f4" stroke-width="3"/>')
+text(66, 49.2, "H", 46, "#f4f4f4", "bold")
+for a in range(0, 360, 30):
+    import math
+    out.append(f'<circle cx="{X(66 + 6.6*math.cos(math.radians(a)))}" cy="{Y(51 + 6.6*math.sin(math.radians(a)))}" r="3" fill="#7CFC00" stroke="#333" stroke-width="0.5"/>')
+text(66, 58.2, "停机坪 TLOF 12×12 m · 周边灯", 10, "#222", "bold")
+text(66, 40.4, "安全区 Ø30 m（红虚线）", 9, "#c0392b")
+out.append(f'<line x1="{X(77)}" y1="{Y(42)}" x2="{X(77)}" y2="{Y(45)}" stroke="#333" stroke-width="2"/>')
+out.append(f'<polygon points="{X(77)},{Y(45)} {X(79.5)},{Y(44.6)} {X(79.5)},{Y(44.0)} {X(77)},{Y(43.7)}" fill="#ff7f27"/>')
+text(78, 41, "风向袋", 9)
+out.append(f'<path d="M {X(66)} {Y(66)} L {X(66)} {Y(78)}" stroke="#c0392b" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arr)"/>')
+text(70, 74, "进近/离场", 10, "#fff", "bold"); text(70, 72.5, "走湖面上空", 10, "#fff")
+
 # title, scale, north
-out.insert(0, f'<text x="{M}" y="32" font-size="20" font-weight="bold" font-family="PingFang SC,Microsoft YaHei,WenQuanYi Zen Hei,sans-serif">总平面布局 · 湖景版 · 地块约 52 × 62 m + 湖岸</text>')
+out.insert(0, f'<text x="{M}" y="32" font-size="20" font-weight="bold" font-family="PingFang SC,Microsoft YaHei,WenQuanYi Zen Hei,sans-serif">总平面布局 · 湖景版 · 地块约 82 × 62 m（≈5100 m²）+ 湖岸 · 含停机坪</text>')
 out.append(f'<line x1="{X(0)}" y1="{Y(-4.2)}" x2="{X(10)}" y2="{Y(-4.2)}" stroke="#333" stroke-width="3"/>')
 text(5, -5.6, "10 m", 11)
-text(31, -5.6, "前 = 公共展示　右 = 车/服务　左 = 花园（安静私密）　后 = 泳池/湖/游艇", 12, "#444")
+text(46, -5.6, "前 = 公共展示　右 = 车 · 船 · 直升机（全部交通集中一侧）　左 = 花园（安静私密）　后 = 泳池 · 湖", 12, "#444")
 
 H = TOP + M + D*S + 120
-svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W*S+2*M}" height="{H}" viewBox="0 0 {W*S+2*M} {H}"><rect width="100%" height="100%" fill="#fbfaf7"/>' + "".join(out) + "</svg>"
+svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W*S+2*M}" height="{H}" viewBox="0 0 {W*S+2*M} {H}"><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c0392b"/></marker></defs><rect width="100%" height="100%" fill="#fbfaf7"/>' + "".join(out) + "</svg>"
 open(__file__.rsplit("/", 1)[0] + "/site-plan.svg", "w").write(svg)
