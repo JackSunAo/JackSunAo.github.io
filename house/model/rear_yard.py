@@ -228,12 +228,12 @@ def _wisteria(bm, coll, rnd):
     fl = V._mat("WisteriaBloom", "#a28ad8", 0.5, sss=0.4, var=0.15)
     b = bmesh.new()
     for k in range(900):
-        x, y = rnd.uniform(0.8, 14.2), rnd.uniform(41.2, 44.8)
+        x, y = rnd.uniform(0.8, 12.4), rnd.uniform(41.2, 44.8)        # stop short of the raised pool deck
         lf = bmesh.ops.create_icosphere(b, subdivisions=1, radius=rnd.uniform(0.05, 0.09))
         bmesh.ops.scale(b, vec=(1, 0.5, 0.2), verts=lf["verts"])
         bmesh.ops.translate(b, vec=(x, y, z + rnd.uniform(0.0, 0.25)), verts=lf["verts"])
     for k in range(260):
-        x, y = rnd.uniform(0.9, 14.1), rnd.uniform(41.3, 44.7)
+        x, y = rnd.uniform(0.9, 12.3), rnd.uniform(41.3, 44.7)
         L = rnd.uniform(0.25, 0.5)
         for i in range(9):
             t = i / 8

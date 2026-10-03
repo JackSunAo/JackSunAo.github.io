@@ -379,8 +379,11 @@ def build(bm_mod, M, coll):
                            M[mat] if mat != "plaster" else M["plaster_int"], coll)
             else:
                 at, inward = (y1, 1) if side == "y1" else (y2, -1)
-                _gable_end(f"{name}_end_{side}", "y", at, x1, x2, ze, pitch, inward,
-                           M[mat] if mat != "plaster" else M["plaster_int"], coll)
+                ge = _gable_end(f"{name}_end_{side}", "y", at, x1, x2, ze, pitch, inward,
+                                M[mat] if mat != "plaster" else M["plaster_int"], coll)
+                if any(w[1] == "y" and abs(w[2] - at) < 1e-6 and w[5] >= ze for w in WINDOWS):
+                    _boolean(ge, cut)                 # windows high up in the gable (game-room lake gable)
+                    _apply_modifiers(ge)
     # the main roof's east end must stay open where the game-room vault sits below the rear gable
     out["rooms"] = ROOMS
     return out
