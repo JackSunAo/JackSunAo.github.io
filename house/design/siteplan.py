@@ -70,18 +70,26 @@ text(43.5, 19.2, "车库门侧开", 10, "#8a5a2b", anchor="start")
 
 # covered patio + pool deck (main-floor level, built up over the lower level)
 rect(15, 29, 29, 33.5, "#c9c0b0", "#555"); text(22, 30.8, "有顶露台 · 壁炉 · 户外厨房", 11)
-rect(13, 33.5, 36, 46.5, "#ece4d4", "#aaa")
-# bar house below the east part of the deck (lower level, opens to the lake terrace)
-rect(28.6, 36, 35, 46.2, "none", "#8a3b12", 1.5, 0, 'stroke-dasharray="5,3"')
-text(31.8, 41.6, "下方：", 9, "#8a3b12"); text(31.8, 40.2, "酒吧屋", 11, "#8a3b12", "bold"); text(31.8, 38.8, "(地下层)", 9, "#8a3b12")
+rect(13, 33.5, 38, 46.5, "#ece4d4", "#aaa")
+# standalone pool bar house on the deck: swim-up bar on the pool side, glass wall to the lake
+rect(29.5, 37, 36.5, 45.5, "#f1e9d8", "#333", 2)
+rect(29.5, 41.2, 30.3, 44.8, "#5a3e22", "none")            # bar counter on the pool wall
+out.append(f'<line x1="{X(29.8)}" y1="{Y(45.5)}" x2="{X(36.2)}" y2="{Y(45.5)}" stroke="#7fc6e0" stroke-width="4"/>')
+rect(34, 37, 36.5, 40.5, "#e6dccb", "#888")                 # bath / shower / changing
+text(35.25, 38.4, "卫浴", 8, "#555")
+text(32.6, 43.4, "酒吧屋", 12, "#8a3b12", "bold"); text(32.6, 42.0, "屋顶观景台", 9, "#8a3b12")
+text(32.0, 38.4, "更衣淋浴", 8, "#555")
 rect(16, 40.5, 28, 45.5, "#3fa7c4", "#1f6f87", 2, 4)
+rect(27.5, 41.4, 29.5, 44.6, "#3fa7c4", "#1f6f87", 1.5)   # swim-up bar alcove
+for dd in (42.0, 43.0, 44.0): circle(28.9, dd, 0.3, "#e9f7fb", "#1f6f87")
+text(28.4, 40.0, "池中吧台", 9, "#1f6f87")
 rect(16, 40.5, 18, 45.5, "#7fcfe0", "none")
 text(22.5, 42.6, "泳池 12×5 m", 12, "#fff", "bold"); text(17, 42.1, "浅台", 9, "#1f6f87")
 circle(14.4, 43, 1.25, "#5ec2da", "#1f6f87"); text(14.4, 42.7, "SPA", 9, "#fff")
 text(22.5, 37.2, "石灰岩泳池平台 · 躺椅", 11, "#666")
 # lower lake terrace (basement level) + stairs down from the deck
-rect(16, 46.5, 36, 50, "#e3d8c4", "#a89a82"); text(26, 47.8, "下沉湖景露台（地下层标高 · 户外吧台）", 10, "#5a3e22")
-for i in range(6): out.append(f'<line x1="{X(36 + i*0.4)}" y1="{Y(46.5)}" x2="{X(36 + i*0.4)}" y2="{Y(49.5)}" stroke="#8a7a62"/>')
+rect(16, 46.5, 36, 50, "#e3d8c4", "#a89a82"); text(26, 47.8, "下沉湖景露台（地下层标高 · 火盆）", 10, "#5a3e22")
+for i in range(5): out.append(f'<line x1="{X(36.2 + i*0.4)}" y1="{Y(46.5)}" x2="{X(36 + i*0.4)}" y2="{Y(49.5)}" stroke="#8a7a62"/>')
 rect(35, 29.5, 40, 32, "#bbb", "#777"); text(37.5, 30.3, "泳池设备", 9)
 
 # garden (left/rear)
