@@ -180,12 +180,13 @@ def interior_trim(M, coll):
         _fb(spec, n + "_linR", b - 0.012, b, -T - 0.002, d_in, z1, z2, paint, coll)
         if style == "arch":
             continue
-        _fb(spec, n + "_linH", a, b, -T - 0.002, d_in, z2 - 0.012, z2, paint, coll)
+        _fb(spec, n + "_linH", a + 0.012, b - 0.012, -T - 0.002, d_in, z2 - 0.012, z2, paint, coll)
         if not floor_level:
             _fb(spec, n + "_stool", a - 0.06, b + 0.06, -T - 0.035, d_in, z1 - 0.025, z1, paint, coll)
             _fb(spec, n + "_apron", a - 0.03, b + 0.03, -T - 0.016, -T, z1 - 0.13, z1 - 0.025, paint, coll)
         else:
-            _fb(spec, n + "_linS", a, b, -T - 0.002, d_in, z1, z1 + 0.012, paint, coll)
-        _fb(spec, n + "_casL", a - 0.075, a, -T - 0.016, -T, z1 - (0.0 if floor_level else 0.025), z2 + 0.075, paint, coll)
-        _fb(spec, n + "_casR", b, b + 0.075, -T - 0.016, -T, z1 - (0.0 if floor_level else 0.025), z2 + 0.075, paint, coll)
+            _fb(spec, n + "_linS", a + 0.012, b - 0.012, -T - 0.002, d_in, z1, z1 + 0.012, paint, coll)
+        # casings stand on the stool (or the floor) and carry the head; no overlapping pieces
+        _fb(spec, n + "_casL", a - 0.075, a, -T - 0.016, -T, z1, z2, paint, coll)
+        _fb(spec, n + "_casR", b, b + 0.075, -T - 0.016, -T, z1, z2, paint, coll)
         _fb(spec, n + "_casH", a - 0.075, b + 0.075, -T - 0.016, -T, z2, z2 + 0.075, paint, coll)

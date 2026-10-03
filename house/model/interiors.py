@@ -599,7 +599,9 @@ def shaker(name, axis, plane, out, u1, u2, z1, z2, n, paint, pull, horizontal_pu
         a, b = u1 + k * w + 0.0015, u1 + (k + 1) * w - 0.0015
         fb(f"{name}{k}_slab", a, b, 0.0, 0.018, z1 + 0.0015, z2 - 0.0015, paint)
         fw = min(0.065, (z2 - z1) * 0.22)
-        for j, (ua, ub, za, zb) in enumerate(((a, a + fw, z1, z2), (b - fw, b, z1, z2), (a, b, z1, z1 + fw), (a, b, z2 - fw, z2))):
+        # stiles full height, rails between them (overlapping coplanar pieces render black corners)
+        for j, (ua, ub, za, zb) in enumerate(((a, a + fw, z1, z2), (b - fw, b, z1, z2), (a + fw, b - fw, z1, z1 + fw),
+                                              (a + fw, b - fw, z2 - fw, z2))):
             fb(f"{name}{k}_fr{j}", ua, ub, 0.018, 0.03, za + 0.0015, zb - 0.0015, paint)
         if horizontal_pull:
             m = (a + b) / 2
@@ -1041,7 +1043,7 @@ def baseboards():
         for (n, ax, pl, a, b, z1, z2, out, st) in H.WINDOWS:
             # WINDOWS axis "y" means the wall lies in a plane y = const (runs along x)
             if (ax == "y") == (axis == "x") and abs(pl - wall_plane) < tol and zf - 0.05 <= z1 <= zf + 0.3:
-                g.append((a - 0.02, b + 0.02))
+                g.append((a - 0.08, b + 0.08))          # the baseboard dies into the casing
         return g
 
     n = len(inner)
