@@ -50,8 +50,10 @@ def flagstone(name="Flagstone", scale=1.1):
     nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
     # per-stone tone: two limestone shades picked by the cell colour, speckled by noise
     tone = nt.nodes.new("ShaderNodeValToRGB")
-    tone.color_ramp.elements[0].color = (0.36, 0.31, 0.24, 1)
-    tone.color_ramp.elements[1].color = (0.55, 0.49, 0.39, 1)
+    tone.color_ramp.elements[0].color = (0.24, 0.21, 0.16, 1)
+    tone.color_ramp.elements[1].color = (0.50, 0.45, 0.36, 1)
+    mid_e = tone.color_ramp.elements.new(0.5)
+    mid_e.color = (0.40, 0.33, 0.24, 1)
     sep = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(cell.outputs["Color"], sep.inputs["Color"])
     mixf = nt.nodes.new("ShaderNodeMath")
@@ -83,7 +85,12 @@ def flagstone(name="Flagstone", scale=1.1):
     hgt.operation = "MULTIPLY_ADD"
     hgt.inputs[1].default_value = 0.08
     nt.links.new(nz.outputs["Fac"], hgt.inputs[0])
-    nt.links.new(joint.outputs["Result"], hgt.inputs[2])
+    per = nt.nodes.new("ShaderNodeMath")                 # each stone set at its own height
+    per.operation = "MULTIPLY_ADD"
+    per.inputs[1].default_value = 0.35
+    nt.links.new(sep.outputs["Green"], per.inputs[0])
+    nt.links.new(joint.outputs["Result"], per.inputs[2])
+    nt.links.new(per.outputs[0], hgt.inputs[2])
     nt.links.new(hgt.outputs[0], bump.inputs["Height"])
     nt.links.new(bump.outputs["Normal"], p.inputs["Normal"])
     return m

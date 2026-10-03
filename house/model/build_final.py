@@ -49,7 +49,7 @@ EXTRA_VIEWS = {
     # interiors, framed like the video: great room from the 2F gallery, the loft over the void, stair + rings ...
     "int_great": ((18.3, 20.55, 5.75), (21.3, 29.0, 2.3), 15, (1600, 1100), 0.0),
     "int_loft": ((18.2, 19.9, 5.65), (29.5, 27.3, 5.3), 16, (1600, 1100), 0.0),
-    "int_stair": ((16.0, 13.85, 1.5), (19.6, 17.0, 4.6), 14, (1200, 1600), 0.0),
+    "int_stair": ((16.0, 13.85, 1.5), (19.6, 17.2, 3.7), 14, (1200, 1600), 0.0),
     "int_game": ((25.9, 22.35, 5.6), (31.5, 29.3, 6.2), 14, (1600, 1100), 0.0),
     "int_kitchen": ((26.05, 28.95, 1.6), (33.0, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
@@ -211,7 +211,7 @@ def trim_roofs_inside(coll):
     coll.objects.link(cutter)
     cutter.hide_render = True
     cutter.display_type = "WIRE"
-    for o in coll.objects:
+    for o in list(coll.objects) + [o for o in bpy.data.objects if o.name.startswith("Garage_")]:
         if o.name.endswith(("_roofS", "_roofN", "_roofW", "_roofE")):
             m = o.modifiers.new("trim_inside", "BOOLEAN")
             m.operation, m.solver, m.object = "DIFFERENCE", "EXACT", cutter
@@ -251,6 +251,7 @@ def build(opt):
     details.build_landscape(M, bm.collection("Hardscape"))
     if "--no-interior" not in sys.argv:
         interiors.build(M, bm.collection("Interiors"))
+        facade.interior_trim(M, bm.collection("Interiors"))
         armory.build(M, bm.collection("Interiors"))
         armory.secret_door(hinge_xy=(10.03, 18.565), angle_deg=-72.0)
         lowerlevel.build(M, bm.collection("LowerLevel"))

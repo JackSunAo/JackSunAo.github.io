@@ -160,3 +160,32 @@ def _trims(M, coll):
         coll.objects.link(g)
     for i, (x, y) in enumerate([(8.15, 13.2), (14.85, 13.2), (22.2, 10.25), (28.3, 10.25), (28.7, 8.75), (33.8, 8.75)]):
         _box(f"Downspout{i}", x - 0.05, x + 0.05, y - 0.05, y + 0.05, -0.4, H.EAVE - 0.45, M["trim"], coll)
+
+
+def interior_trim(M, coll):
+    """Inside each opening: painted jamb liners over the inner part of the reveal, a stool and apron
+    under windows, and flat casings on the room face (arched transoms get liners only)."""
+    paint = bpy.data.materials.get("BaseboardPaint")
+    if paint is None:
+        paint = M["trim"]
+    T = H.T_EXT
+    d_in = -(RECESS + 0.022)                      # liners butt against the back of the frame
+    for spec in H.WINDOWS:
+        n, axis, plane, a, b, z1, z2, out, style = spec
+        if style == "door":
+            continue
+        floor_level = z1 < 0.25 or (H.F1 - 0.05 <= z1 <= H.F1 + 0.25)
+        T = H.T_EXT + (0.022 if n.startswith("Game") and axis == "y" else 0.0)   # proud of the teal accent wall
+        _fb(spec, n + "_linL", a, a + 0.012, -T - 0.002, d_in, z1, z2, paint, coll)
+        _fb(spec, n + "_linR", b - 0.012, b, -T - 0.002, d_in, z1, z2, paint, coll)
+        if style == "arch":
+            continue
+        _fb(spec, n + "_linH", a, b, -T - 0.002, d_in, z2 - 0.012, z2, paint, coll)
+        if not floor_level:
+            _fb(spec, n + "_stool", a - 0.06, b + 0.06, -T - 0.035, d_in, z1 - 0.025, z1, paint, coll)
+            _fb(spec, n + "_apron", a - 0.03, b + 0.03, -T - 0.016, -T, z1 - 0.13, z1 - 0.025, paint, coll)
+        else:
+            _fb(spec, n + "_linS", a, b, -T - 0.002, d_in, z1, z1 + 0.012, paint, coll)
+        _fb(spec, n + "_casL", a - 0.075, a, -T - 0.016, -T, z1 - (0.0 if floor_level else 0.025), z2 + 0.075, paint, coll)
+        _fb(spec, n + "_casR", b, b + 0.075, -T - 0.016, -T, z1 - (0.0 if floor_level else 0.025), z2 + 0.075, paint, coll)
+        _fb(spec, n + "_casH", a - 0.075, b + 0.075, -T - 0.016, -T, z2, z2 + 0.075, paint, coll)

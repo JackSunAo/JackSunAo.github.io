@@ -466,8 +466,8 @@ def media_room():
         box(f"MediaSlat{k}", x, x + 0.05, 19.82, 19.9, z, EAVE - 0.4, slat)
     box("TVPanel", 24.35, 26.15, 19.86, 19.9, z + 1.0, z + 2.05, mat("TVBlack", "#0b0b0c", 0.15))
     box("TVScreen", 24.4, 26.1, 19.855, 19.86, z + 1.05, z + 2.0, mat("TVScreen", "#0d1218", 0.08, emit=((0.55, 0.7, 1.0), 0.35)))
-    for k, y in enumerate((13.2, 16.6)):
-        P.place("hanging_picture_frame_01", (28.42, y, z + 1.65), 90, 1.4, coll=COLL, name=f"MediaArt{k}")
+    for k, (y, uv) in enumerate(((13.2, (0.22, 0.47, 0.36, 0.6)), (16.6, (0.62, 0.47, 0.76, 0.6)))):
+        framed_print(f"MediaPrint{k}", "x", 28.5 - 0.075, y, z + 1.65, 1.3, 1.0, -1, uv)
     box("MediaConsole", 23.6, 26.9, 19.45, 19.88, z, z + 0.5, mat("WalnutFurniture", "#4a3526", 0.4), 0.01)
     P.place("sofa_03", (25.25, 13.4, z), 0, coll=COLL, name="MediaSofa")
     P.place("modern_arm_chair_01", (24.3, 16.4, z), 200, coll=COLL, name="MediaChair1")
@@ -493,6 +493,7 @@ def build(materials, coll):
     bedroom4()
     media_room()
     build_rear()
+    finish()
 
 
 # ---------------------------------------------------------------- rear rooms (video): great room, kitchen, game room, master
@@ -539,6 +540,7 @@ def great_room():
     P.place("modern_coffee_table_02", (19.3, 25.9, z), 0, coll=COLL, name="GreatTable")
     P.place("throw_pillows_01", (18.9, 24.0, 0.45), 0, coll=COLL, name="GreatPillows")
     P.place("side_table_01", (17.0, 24.5, z), 0, coll=COLL, name="GreatSide")
+    framed_print("GreatPrint", "x", 16.0 + 0.075, 26.1, 2.1, 2.2, 1.4, 1, (0.40, 0.46, 0.62, 0.6))
     table_lamp("GreatLamp", 17.0, 24.5, 0.55, 0.6)
     # dining in front of the windows, geometric rug, ring pendants (as in the video)
     rug("GreatDiningRug", 21.9, 25.2, 22.3, 27.6, z, "#e9e4d8", "#1d1d1d")
@@ -886,3 +888,190 @@ def build_rear():
     kitchen()
     game_room()
     master()
+
+
+def framed_print(name, axis, plane, uc, zc, w, h, inward, uv=(0.28, 0.47, 0.44, 0.58)):
+    """Gallery-framed photographic print (a cloudscape crop of the sky HDRI) with a white mat."""
+    import assets
+    frame = mat("PrintFrame", "#161616", 0.4)
+    matte = mat("PrintMatte", "#f3f1ec", 0.8)
+    dd = lambda v: plane + inward * v
+
+    def bx(n, u1, u2, z1, z2, d1, d2, m):
+        a, b = sorted((dd(d1), dd(d2)))
+        if axis == "x":                      # wall in the plane x = const, u runs along y
+            return box(n, a, b, u1, u2, z1, z2, m)
+        return box(n, u1, u2, a, b, z1, z2, m)
+    bx(name + "_frame", uc - w / 2, uc + w / 2, zc - h / 2, zc + h / 2, 0.0, 0.035, frame)
+    bx(name + "_matte", uc - w / 2 + 0.03, uc + w / 2 - 0.03, zc - h / 2 + 0.03, zc + h / 2 - 0.03, 0.035, 0.037, matte)
+    m = bpy.data.materials.get("PrintImage")
+    if m is None:
+        m = bpy.data.materials.new("PrintImage")
+        m.use_nodes = True
+        nt = m.node_tree
+        p = nt.nodes["Principled BSDF"]
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(assets.hdri("day", "1k"), check_existing=False)
+        tex.image.name = "PrintPhoto"
+        mr = nt.nodes.new("ShaderNodeMapRange")
+        mr.data_type = "FLOAT_VECTOR"
+        mr.clamp = True
+        mr.inputs[8].default_value = (1.6, 1.6, 1.6)         # From Max (vector)
+        mr.inputs[10].default_value = (0.8, 0.8, 0.8)        # To Max (vector)
+        nt.links.new(tex.outputs["Color"], mr.inputs[6])
+        nt.links.new(mr.outputs[1], p.inputs["Base Color"])
+        p.inputs["Roughness"].default_value = 0.45
+    pw, ph = w - 0.2, h - 0.2
+    d = dd(0.038)
+    if axis == "x":
+        co = [(d, uc - pw / 2 * inward, zc - ph / 2), (d, uc + pw / 2 * inward, zc - ph / 2),
+              (d, uc + pw / 2 * inward, zc + ph / 2), (d, uc - pw / 2 * inward, zc + ph / 2)]
+    else:
+        co = [(uc + pw / 2 * inward, d, zc - ph / 2), (uc - pw / 2 * inward, d, zc - ph / 2),
+              (uc - pw / 2 * inward, d, zc + ph / 2), (uc + pw / 2 * inward, d, zc + ph / 2)]
+    me = bpy.data.meshes.new(name + "_photo")
+    me.from_pydata(co, [], [(0, 1, 2, 3)])
+    uvl = me.uv_layers.new()
+    u0, v0, u1, v1 = uv
+    for i, (u, v) in enumerate(((u0, v0), (u1, v0), (u1, v1), (u0, v1))):
+        uvl.data[i].uv = (u, v)
+    o = bpy.data.objects.new(name + "_photo", me)
+    o.data.materials.append(m)
+    COLL.objects.link(o)
+
+
+# ---------------------------------------------------------------- finishing: recessed downlights, baseboards
+def _in_rects(x, y, rects, pad=0.0):
+    return any(a - pad <= x <= c + pad and b - pad <= y <= d + pad for a, b, c, d in rects)
+
+
+def recessed_cans():
+    """Recessed downlights on a ~1.8 m grid in every flat ceiling (white trim ring + glowing lens).
+    Visual only: the rooms are lit by their area lights."""
+    trim = mat("CanTrim", "#f4f2ee", 0.4)
+    lens = mat("CanLens", "#fff4e6", 0.3, emit=((1.0, 0.86, 0.68), 9.0))
+    bmm = bmesh.new()
+    zc1 = F1 - H.SLAB
+    skip1 = H.FLOOR2_HOLES
+    busy = [(19.4 - 2.3, 16.1 - 2.3, 19.4 + 2.3, 16.1 + 2.3),        # ring chandelier
+            (21.9, 22.3, 25.2, 27.6), (27.9, 24.4, 31.7, 26.0),       # dining rings, island pendants
+            (10.5, 15.2, 12.7, 17.4), (10.9, 24.0, 13.1, 26.0), (24.0, 13.6, 26.5, 16.0)]   # chandeliers
+    pts = []
+    for name, (x1, y1, x2, y2, zf, zc, kind) in H.ROOMS.items():
+        if name in ("armory",) or kind == "game":
+            continue
+        planes = []                                          # (ceiling z, holes, which points: "solid" / "void" / "all")
+        if zf == 0.0:
+            planes.append((zc1, skip1, "solid"))             # under the upper floor
+            if zc == EAVE:
+                planes.append((EAVE, H.CEIL2_HOLES, "all"))  # double-height part and its upper gallery
+        else:
+            planes.append((zc if zc else EAVE, H.CEIL2_HOLES, "solid"))
+        for z, holes, which in planes:
+            nx, ny = max(1, round((x2 - x1 - 1.0) / 1.8)), max(1, round((y2 - y1 - 1.0) / 1.8))
+            for i in range(nx + 1 if nx > 1 else 1):
+                for j in range(ny + 1 if ny > 1 else 1):
+                    x = x1 + 0.9 + (x2 - x1 - 1.8) * (i / nx if nx > 1 else 0.5)
+                    y = y1 + 0.9 + (y2 - y1 - 1.8) * (j / ny if ny > 1 else 0.5)
+                    in_void = _in_rects(x, y, H.FLOOR2_HOLES)
+                    if (which == "solid" and in_void) or _in_rects(x, y, holes, 0.3):
+                        continue
+                    if _in_rects(x, y, busy):
+                        continue
+                    pts.append((x, y, z))
+    for x, y, z in pts:
+        for r, zz, mi in ((0.075, z - 0.004, 0), (0.055, z - 0.006, 1)):
+            ring = [bmm.verts.new((x + r * math.cos(a), y + r * math.sin(a), zz)) for a in [k * math.pi / 12 for k in range(24)]]
+            f = bmm.faces.new(list(reversed(ring)))
+            f.material_index = mi
+    me = bpy.data.meshes.new("RecessedCans")
+    bmm.to_mesh(me)
+    bmm.free()
+    o = bpy.data.objects.new("RecessedCans", me)
+    o.data.materials.append(trim)
+    o.data.materials.append(lens)
+    COLL.objects.link(o)
+
+
+def baseboards():
+    """12 cm painted baseboards along the exterior walls' inner faces and both faces of the partitions,
+    broken at doors and floor-level glazing; none along a gallery edge over a void."""
+    paint = mat("BaseboardPaint", "#f4f1ea", 0.35)
+    inner = H._poly_offset(H.FOOTPRINT, H.T_EXT)
+    h, t = 0.12, 0.014
+    bmm = bmesh.new()
+
+    def add_box(x1, x2, y1, y2, z1, z2):
+        bmesh.ops.create_cube(bmm, size=1.0, matrix=Matrix.Translation(((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2))
+                              @ Matrix.Diagonal((x2 - x1, y2 - y1, z2 - z1, 1.0)))
+
+    def run(axis, plane, u1, u2, zf, side, gaps):
+        """Baseboard on the wall plane, offset toward `side` (+1/-1 along the normal axis)."""
+        cuts = [u1] + [v for g in sorted(gaps) for v in g] + [u2]
+        for i in range(0, len(cuts) - 1, 2):
+            a, b = cuts[i], cuts[i + 1]
+            if b - a < 0.05:
+                continue
+            # skip stretches that border a void on the upper floor
+            m = (a + b) / 2
+            px, py = (m, plane + side * 0.3) if axis == "x" else (plane + side * 0.3, m)
+            if zf > 0 and _in_rects(px, py, H.FLOOR2_HOLES):
+                # split finer: walk along and keep only the parts not facing the void
+                n = max(2, int((b - a) / 0.25))
+                seg = []
+                for k in range(n):
+                    ua, ub = a + (b - a) * k / n, a + (b - a) * (k + 1) / n
+                    qx, qy = ((ua + ub) / 2, plane + side * 0.3) if axis == "x" else (plane + side * 0.3, (ua + ub) / 2)
+                    if not _in_rects(qx, qy, H.FLOOR2_HOLES):
+                        seg.append((ua, ub))
+                for ua, ub in seg:
+                    _emit(axis, plane, ua, ub, zf, side)
+                continue
+            _emit(axis, plane, a, b, zf, side)
+
+    def _emit(axis, plane, a, b, zf, side):
+        d0, d1 = sorted((plane, plane + side * t))
+        if axis == "x":
+            add_box(a, b, d0, d1, zf, zf + h)
+        else:
+            add_box(d0, d1, a, b, zf, zf + h)
+
+    def floor_gaps(axis, wall_plane, zf, tol=0.35):
+        g = []
+        for (n, ax, pl, a, b, z1, z2, out, st) in H.WINDOWS:
+            # WINDOWS axis "y" means the wall lies in a plane y = const (runs along x)
+            if (ax == "y") == (axis == "x") and abs(pl - wall_plane) < tol and zf - 0.05 <= z1 <= zf + 0.3:
+                g.append((a - 0.02, b + 0.02))
+        return g
+
+    n = len(inner)
+    for zf in (0.0, F1):
+        for i in range(n):
+            (x0, y0), (x1, y1) = inner[i], inner[(i + 1) % n]
+            if abs(y1 - y0) < 1e-6:                       # wall along x at y = y0; room side = +y if going +x (ccw)
+                side = 1 if x1 > x0 else -1
+                outer_plane = y0 - side * H.T_EXT
+                run("x", y0, min(x0, x1), max(x0, x1), zf, side, floor_gaps("x", outer_plane, zf))
+            else:
+                side = -1 if y1 > y0 else 1
+                outer_plane = x0 - side * H.T_EXT
+                run("y", x0, min(y0, y1), max(y0, y1), zf, side, floor_gaps("y", outer_plane, zf))
+    for (x1, y1, x2, y2, z0, z1, doors) in H.PARTITIONS:
+        horiz = abs(y2 - y1) < 1e-6
+        gaps = [(c - w / 2, c + w / 2) for c, w in doors]
+        for side in (-1, 1):
+            if horiz:
+                run("x", y1 + side * H.T_INT / 2, min(x1, x2), max(x1, x2), z0, side, gaps)
+            else:
+                run("y", x1 + side * H.T_INT / 2, min(y1, y2), max(y1, y2), z0, side, gaps)
+    me = bpy.data.meshes.new("Baseboards")
+    bmm.to_mesh(me)
+    bmm.free()
+    o = bpy.data.objects.new("Baseboards", me)
+    o.data.materials.append(paint)
+    COLL.objects.link(o)
+
+
+def finish():
+    recessed_cans()
+    baseboards()
