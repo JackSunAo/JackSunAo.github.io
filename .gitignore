@@ -1,3 +1,4 @@
 *.blend1
 __pycache__/
 house/assets/
+house/model/final.blend

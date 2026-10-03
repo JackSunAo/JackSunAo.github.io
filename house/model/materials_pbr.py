@@ -116,8 +116,8 @@ def build_all(dusk=True):
     M = legacy.build_all(dusk)            # keeps siding, metal roof, glass, water, foliage, etc.
     M.update({
         # facades: cream brick (smooth modern), chopped limestone blocks, dark architectural shingles
-        "brick": pbr("BrickPBR", "brick", 1.6, "#f7ebd3", 0.75, value=1.3, sat=0.35, bump=0.8),
-        "stone": pbr("LimestonePBR", "stone", 2.4, "#f4e2c0", 0.6, value=1.25, sat=0.8, bump=1.0),
+        "brick": pbr("BrickPBR", "brick", 1.6, "#f5dfb6", 0.85, value=1.38, sat=0.35, bump=0.8),
+        "stone": pbr("LimestonePBR", "stone", 2.4, "#f3dcb2", 0.7, value=1.3, sat=0.8, bump=1.0),
         "shingle": pbr("ShinglePBR", "shingle", 2.0, "#3a3a3d", 0.6, value=0.55, sat=0.4, bump=0.9),
         "reveal": pbr("RevealBrick", "brick", 1.6, "#f7ebd3", 0.75, value=1.3, sat=0.35, bump=0.5),
         # ground and paving
@@ -131,7 +131,7 @@ def build_all(dusk=True):
         "mulch": pbr("Mulch", "mulch", 1.5, "#6a4a32", 0.3, value=0.8, bump=0.8),
         # interiors
         "floor_oak": pbr("WhiteOakFloor", "floor_oak", 2.0, "#e2c9a4", 0.35, value=1.05, sat=0.8, rough_mul=0.9, bump=0.3),
-        "plaster_int": pbr("InteriorPlaster", "plaster", 2.0, "#f1ede4", 0.6, value=1.15, sat=0.3, bump=0.15),
+        "plaster_int": pbr("InteriorPlaster", "plaster", 2.0, "#eadfcb", 0.75, value=1.05, sat=0.3, bump=0.15),
         "ceiling": paint("CeilingPaint", "#f4f1ea", 0.85),
         "teal": paint("TealAccentWall", "#24495a", 0.75),
         "lawn": None,

@@ -19,6 +19,7 @@ import build_massing as bm  # noqa: E402
 import details  # noqa: E402
 import facade  # noqa: E402
 import front_yard  # noqa: E402
+import interiors  # noqa: E402
 import house_real  # noqa: E402
 import materials_pbr  # noqa: E402
 
@@ -103,14 +104,14 @@ def dusk_sun(on, compass_deg=200, elev=7.0):
         L = bpy.data.lights.new("DuskSun", "SUN")
         o = bpy.data.objects.new("DuskSun", L)
         bpy.context.scene.collection.objects.link(o)
-    o.data.energy = float(os.environ.get("SUN_E", 2.6))
+    o.data.energy = float(os.environ.get("SUN_E", 1.2))
     o.data.color = (1.0, 0.64, 0.38)
     o.data.angle = math.radians(8)
     o.hide_render = not on
     bm.aim(o, compass_deg, elev)
 
 
-def room_lights(rooms, coll, warm=(1.0, 0.70, 0.45), w_per_m2=float(os.environ.get("ROOM_W", 200))):
+def room_lights(rooms, coll, warm=(1.0, 0.70, 0.45), w_per_m2=float(os.environ.get("ROOM_W", 35))):
     for name, (x1, y1, x2, y2, zf, zc, kind) in rooms.items():
         zc = zc if zc is not None else zf + 3.2
         L = bpy.data.lights.new("RL_" + name, "AREA")
@@ -169,6 +170,8 @@ def build(opt):
                     mod.material_offset_rim = 1
     facade.build(M, bm.collection("Windows"))
     details.build_landscape(M, bm.collection("Hardscape"))
+    if "--no-interior" not in sys.argv:
+        interiors.build(M, bm.collection("Interiors"))
     if "--no-plants" not in sys.argv:
         front_yard.build(bm, M, bm.collection("FrontYard"))
     lights = bm.collection("Lights")
@@ -205,7 +208,7 @@ def render(opt, M):
         mode, az = LIGHT.get(name, ("dusk", 20))
         if mode == "dusk":
             set_world(os.environ.get("DUSK_HDRI", "dusk"), int(os.environ.get("DUSK_AZ", az)), 1.0,
-                      float(os.environ.get("DUSK_EXPOSURE", "0.9")))
+                      float(os.environ.get("DUSK_EXPOSURE", "-0.2")))
         else:
             set_world("day", az, 1.0, 0.0)
         dusk_sun(mode == "dusk", int(os.environ.get("SUN_AZ", az)), float(os.environ.get("SUN_EL", 7)))
