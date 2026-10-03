@@ -465,12 +465,12 @@ def bloom_bush(name, seed, radius=0.45, height=0.8, n_leaf=160, n_bloom=24, bloo
     return _mesh_obj(name, bmm, [lm, bmat])
 
 
-def willow(name, seed, height=9.5, crown=4.8, strands=1500):
+def willow(name, seed, height=9.5, crown=4.8, strands=3400):
     """Weeping willow: leaning trunk, arching scaffold limbs, and a dome of long hanging branchlets
     clothed in narrow leaves (each strand is a curved twig with alternate lanceolate leaves)."""
     rnd = random.Random(seed)
     bark = _mat("WillowBark", "#4f4234", 0.85, var=0.2)
-    leaf = _mat("WillowLeaf2", "#7a9341", 0.6, sss=0.25, var=0.35)
+    leaf = _mat("WillowLeaf3", "#6a8636", 0.55, sss=0.0, var=0.3)
     bmm = bmesh.new()
     up = Vector((0, 0, 1))
 
@@ -534,7 +534,7 @@ def willow(name, seed, height=9.5, crown=4.8, strands=1500):
         P2 = o + outv * rnd.uniform(0.35, 0.8) + side - up * L
         bez = lambda t: P0 * (1 - t) ** 2 + P1 * (2 * (1 - t) * t) + P2 * (t * t)
         tan = lambda t: ((P1 - P0) * (2 * (1 - t)) + (P2 - P1) * (2 * t)).normalized()
-        n = max(8, int(L / 0.06))
+        n = max(8, int(L / 0.05))
         prev = None
         for i in range(7):                                        # thin twig ribbon
             t = i / 6
@@ -554,7 +554,7 @@ def willow(name, seed, height=9.5, crown=4.8, strands=1500):
             beta = math.radians(rnd.uniform(28, 50))
             lv = (T * math.cos(beta) + perp * math.sin(beta)).normalized()
             ell = rnd.uniform(0.07, 0.11) * (1.0 - 0.35 * t)
-            sd = lv.cross(perp).normalized() * ell * 0.09
+            sd = lv.cross(perp).normalized() * ell * 0.13
             v = (bmm.verts.new(b), bmm.verts.new(b + lv * ell * 0.45 + sd), bmm.verts.new(b + lv * ell),
                  bmm.verts.new(b + lv * ell * 0.45 - sd))
             f = bmm.faces.new(v)

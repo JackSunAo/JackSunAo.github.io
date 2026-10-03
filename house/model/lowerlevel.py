@@ -244,7 +244,7 @@ def cinema():
     scr.from_pydata([(cx - sw / 2, y1 + 0.05, zb), (cx + sw / 2, y1 + 0.05, zb), (cx + sw / 2, y1 + 0.05, zb + sh),
                      (cx - sw / 2, y1 + 0.05, zb + sh)], [], [(0, 1, 2, 3)])
     uv = scr.uv_layers.new()
-    for i, (u, v) in enumerate(((0.36, 0.45), (0.56, 0.45), (0.56, 0.617), (0.36, 0.617))):
+    for i, (u, v) in enumerate(((0.30, 0.40), (0.50, 0.40), (0.50, 0.567), (0.30, 0.567))):
         uv.data[i].uv = (u, v)
     so = bpy.data.objects.new("CinemaScreen", scr)
     sm = bpy.data.materials.new("CinemaScreenImage")
@@ -396,7 +396,7 @@ def tasting_lounge():
 
 def gym_spa():
     x1, x2, y1, y2 = 25.8, 33.7, 9.4, 22.8
-    rubber = carpet("GymRubber", "#202224", 220.0)
+    rubber = carpet("GymRubber", "#141516", 220.0)
     wall = M["plaster_int"]
     shell("Gym", x1, x2, y1, y2, ZF, ZC, rubber, M["ceiling"], wall)
     mirror = I.mat("Mirror", "#e8eaec", 0.02, 1.0)

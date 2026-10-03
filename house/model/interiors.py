@@ -465,7 +465,9 @@ def media_room():
             continue
         box(f"MediaSlat{k}", x, x + 0.05, 19.82, 19.9, z, EAVE - 0.4, slat)
     box("TVPanel", 24.35, 26.15, 19.86, 19.9, z + 1.0, z + 2.05, mat("TVBlack", "#0b0b0c", 0.15))
-    box("TVScreen", 24.4, 26.1, 19.855, 19.86, z + 1.05, z + 2.0, mat("TVScreen", "#1b2a3a", 0.1, emit=((0.55, 0.7, 1.0), 2.5)))
+    box("TVScreen", 24.4, 26.1, 19.855, 19.86, z + 1.05, z + 2.0, mat("TVScreen", "#0d1218", 0.08, emit=((0.55, 0.7, 1.0), 0.35)))
+    for k, y in enumerate((13.2, 16.6)):
+        P.place("hanging_picture_frame_01", (28.42, y, z + 1.65), 90, 1.4, coll=COLL, name=f"MediaArt{k}")
     box("MediaConsole", 23.6, 26.9, 19.45, 19.88, z, z + 0.5, mat("WalnutFurniture", "#4a3526", 0.4), 0.01)
     P.place("sofa_03", (25.25, 13.4, z), 0, coll=COLL, name="MediaSofa")
     P.place("modern_arm_chair_01", (24.3, 16.4, z), 200, coll=COLL, name="MediaChair1")

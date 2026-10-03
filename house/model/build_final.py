@@ -25,6 +25,7 @@ import lowerlevel  # noqa: E402
 import rear_yard  # noqa: E402
 import outdoor  # noqa: E402
 import outdoor2  # noqa: E402
+import vehicles  # noqa: E402
 import house_real  # noqa: E402
 import materials_pbr  # noqa: E402
 
@@ -39,6 +40,7 @@ LIGHT = {
     "int_great": ("inside", 235), "int_loft": ("inside", 235), "int_stair": ("inside", 160),
     "int_game": ("inside", 235), "int_kitchen": ("inside", 235), "int_media": ("inside", 160),
     "int_armory": ("inside", 235), "int_secret": ("inside", 235),
+    "heli": ("day", 60), "dock": ("day", 300),
     "int_cinema": ("inside", 0, 0.8), "int_wine": ("inside", 0, 0.6), "int_gym": ("inside", 0, 0.6),
 }
 EXTRA_VIEWS = {
@@ -53,6 +55,8 @@ EXTRA_VIEWS = {
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
     "int_armory": ((12.55, 19.95, 1.65), (8.6, 22.6, 1.2), 14, (1600, 1100), 0.0),
     "int_secret": ((11.0, 14.9, 1.5), (10.45, 21.5, 1.3), 20, (1200, 1500), 0.0),
+    "heli": ((79.0, 63.5, -1.75), (65.0, 49.0, -2.0), 28, (1600, 900), 0.0),
+    "dock": ((58.0, 126.0, -3.4), (42.0, 108.0, -3.6), 30, (1600, 900), 0.0),
     "int_cinema": ((15.5, 22.45, -2.15), (11.3, 14.0, -2.6), 16, (1600, 1100), 0.0),
     "int_wine": ((25.1, 21.95, -2.3), (17.4, 16.2, -2.35), 15, (1600, 1100), 0.0),
     "int_gym": ((26.25, 9.95, -2.2), (32.5, 21.0, -2.6), 16, (1600, 1100), 0.0),
@@ -255,6 +259,7 @@ def build(opt):
         rear_yard.build(bm, M, bm.collection("RearYard"))
     outdoor.build(bm, M, bm.collection("Outdoor"))
     outdoor2.build(bm, M, bm.collection("Outdoor2"))
+    vehicles.build(bm, M, bm.collection("Vehicles"))
     lights = bm.collection("Lights")
     room_lights(info["rooms"], lights)
     porch_lights(lights)
@@ -271,6 +276,7 @@ def render(opt, M):
     c.caustics_reflective = c.caustics_refractive = False
     c.sample_clamp_indirect = 8.0
     c.use_adaptive_sampling = True
+    c.adaptive_threshold = float(os.environ.get("NOISE", "0.015"))
     scn.render.use_persistent_data = True
     scn.view_settings.look = os.environ.get("LOOK", "AgX - Medium High Contrast")
     views = dict(bm.VIEWS)
@@ -284,6 +290,10 @@ def render(opt, M):
     scale = float(opt["scale"] or (0.5 if opt["preview"] else 1.0))
     for name in names:
         v = views[name]
+        target = os.path.join(OUT_DIR, f"{name}{'_preview' if opt['preview'] else ''}.png")
+        if "--skip-existing" in sys.argv and os.path.exists(target):
+            print("skip", target, flush=True)
+            continue
         scn.camera = bpy.data.objects["Cam_" + name]
         scn.render.resolution_x, scn.render.resolution_y = int(v[3][0] * scale), int(v[3][1] * scale)
         spec = LIGHT.get(name, ("dusk", 20))

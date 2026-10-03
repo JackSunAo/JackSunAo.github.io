@@ -26,7 +26,7 @@ def _m(name, hexcol, rough=0.5, metal=0.0, **kw):
 
 
 # ---------------------------------------------------------------- materials
-def flagstone(name="Flagstone", scale=1.4):
+def flagstone(name="Flagstone", scale=1.1):
     m = bpy.data.materials.get(name)
     if m:
         return m
@@ -50,8 +50,8 @@ def flagstone(name="Flagstone", scale=1.4):
     nt.links.new(tc.outputs["Object"], mp.inputs["Vector"])
     # per-stone tone: two limestone shades picked by the cell colour, speckled by noise
     tone = nt.nodes.new("ShaderNodeValToRGB")
-    tone.color_ramp.elements[0].color = (0.50, 0.44, 0.34, 1)
-    tone.color_ramp.elements[1].color = (0.70, 0.64, 0.52, 1)
+    tone.color_ramp.elements[0].color = (0.36, 0.31, 0.24, 1)
+    tone.color_ramp.elements[1].color = (0.55, 0.49, 0.39, 1)
     sep = nt.nodes.new("ShaderNodeSeparateColor")
     nt.links.new(cell.outputs["Color"], sep.inputs["Color"])
     mixf = nt.nodes.new("ShaderNodeMath")
@@ -106,9 +106,9 @@ def canopy(name="FarCanopy"):
     nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     ramp.color_ramp.elements[0].position = 0.35
-    ramp.color_ramp.elements[0].color = (0.035, 0.055, 0.04, 1)
+    ramp.color_ramp.elements[0].color = (0.018, 0.03, 0.02, 1)
     ramp.color_ramp.elements[1].position = 0.7
-    ramp.color_ramp.elements[1].color = (0.11, 0.15, 0.11, 1)
+    ramp.color_ramp.elements[1].color = (0.055, 0.08, 0.055, 1)
     nt.links.new(nz.outputs["Fac"], ramp.inputs["Fac"])
     nt.links.new(ramp.outputs["Color"], p.inputs["Base Color"])
     p.inputs["Roughness"].default_value = 0.95
@@ -201,6 +201,79 @@ def garden_paths():
         if o.name.startswith("FarTree"):
             o.data.materials.clear()
             o.data.materials.append(canopy())
+
+
+def far_forest(bm):
+    """Wooded far shore: a few thousand instanced trees on the hills across the lake (real silhouettes)."""
+    import re
+    import vegetation as V
+    import rear_yard as RY
+    fir = V.load("fir_tree_01", lambda n: re.fullmatch(r"fir_tree_01_[abc]_LOD1", n) is not None, "fir")
+    shade = V.load("island_tree_02", lambda n: n == "island_tree_02_LOD1", "shade2")
+    shade3 = V.load("island_tree_03", lambda n: n == "island_tree_03_LOD1", "shade3")
+    fir_s = RY._height_scale(fir, 1.0)
+    hills = [(-260, 220, 22), (-40, 180, 16), (150, 240, 26), (380, 220, 18)]
+
+    def hz(x, y):
+        best = None
+        for xc, w, h in hills:
+            q = 1 - ((x - xc) / w) ** 2 - ((y - 620) / 90) ** 2
+            if q > 0:
+                z = bm.LAKE + h * math.sqrt(q)
+                best = z if best is None else max(best, z)
+        return best
+    rnd = random.Random(31)
+    pf, ps, ps3 = [], [], []
+    for _ in range(3200):
+        x, y = rnd.uniform(-480, 600), rnd.uniform(534, 690)
+        z = hz(x, y)
+        if z is None or z < bm.LAKE + 0.6:
+            continue
+        r = rnd.random()
+        if r < 0.4:
+            pf.append((x, y, z - 0.5, fir_s * rnd.uniform(12, 22)))
+        elif r < 0.7:
+            ps.append((x, y, z - 0.5, rnd.uniform(1.8, 2.8)))
+        else:
+            ps3.append((x, y, z - 0.5, rnd.uniform(1.8, 2.8)))
+    V.scatter("FarForestFir", fir, pf, COLL, 81)
+    V.scatter("FarForestShade", shade, ps, COLL, 82)
+    V.scatter("FarForestShade3", shade3, ps3, COLL, 83)
+
+
+def woodland(bm):
+    """Neighbouring land as Texas hill-country woodland (live oaks, cedar elms, junipers) with clearings,
+    so the estate does not sit in an empty field in the wide shots."""
+    import re
+    import vegetation as V
+    import rear_yard as RY
+    fir = V.load("fir_tree_01", lambda n: re.fullmatch(r"fir_tree_01_[abc]_LOD1", n) is not None, "fir")
+    shade = V.load("island_tree_02", lambda n: n == "island_tree_02_LOD1", "shade2")
+    shade3 = V.load("island_tree_03", lambda n: n == "island_tree_03_LOD1", "shade3")
+    fir_s = RY._height_scale(fir, 1.0)
+    rnd = random.Random(57)
+    regions = [(-130, -5, -45, 97), (87, 210, -45, 97), (-130, 210, -90, -16)]
+    pf, ps, ps3, taken = [], [], [], []
+    for (x1, x2, y1, y2) in regions:
+        n = int((x2 - x1) * (y2 - y1) / 110)
+        for _ in range(n):
+            x, y = rnd.uniform(x1, x2), rnd.uniform(y1, y2)
+            if math.sin(x * 0.045) + math.cos(y * 0.06 + 1.3) + 0.6 * math.sin((x + y) * 0.11) < -0.7:
+                continue                                      # clearings
+            if any((x - a) ** 2 + (y - b) ** 2 < 36 for a, b in taken[-60:]):
+                continue
+            taken.append((x, y))
+            z = bm.ground(x, y) - 0.2
+            r = rnd.random()
+            if r < 0.22:
+                pf.append((x, y, z, fir_s * rnd.uniform(8, 14)))
+            elif r < 0.62:
+                ps.append((x, y, z, rnd.uniform(1.1, 1.9)))
+            else:
+                ps3.append((x, y, z, rnd.uniform(1.1, 1.9)))
+    V.scatter("WoodlandFir", fir, pf, COLL, 91)
+    V.scatter("WoodlandShade", shade, ps, COLL, 92)
+    V.scatter("WoodlandShade3", shade3, ps3, COLL, 93)
 
 
 # ---------------------------------------------------------------- cedar play set
@@ -492,11 +565,60 @@ def bbq_pavilion(bm):
         I.box(f"BBQBeamY{x}", x - 0.08, x + 0.08, 88.8, 94.2, z + 2.6, z + 2.85, stain)
 
 
+def lake_water():
+    """Deep lake water reads dark; the sky reflection does the rest (the massing teal looked like a pool)."""
+    m = M.get("lake")
+    if m:
+        p = m.node_tree.nodes.get("Principled BSDF")
+        if p and not p.inputs["Base Color"].is_linked:
+            p.inputs["Base Color"].default_value = (0.010, 0.026, 0.026, 1)
+
+
+def heli_area(bm):
+    """Helipad: charcoal concrete TLOF with white H and yellow touchdown ring, grass FATO; ribbed hangar door."""
+    fato = bpy.data.objects.get("FATO")
+    if fato:
+        fato.hide_render = True
+    pad = _m("PadConcrete", "#55585b", 0.75)
+    white = _m("PadWhite", "#f2f2ef", 0.6)
+    yellow = _m("PadYellow", "#e8b628", 0.55)
+    for o in bpy.data.objects:
+        if o.name == "TLOF":
+            o.data.materials.clear()
+            o.data.materials.append(pad)
+        elif o.name.startswith("H_"):
+            o.data.materials.clear()
+            o.data.materials.append(white)
+        elif o.name == "TD_Circle":
+            o.data.materials.clear()
+            o.data.materials.append(yellow)
+        elif o.name.startswith("PadLight"):
+            o.data.materials.clear()
+            o.data.materials.append(_m("PadLightGreen", "#7fe08a", 0.3, emit=((0.4, 1.0, 0.5), 3.0)))
+    door = bpy.data.objects.get("HangarDoor")
+    if door:
+        door.data.materials.clear()
+        door.data.materials.append(_m("HangarDoorMetal", "#4a4744", 0.45, 0.6))
+        x1, x2, y, z1, z2 = 54.5, 67.5, 31.08, -0.5, 4.1
+        seam = _m("HangarSeam", "#2a2826", 0.6, 0.5)
+        for k in range(1, 13):                          # vertical door leaves
+            x = x1 + k * (x2 - x1) / 13
+            I.box(f"HangarLeaf{k}", x - 0.015, x + 0.015, y, y + 0.03, z1, z2, seam)
+        for k in range(1, 9):                           # horizontal ribs
+            z = z1 + k * (z2 - z1) / 9
+            I.box(f"HangarRib{k}", x1, x2, y, y + 0.02, z - 0.01, z + 0.01, seam)
+        I.box("HangarDoorTrack", x1 - 0.3, x2 + 0.3, y, y + 0.12, z2, z2 + 0.18, seam)
+
+
 def build(bm, materials, coll):
     global COLL, M
     COLL, M = coll, materials
     I.COLL, I.M = coll, materials
     garden_paths()
+    far_forest(bm)
+    woodland(bm)
     playground(bm)
     bar_house(bm)
     bbq_pavilion(bm)
+    heli_area(bm)
+    lake_water()
