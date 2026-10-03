@@ -1,5 +1,6 @@
 # Site plan generator: x = meters from left lot line, d = meters from street.
-S, M, W, D = 12, 50, 52, 62
+S, M, W, D = 12, 50, 52, 80
+LOT = 62  # lot depth; lake beyond
 TOP = 0
 out = []
 def Y(d): return TOP + M + (D - d) * S
@@ -12,13 +13,20 @@ def circle(x, d, r, fill, stroke="#555"):
     out.append(f'<circle cx="{X(x)}" cy="{Y(d)}" r="{r*S}" fill="{fill}" stroke="{stroke}"/>')
 
 # lot + lawn
-rect(0, 0, W, D, "#b9d99a", "#333", 2)
+rect(0, 0, W, LOT, "#b9d99a", "#333", 2)
+# lake
+rect(-4, LOT, W + 4, D, "#6fa8c8", "none")
+for i, d in enumerate(range(66, 80, 3)):
+    out.append(f'<path d="M {X(2 + i % 2 * 3)} {Y(d)} q 12 -5 24 0 t 24 0" fill="none" stroke="#9cc6dc" stroke-width="1.5"/>')
+text(10, 74, "大  湖", 22, "#fff", "bold")
+text(10, 71.6, "湖景正对后立面", 11, "#eaf4f9")
+# shoreline bulkhead
+out.append(f'<line x1="{X(0)}" y1="{Y(LOT)}" x2="{X(W)}" y2="{Y(LOT)}" stroke="#a89a82" stroke-width="5"/>')
 # street
 out.append(f'<rect x="{M-20}" y="{Y(0)}" width="{W*S+40}" height="34" fill="#9a9a9a"/>')
 text(W/2, -2.0, "街 道", 15, "#fff", "bold")
-# rear tree screen + right buffer
-for x in range(1, W, 3): circle(x+0.5, 61, 1.3, "#5f8f4e", "#4a7a3b")
-for d in range(3, 58, 3): circle(50.8, d, 1.0, "#5f8f4e", "#4a7a3b")
+# right side buffer (rear kept open for lake view)
+for d in range(3, 30, 3): circle(50.8, d, 1.0, "#5f8f4e", "#4a7a3b")
 
 # driveway, motor court
 rect(45, 0, 49, 17, "#d8d2c6", "#999")
@@ -84,15 +92,42 @@ text(10.6, 47.3, "果树", 9, "#3d5e2f")
 out.append(f'<line x1="{X(12.5)}" y1="{Y(46)}" x2="{X(12.5)}" y2="{Y(33.5)}" stroke="#4a7a3b" stroke-width="5" stroke-dasharray="40,18"/>')
 
 # rear lawn + fire pit
-text(33, 54, "后院大草坪（活动/儿童）", 13, "#3d5e2f")
-circle(23, 52, 1.6, "#d9c3a0", "#8a6d4a"); circle(23, 52, 0.6, "#e07b39", "none")
-text(23, 49.2, "火坑", 10, "#5a3e22")
+text(29, 53, "缓坡草坪 → 湖岸", 13, "#3d5e2f")
+text(29, 51.4, "（活动/儿童/观景）", 10, "#3d5e2f")
+circle(20, 57.5, 1.6, "#d9c3a0", "#8a6d4a"); circle(20, 57.5, 0.6, "#e07b39", "none")
+text(20, 54.9, "湖边火坑", 10, "#5a3e22")
+
+
+# infinity edge facing the lake
+out.append(f'<line x1="{X(17)}" y1="{Y(41)}" x2="{X(29)}" y2="{Y(41)}" stroke="#e9f7fb" stroke-width="4" stroke-dasharray="6,3"/>')
+text(23.5, 41.6, "无边际边 → 望湖", 9, "#1f6f87", anchor="middle")
+
+# path from motor court down to the boathouse
+rect(44.5, 31, 47.5, LOT, "#e3dacb", "#b8ab95")
+text(46, 46, "船屋步道", 11, "#5a3e22"); text(46, 44.4, "(可走高尔夫车)", 9, "#5a3e22")
+
+# boathouse over the water: yacht slip + jet-ski lifts, sun deck on top
+rect(36, 63, 50, 77, "#e9dfcb", "#333", 2)
+rect(37, 64, 44, 76, "#4f8fb3", "#1f5f7f")
+out.append(f'<path d="M {X(40.5)} {Y(75.4)} L {X(43.2)} {Y(72.5)} L {X(43.2)} {Y(64.6)} L {X(37.8)} {Y(64.6)} L {X(37.8)} {Y(72.5)} Z" fill="#fafafa" stroke="#555"/>')
+rect(39, 66, 42, 70, "#cfd8dc", "#777")
+text(40.5, 67.6, "游艇", 10, "#222", "bold")
+rect(45, 64, 49, 68.5, "#4f8fb3", "#1f5f7f")
+for x in (46, 48): out.append(f'<ellipse cx="{X(x)}" cy="{Y(66.2)}" rx="{0.6*S}" ry="{1.4*S}" fill="#f0c040" stroke="#555"/>')
+text(47, 69.2, "摩托艇升降架", 8, "#333")
+text(47, 74.6, "船屋", 12, "#222", "bold"); text(47, 73.0, "顶层观景台", 9, "#555"); text(47, 71.7, "+ 吧台", 9, "#555")
+text(40.5, 77.6, "约 11 m 日间巡航艇 · 船坞升降机", 9, "#fff")
+
+# main pier with T-head (swim ladder, seating)
+rect(22.5, LOT, 24.5, 70, "#b08a5a", "#6b4f2e")
+rect(18, 70, 29, 72, "#b08a5a", "#6b4f2e")
+text(23.5, 72.8, "T 型码头 · 下水梯", 10, "#fff")
 
 # title, scale, north
-out.insert(0, f'<text x="{M}" y="32" font-size="20" font-weight="bold" font-family="PingFang SC,Microsoft YaHei,WenQuanYi Zen Hei,sans-serif">总平面布局 · 地块约 52 × 62 m（≈3200 m²）</text>')
+out.insert(0, f'<text x="{M}" y="32" font-size="20" font-weight="bold" font-family="PingFang SC,Microsoft YaHei,WenQuanYi Zen Hei,sans-serif">总平面布局 · 湖景版 · 地块约 52 × 62 m + 湖岸</text>')
 out.append(f'<line x1="{X(0)}" y1="{Y(-4.2)}" x2="{X(10)}" y2="{Y(-4.2)}" stroke="#333" stroke-width="3"/>')
 text(5, -5.6, "10 m", 11)
-text(31, -5.6, "前 = 公共展示　右 = 车/服务　左 = 花园（安静私密）　后 = 泳池/娱乐", 12, "#444")
+text(31, -5.6, "前 = 公共展示　右 = 车/服务　左 = 花园（安静私密）　后 = 泳池/湖/游艇", 12, "#444")
 
 H = TOP + M + D*S + 120
 svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{W*S+2*M}" height="{H}" viewBox="0 0 {W*S+2*M} {H}"><rect width="100%" height="100%" fill="#fbfaf7"/>' + "".join(out) + "</svg>"
