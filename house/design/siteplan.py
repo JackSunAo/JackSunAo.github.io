@@ -68,14 +68,20 @@ text(37.75, 25, "2车位车库", 12, weight="bold"); text(37.75, 23.3, "7×8 m",
 out.append(f'<line x1="{X(41.5)}" y1="{Y(27.5)}" x2="{X(41.5)}" y2="{Y(21)}" stroke="#8a5a2b" stroke-width="5"/>')
 text(43.5, 19.2, "车库门侧开", 10, "#8a5a2b", anchor="start")
 
-# covered patio + pool
+# covered patio + pool deck (main-floor level, built up over the lower level)
 rect(15, 29, 29, 33.5, "#c9c0b0", "#555"); text(22, 30.8, "有顶露台 · 壁炉 · 户外厨房", 11)
-rect(13, 33.5, 34, 46, "#ece4d4", "#aaa")
-rect(17, 36, 29, 41, "#3fa7c4", "#1f6f87", 2, 4)
-rect(17, 36, 19, 41, "#7fcfe0", "none")
-text(23.5, 38.1, "泳池 12×5 m", 12, "#fff", "bold"); text(18, 37.6, "浅台", 9, "#1f6f87")
-circle(31, 38.5, 1.3, "#5ec2da", "#1f6f87"); text(31, 38.2, "SPA", 9, "#fff")
-text(23.5, 43.5, "石灰岩泳池平台 · 躺椅", 11, "#666")
+rect(13, 33.5, 36, 46.5, "#ece4d4", "#aaa")
+# bar house below the east part of the deck (lower level, opens to the lake terrace)
+rect(28.6, 36, 35, 46.2, "none", "#8a3b12", 1.5, 0, 'stroke-dasharray="5,3"')
+text(31.8, 41.6, "下方：", 9, "#8a3b12"); text(31.8, 40.2, "酒吧屋", 11, "#8a3b12", "bold"); text(31.8, 38.8, "(地下层)", 9, "#8a3b12")
+rect(16, 40.5, 28, 45.5, "#3fa7c4", "#1f6f87", 2, 4)
+rect(16, 40.5, 18, 45.5, "#7fcfe0", "none")
+text(22.5, 42.6, "泳池 12×5 m", 12, "#fff", "bold"); text(17, 42.1, "浅台", 9, "#1f6f87")
+circle(14.4, 43, 1.25, "#5ec2da", "#1f6f87"); text(14.4, 42.7, "SPA", 9, "#fff")
+text(22.5, 37.2, "石灰岩泳池平台 · 躺椅", 11, "#666")
+# lower lake terrace (basement level) + stairs down from the deck
+rect(16, 46.5, 36, 50, "#e3d8c4", "#a89a82"); text(26, 47.8, "下沉湖景露台（地下层标高 · 户外吧台）", 10, "#5a3e22")
+for i in range(6): out.append(f'<line x1="{X(36 + i*0.4)}" y1="{Y(46.5)}" x2="{X(36 + i*0.4)}" y2="{Y(49.5)}" stroke="#8a7a62"/>')
 rect(35, 29.5, 40, 32, "#bbb", "#777"); text(37.5, 30.3, "泳池设备", 9)
 
 # garden (left/rear)
@@ -107,8 +113,8 @@ text(20, 54.9, "湖边火坑", 10, "#5a3e22")
 
 
 # infinity edge facing the lake
-out.append(f'<line x1="{X(17)}" y1="{Y(41)}" x2="{X(29)}" y2="{Y(41)}" stroke="#e9f7fb" stroke-width="4" stroke-dasharray="6,3"/>')
-text(23.5, 41.6, "无边际边 → 望湖", 9, "#1f6f87", anchor="middle")
+out.append(f'<line x1="{X(16)}" y1="{Y(45.5)}" x2="{X(28)}" y2="{Y(45.5)}" stroke="#e9f7fb" stroke-width="4" stroke-dasharray="6,3"/>')
+text(22.5, 44.0, "无边际边 → 望湖", 9, "#1f6f87", anchor="middle")
 
 # path from motor court down to the boathouse
 rect(44.5, 31, 47.5, LOT, "#e3dacb", "#b8ab95")
