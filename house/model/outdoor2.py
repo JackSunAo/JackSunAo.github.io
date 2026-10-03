@@ -241,6 +241,64 @@ def far_forest(bm):
     V.scatter("FarForestShade3", shade3, ps3, COLL, 83)
 
 
+def wild_ground():
+    """Unmown ground outside the lot: dry and green grasses with bare patches, large-scale variation
+    (the lawn texture's mowing stripes only belong inside the estate)."""
+    m = bpy.data.materials.get("WildGround")
+    if m is None:
+        m = bpy.data.materials.new("WildGround")
+        m.use_nodes = True
+        nt = m.node_tree
+        p = nt.nodes["Principled BSDF"]
+        tc = nt.nodes.new("ShaderNodeTexCoord")
+        big = nt.nodes.new("ShaderNodeTexNoise")
+        big.inputs["Scale"].default_value = 0.03
+        big.inputs["Detail"].default_value = 6.0
+        mid = nt.nodes.new("ShaderNodeTexNoise")
+        mid.inputs["Scale"].default_value = 0.6
+        mid.inputs["Detail"].default_value = 8.0
+        fine = nt.nodes.new("ShaderNodeTexNoise")
+        fine.inputs["Scale"].default_value = 30.0
+        for n in (big, mid, fine):
+            nt.links.new(tc.outputs["Object"], n.inputs["Vector"])
+        mix = nt.nodes.new("ShaderNodeMath")
+        mix.operation = "MULTIPLY_ADD"
+        mix.inputs[1].default_value = 0.6
+        nt.links.new(big.outputs["Fac"], mix.inputs[0])
+        nt.links.new(mid.outputs["Fac"], mix.inputs[2])
+        sub = nt.nodes.new("ShaderNodeMath")
+        sub.operation = "SUBTRACT"
+        sub.inputs[1].default_value = 0.35
+        nt.links.new(mix.outputs[0], sub.inputs[0])
+        ramp = nt.nodes.new("ShaderNodeValToRGB")
+        cr = ramp.color_ramp
+        cr.elements[0].position, cr.elements[0].color = 0.15, (0.05, 0.075, 0.025, 1)
+        cr.elements[1].position, cr.elements[1].color = 0.75, (0.16, 0.14, 0.07, 1)
+        e = cr.elements.new(0.45)
+        e.color = (0.08, 0.11, 0.035, 1)
+        nt.links.new(sub.outputs[0], ramp.inputs["Fac"])
+        nt.links.new(ramp.outputs["Color"], p.inputs["Base Color"])
+        p.inputs["Roughness"].default_value = 0.95
+        bump = nt.nodes.new("ShaderNodeBump")
+        bump.inputs["Strength"].default_value = 0.4
+        nt.links.new(fine.outputs["Fac"], bump.inputs["Height"])
+        nt.links.new(bump.outputs["Normal"], p.inputs["Normal"])
+    t = bpy.data.objects.get("Terrain")
+    if t:
+        if m.name not in [x.name for x in t.data.materials]:
+            t.data.materials.append(m)
+        idx = [x.name for x in t.data.materials].index(m.name)
+        for poly in t.data.polygons:
+            c = poly.center
+            if c.x < -3 or c.x > 85 or c.y < -13:
+                poly.material_index = idx
+    for n in ("GroundW", "GroundE", "FarGround"):
+        o = bpy.data.objects.get(n)
+        if o:
+            o.data.materials.clear()
+            o.data.materials.append(m)
+
+
 def woodland(bm):
     """Neighbouring land as Texas hill-country woodland (live oaks, cedar elms, junipers) with clearings,
     so the estate does not sit in an empty field in the wide shots."""
@@ -252,25 +310,28 @@ def woodland(bm):
     shade3 = V.load("island_tree_03", lambda n: n == "island_tree_03_LOD1", "shade3")
     fir_s = RY._height_scale(fir, 1.0)
     rnd = random.Random(57)
-    regions = [(-130, -5, -45, 97), (87, 210, -45, 97), (-130, 210, -90, -16)]
-    pf, ps, ps3, taken = [], [], [], []
+    regions = [(-160, -4, -60, 97), (86, 240, -60, 97), (-160, 240, -110, -15)]
+    pf, ps, ps3 = [], [], []
+    grid = {}
     for (x1, x2, y1, y2) in regions:
-        n = int((x2 - x1) * (y2 - y1) / 110)
+        n = int((x2 - x1) * (y2 - y1) / 45)
         for _ in range(n):
             x, y = rnd.uniform(x1, x2), rnd.uniform(y1, y2)
-            if math.sin(x * 0.045) + math.cos(y * 0.06 + 1.3) + 0.6 * math.sin((x + y) * 0.11) < -0.7:
-                continue                                      # clearings
-            if any((x - a) ** 2 + (y - b) ** 2 < 36 for a, b in taken[-60:]):
+            if math.sin(x * 0.045) + math.cos(y * 0.06 + 1.3) + 0.6 * math.sin((x + y) * 0.11) < -1.5:
+                continue                                      # a few clearings
+            cx, cy = int(x // 5), int(y // 5)
+            if any((x - a) ** 2 + (y - b) ** 2 < 20 for i in (-1, 0, 1) for j in (-1, 0, 1) for a, b in grid.get((cx + i, cy + j), ())):
                 continue
-            taken.append((x, y))
+            grid.setdefault((cx, cy), []).append((x, y))
             z = bm.ground(x, y) - 0.2
             r = rnd.random()
             if r < 0.22:
-                pf.append((x, y, z, fir_s * rnd.uniform(8, 14)))
+                pf.append((x, y, z, fir_s * rnd.uniform(9, 16)))
             elif r < 0.62:
-                ps.append((x, y, z, rnd.uniform(1.1, 1.9)))
+                ps.append((x, y, z, rnd.uniform(1.3, 2.2)))
             else:
-                ps3.append((x, y, z, rnd.uniform(1.1, 1.9)))
+                ps3.append((x, y, z, rnd.uniform(1.3, 2.2)))
+    wild_ground()
     V.scatter("WoodlandFir", fir, pf, COLL, 91)
     V.scatter("WoodlandShade", shade, ps, COLL, 92)
     V.scatter("WoodlandShade3", shade3, ps3, COLL, 93)
