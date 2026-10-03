@@ -11,7 +11,7 @@ def R(x1, y1, x2, y2, fill, stroke="#444", sw=1, extra=""):
 
 # ---------------- section ----------------
 SS, SX0, SY0 = 14, 40, 70          # px per m, left margin, top margin
-D0, ZTOP = 10, 13                  # first d shown, highest z shown
+D0, ZTOP = 6, 17                  # first d shown, highest z shown
 def sx(d): return SX0 + (d - D0) * SS
 def sy(z): return SY0 + (ZTOP - z) * SS
 T(SX0, 34, "示意剖面（从街道到湖，竖向不夸张，真实比例）", 18, weight="bold", anchor="start")
@@ -20,14 +20,14 @@ T(SX0, 54, "← 街道　　标高：±0.0 主层 · −3.3 地下层/湖景露�
 R(sx(D0), sy(ZTOP), sx(80), sy(-9), "#f4f8fb", "none")
 lake = [(sx(60), sy(-5.0)), (sx(80), sy(-5.0)), (sx(80), sy(-9)), (sx(64), sy(-9)), (sx(62), sy(-7.5)), (sx(62), sy(-5.0))]
 poly(lake, "#6fa8c8", "none")
-ground = [(sx(D0), sy(-0.7)), (sx(16.5), sy(-0.4)), (sx(16.5), sy(-3.6)), (sx(46.6), sy(-3.6)),
+ground = [(sx(D0), sy(-0.7)), (sx(13.5), sy(-0.4)), (sx(13.5), sy(-3.6)), (sx(46.6), sy(-3.6)),
           (sx(50), sy(-3.2)), (sx(62), sy(-4.4)), (sx(62), sy(-7.5)), (sx(64), sy(-9)), (sx(D0), sy(-9))]
 poly(ground, "#cdbb9a", "#8a7a62")
 # lawn slope surface
 out.append(f'<polyline points="{sx(50)},{sy(-3.0)} {sx(62)},{sy(-4.2)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
-out.append(f'<polyline points="{sx(D0)},{sy(-0.5)} {sx(16.5)},{sy(-0.3)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
+out.append(f'<polyline points="{sx(D0)},{sy(-0.5)} {sx(13.5)},{sy(-0.3)}" fill="none" stroke="#6a9a4f" stroke-width="4"/>')
 # basement under house + corridor + bar (lower level, floor z = -3.3)
-R(sx(16.5), sy(0), sx(29), sy(-3.3), "#efe4cf", "#333", 2)
+R(sx(13.5), sy(0), sx(29), sy(-3.3), "#efe4cf", "#333", 2)
 T(sx(22.75), sy(-1.4), "地下室  层高 3.0 m", 11, weight="bold")
 T(sx(22.75), sy(-2.6), "影院 · 酒窖 · 健身SPA · 休闲厅", 9, "#555")
 R(sx(29), sy(-0.4), sx(36), sy(-3.3), "#efe4cf", "#333", 1.5)
@@ -47,21 +47,21 @@ out.append(f'<line x1="{sx(46.2)}" y1="{sy(-0.4)}" x2="{sx(46.2)}" y2="{sy(-3.3)
 R(sx(46.2), sy(-3.3), sx(50), sy(-3.6), "#e3d8c4", "#8a7a62")
 T(sx(48.1), sy(-4.4), "下沉露台", 9, "#5a3e22")
 # main floor house
-R(sx(16.5), sy(3.05), sx(29), sy(0), "#fbf5e8", "#333", 2)
-R(sx(16.5), sy(5.8), sx(29), sy(3.05), "#fbf5e8", "#333", 2)
-R(sx(20), sy(5.8), sx(29), sy(0.1), "#fffaf0", "none")  # double-height great room void
-out.append(f'<line x1="{sx(20)}" y1="{sy(3.05)}" x2="{sx(20)}" y2="{sy(5.8)}" stroke="#333" stroke-width="1"/>')
-T(sx(24.5), sy(2.6), "两层通高大客厅 ~5.8 m", 10)
-T(sx(18.2), sy(1.4), "门厅", 9); T(sx(18.2), sy(4.3), "二层", 9)
-poly([(sx(16.0), sy(5.8)), (sx(22.75), sy(12.3)), (sx(29.5), sy(5.8))], "#3a3a3c", "#222")
+R(sx(13.5), sy(4.0), sx(29), sy(0), "#fbf5e8", "#333", 2)
+R(sx(13.5), sy(7.4), sx(29), sy(4.0), "#fbf5e8", "#333", 2)
+R(sx(21), sy(7.4), sx(29), sy(0.1), "#fffaf0", "none")  # double-height great room void
+out.append(f'<line x1="{sx(21)}" y1="{sy(4.0)}" x2="{sx(21)}" y2="{sy(7.4)}" stroke="#333" stroke-width="1"/>')
+T(sx(25), sy(3.4), "两层通高大客厅 ~7.4 m", 10)
+T(sx(17.2), sy(1.8), "门厅 · 层高 4.0 m", 9); T(sx(17.2), sy(5.6), "二层 · 层高 3.4 m", 9)
+poly([(sx(13.0), sy(7.4)), (sx(21.25), sy(16.4)), (sx(29.5), sy(7.4))], "#3a3a3c", "#222")
 # arched windows to the lake
-out.append(f'<line x1="{sx(29)}" y1="{sy(0.3)}" x2="{sx(29)}" y2="{sy(5.4)}" stroke="#7fc6e0" stroke-width="4"/>')
+out.append(f'<line x1="{sx(29)}" y1="{sy(0.3)}" x2="{sx(29)}" y2="{sy(6.8)}" stroke="#7fc6e0" stroke-width="4"/>')
 # curved stair continues down
 out.append(f'<polyline points="{sx(17.2)},{sy(0)} {sx(18.6)},{sy(-1.6)} {sx(17.2)},{sy(-3.3)}" fill="none" stroke="#8a6d4a" stroke-width="3"/>')
 # covered patio + pool deck (built over the lower level)
-R(sx(29), sy(3.1), sx(33.5), sy(2.9), "#3a3632", "none")
-out.append(f'<line x1="{sx(33.3)}" y1="{sy(2.9)}" x2="{sx(33.3)}" y2="{sy(0)}" stroke="#7d7466" stroke-width="3"/>')
-T(sx(31.2), sy(3.6), "有顶露台", 9)
+R(sx(29), sy(3.6), sx(33.5), sy(3.4), "#3a3632", "none")
+out.append(f'<line x1="{sx(33.3)}" y1="{sy(3.4)}" x2="{sx(33.3)}" y2="{sy(0)}" stroke="#7d7466" stroke-width="3"/>')
+T(sx(31.2), sy(4.1), "有顶露台", 9)
 R(sx(29), sy(0), sx(46.6), sy(-0.4), "#e8dfcf", "#8a7a62")
 # pool (drawn in front of the bar: they sit side by side in plan)
 R(sx(40.5), sy(-0.05), sx(45.5), sy(-2.4), "#3fa7c4", "#1f6f87", 1.5, 'fill-opacity="0.35" stroke-dasharray="5,3"')
@@ -89,7 +89,7 @@ SECTION_BOTTOM = sy(-9)
 # ---------------- lower-level plan ----------------
 PS, PX0 = 16, 40
 PY0 = SECTION_BOTTOM + 70
-XA, DA, DB = 6, 14, 52              # shown range: x from XA, d from DA to DB
+XA, DA, DB = 6, 11, 52              # shown range: x from XA, d from DA to DB
 def px(x): return PX0 + (x - XA) * PS
 def py(d): return PY0 + (DB - d) * PS
 def room(x1, d1, x2, d2, name, sub="", fill="#efe4cf", color="#222", stroke="#555", sw=1.2, subc="#666"):
@@ -120,16 +120,16 @@ room(35, 36, 38, 40, "卫", "", "#efe4cf")
 T(px(36.5), py(41.4), "户外淋浴", 9, "#666")
 # corridor under patio
 room(29, 29, 33, 36, "连廊", "", "#f3ece0")
-# basement under the house (x 8–34, d 16.5–29)
-R(px(8), py(29), px(34), py(16.5), "#efe4cf", "#333", 2.5)
-room(8, 16.5, 16, 24, "家庭影院", "10 座 · 两级阶梯", "#3b3346", "#f3e6c8", subc="#cfc3d8")
+# basement under the house (x 8–34, d 13.5–29)
+R(px(8), py(29), px(34), py(13.5), "#efe4cf", "#333", 2.5)
+room(8, 13.5, 16, 24, "家庭影院", "10 座 · 两级阶梯", "#3b3346", "#f3e6c8", subc="#cfc3d8")
 room(8, 24, 16, 29, "设备间 / 储藏", "发电机 · 净水 · 新风")
-room(16, 16.5, 21, 22.5, "楼梯厅", "")
+room(16, 13.5, 21, 22.5, "楼梯厅", "")
 out.append(f'<circle cx="{px(18.5)}" cy="{py(19.2)}" r="{1.6*PS}" fill="none" stroke="#8a6d4a" stroke-width="2"/>')
 R(px(16.2), py(22.3), px(17.8), py(20.7), "#ccc", "#555"); T(px(17), py(21.3), "电梯", 8)
-room(21, 16.5, 27, 22.5, "酒窖", "恒温 13°C|玻璃墙 · 品酒桌", "#4a2c2a", "#f3e6c8", subc="#e0c9b8")
+room(21, 13.5, 27, 22.5, "酒窖", "恒温 13°C|玻璃墙 · 品酒桌", "#4a2c2a", "#f3e6c8", subc="#e0c9b8")
 out.append(f'<line x1="{px(21)}" y1="{py(22.3)}" x2="{px(21)}" y2="{py(17)}" stroke="#7fc6e0" stroke-width="4"/>')
-room(27, 16.5, 34, 23, "健身房", "")
+room(27, 13.5, 34, 23, "健身房", "")
 room(27, 23, 34, 29, "SPA", "桑拿 · 蒸汽 · 冷水池")
 room(16, 22.5, 27, 29, "休闲厅", "高尔夫模拟器 · 沙狐球")
 out.append(f'<line x1="{px(29)}" y1="{py(29)}" x2="{px(33)}" y2="{py(29)}" stroke="#efe4cf" stroke-width="3"/>')

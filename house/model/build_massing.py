@@ -22,7 +22,11 @@ OUT_BLEND = os.path.join(HERE, "massing.blend")
 OUT_DIR = os.path.join(HERE, "..", "renders", "massing")
 
 # ---------------------------------------------------------------- levels
-EAVE = 5.8          # 2-storey wall top (3.05 + 2.75)
+F1, F2 = 4.0, 3.4   # storey heights (13 ft + 11 ft, matching the reference image)
+EAVE = F1 + F2      # 2-storey wall top
+Y_MAIN = 13.5       # front wall of the west wing / stone gable (porch in front)
+Y_BRICK = 10.5      # brick wing front, flush with the porch
+Y_EGABLE = 9.0      # east gable, projecting furthest
 LAKE = -5.0
 SHORE = 62.0
 
@@ -285,14 +289,16 @@ def build_site():
         blob(f"FarTree{i}", x, y, LAKE + 6 + (i * 17 % 7), 6, 6, 8, "tree", c, 1)
 
     # front: walkway, drive, motor court, planting
-    ribbon("Walkway", bezier((17, -0.2), (10, 5), (30, 9), (18.5, 14)), 2.4, "paving", c)
+    ribbon("Walkway", bezier((17, -0.2), (10, 4), (28, 6), (19.5, Y_MAIN - 3.2)), 2.4, "paving", c)
     terrain_strip("Driveway", 45, 49, -0.2, 17, "asphalt", c)
     terrain_strip("MotorCourt", 41.5, 49.5, 17, 31, "asphalt", c)
     terrain_strip("HangarApron", 49.5, 53, 17, 31, "asphalt", c)
-    box("FrontBed", 8, 34, 12.5, 14, -0.9, -0.55, "garden", c)
-    for i, x in enumerate([9.5, 12, 26, 29, 32.5]):
-        blob(f"Shrub{i}", x, 13.2, -0.2, 0.9, 0.7, 0.8, "hedge", c, 1)
-    tree("OakFront1", 0.5, 4.0, 11, 6.5, c)
+    box("FrontBed", 8, 18.2, Y_MAIN - 4.7, Y_MAIN - 3.2, -0.9, -0.55, "garden", c)
+    box("FrontBed2", 21.5, 29, Y_BRICK - 1.8, Y_BRICK, -0.9, -0.55, "garden", c)
+    box("FrontBed3", 29, 34, Y_EGABLE - 1.6, Y_EGABLE, -0.9, -0.55, "garden", c)
+    for i, (x, y) in enumerate([(9.5, 9.5), (13, 9.5), (16.5, 9.5), (23, 9.5), (27.5, 9.5), (32, 8.0)]):
+        blob(f"Shrub{i}", x, y, -0.3, 0.9, 0.7, 0.9, "hedge", c, 1)
+    tree("OakFront1", -6.0, 2.0, 11, 6.5, c)
     tree("OakFront2", 37.5, 5.0, 10, 5.5, c)
     for i, x in enumerate(range(52, 81, 3)):
         for k, y in enumerate((4, 8, 12)):
@@ -347,57 +353,67 @@ def build_site():
 
 # ---------------------------------------------------------------- house
 def build_house():
+    """Proportions follow the reference image: tall 3.7 m + 3.2 m storeys, steep gables,
+    brick wing flush with the porch front and the east gable projecting further."""
     c = collection("House")
     base = -1.0
-    # main side-gabled block (left wing + centre), ridge running east-west
-    gable("Main", 8, 29, 16.5, 29, EAVE, "x", 1.0, 0.45, coll=c, base=base)
-    # front stone gable (projects 0.6 m, steeper)
-    gable("StoneGable", 15, 21.5, 15.9, 24, EAVE + 0.4, "y", 1.35, 0.35, coll=c, base=base)
-    # east gabled wing
-    gable("EastWing", 29, 34, 15.9, 29, EAVE, "y", 1.3, 0.4, coll=c, base=base)
-    # rear game-room gable over the great room
-    gable("RearGable", 17, 25.5, 22, 29.6, EAVE, "y", 1.0, 0.4, coll=c, base=base)
-    # front dormers on the west wing and between the gables
-    for i, (x, w) in enumerate([(9.2, 1.6), (12.2, 1.6), (22.6, 1.3), (24.6, 1.3)]):
-        y0 = 17.6 if x < 15 else 18.4
-        z0 = EAVE + (y0 - 16.5) * 1.0
-        box(f"Dormer{i}", x, x + w, y0 - 0.2, y0 + 1.8, z0 - 0.6, z0 + 1.4, "wall", c)
-        gable(f"Dormer{i}R", x, x + w, y0 - 0.2, y0 + 1.8, z0 + 1.4, "y", 1.3, 0.15, coll=c)
+    # main side-gabled block (west wing + centre), ridge running east-west
+    gable("Main", 8, 29, Y_MAIN, 29, EAVE, "x", 1.1, 0.45, coll=c, base=base)
+    # front stone gable, steep, rising over the porch
+    gable("StoneGable", 15, 22, Y_MAIN - 0.3, 22, EAVE + 0.4, "y", 1.6, 0.35, coll=c, base=base)
+    # brick wing, flush with the porch front, eave facing the street
+    gable("BrickWing", 22, 28.5, Y_BRICK, 20, EAVE, "x", 1.15, 0.4, coll=c, base=base)
+    # east front gable, projecting furthest
+    gable("EastGable", 28.5, 34, Y_EGABLE, 29, EAVE, "y", 1.5, 0.4, coll=c, base=base)
+    # rear game-room gable (over kitchen / breakfast, facing the lake)
+    gable("RearGable", 25.5, 33.5, 22, 29.6, EAVE, "y", 1.0, 0.4, coll=c, base=base)
+    # dormers: two on the west wing roof, two high up behind the brick wing
+    for i, (x, w, y0) in enumerate([(9.2, 1.7, 14.6), (12.2, 1.7, 14.6), (22.3, 1.4, 19.2), (24.6, 1.4, 19.2)]):
+        z0 = EAVE + (y0 - Y_MAIN) * 1.1
+        box(f"Dormer{i}", x, x + w, y0 - 0.2, y0 + 1.8, z0 - 0.6, z0 + 1.6, "wall", c)
+        gable(f"Dormer{i}R", x, x + w, y0 - 0.2, y0 + 1.8, z0 + 1.6, "y", 1.6, 0.15, coll=c)
+        box(f"DormerWin{i}", x + 0.3, x + w - 0.3, y0 - 0.26, y0 - 0.18, z0, z0 + 1.3, "glass", c)
     # porch: shed metal roof on posts across the west wing and stone gable
-    quad_slab("PorchRoof", [(8.2, 13.8, 3.0), (22.6, 13.8, 3.0), (22.6, 16.5, 3.55), (8.2, 16.5, 3.55)], 0.14, "metalroof", c)
-    for x in (8.6, 12.2, 15.6, 19.0, 22.2):
-        box(f"PorchPost{x}", x - 0.18, x + 0.18, 14.0, 14.36, -0.5, 3.0, "wall", c)
-    box("PorchSlab", 8.2, 22.6, 13.8, 16.5, -0.6, -0.05, "deck", c)
+    yp = Y_MAIN - 3.2
+    quad_slab("PorchRoof", [(8.2, yp, 3.5), (22, yp, 3.5), (22, Y_MAIN, 4.05), (8.2, Y_MAIN, 4.05)], 0.14, "metalroof", c)
+    for x in (8.6, 11.9, 15.2, 18.5, 21.7):
+        box(f"PorchPost{x}", x - 0.2, x + 0.2, yp + 0.2, yp + 0.6, -0.5, 3.5, "wall", c)
+    box("PorchSlab", 8.2, 22, yp, Y_MAIN, -0.7, -0.05, "deck", c)
     # chimneys: great-room fireplace (rear) and outdoor fireplace (patio)
-    box("Chimney", 20.0, 21.6, 29.0, 30.2, base, 13.6, "wall", c)
-    box("ChimneyPatio", 15.0, 16.4, 31.6, 33.2, 0, 6.0, "wall", c)
-    # key windows as dark inset panels (front + lake facades) so the massing reads
-    win = [  # (x1, x2, y, z1, z2)
-        (16.6, 19.9, 15.85, 3.5, 6.3),        # stone gable 2F big window
-        (9.0, 13.8, 16.45, 3.6, 5.2),         # west wing 2F triple window
-        (23.6, 24.3, 16.45, 3.6, 5.4), (25.1, 25.8, 16.45, 3.6, 5.4), (26.6, 27.3, 16.45, 3.6, 5.4),
-        (23.4, 25.6, 16.45, 0.5, 2.6), (26.3, 28.5, 16.45, 0.5, 2.6),   # east-centre 1F pair
-        (30.0, 33.0, 15.85, 0.5, 2.6), (31.0, 32.0, 15.85, 3.8, 5.6),   # east wing
-        (9.2, 11.8, 16.45, 0.2, 2.6), (12.8, 14.6, 16.45, 0.2, 2.6),    # porch glass doors
-        (16.0, 17.6, 15.85, 0.2, 2.6), (18.6, 20.4, 15.85, 0.2, 2.6),
+    box("Chimney", 20.0, 21.6, 29.0, 30.2, base, 16.2, "wall", c)
+    box("ChimneyPatio", 15.0, 16.4, 31.6, 33.2, 0, 6.6, "wall", c)
+    # key windows as dark inset panels so the massing reads (x1, x2, facade y, z1, z2)
+    win = [
+        (16.8, 20.2, Y_MAIN - 0.3, 4.4, 6.9),                                     # stone gable 2F
+        (16.0, 17.8, Y_MAIN - 0.3, 0.2, 3.0), (18.6, 20.4, Y_MAIN - 0.3, 0.2, 3.0),  # stone gable 1F
+        (9.0, 13.8, Y_MAIN, 4.6, 6.4),                                             # west wing 2F triple
+        (9.2, 11.8, Y_MAIN, 0.2, 3.0), (12.6, 14.4, Y_MAIN, 0.2, 3.0),             # porch glass doors
+        (23.0, 23.8, Y_BRICK, 4.3, 6.3), (24.85, 25.65, Y_BRICK, 4.3, 6.3), (26.7, 27.5, Y_BRICK, 4.3, 6.3),
+        (22.7, 25.0, Y_BRICK, 0.4, 3.0), (25.5, 27.8, Y_BRICK, 0.4, 3.0),         # brick wing 1F pair
+        (29.9, 32.6, Y_EGABLE, 0.4, 3.0), (30.8, 31.8, Y_EGABLE, 4.3, 6.3), (31.0, 31.6, Y_EGABLE, 7.8, 8.7),
     ]
     for i, (a, b, y, z1, z2) in enumerate(win):
         box(f"WinF{i}", a, b, y - 0.06, y + 0.02, z1, z2, "glass", c)
-    for i, x in enumerate([17.6, 19.6, 21.6, 23.6]):        # great-room wall of glass + arched transoms
-        box(f"WinGR{i}", x, x + 1.8, 29.58, 29.66, 0.2, 3.2, "glass", c)
-        box(f"WinGRt{i}", x + 0.1, x + 1.7, 29.58, 29.66, 3.6, 5.0, "glass", c)
-    box("WinGame", 18.5, 24.0, 29.58, 29.66, 6.1, 7.6, "glass", c)
-    for i, x in enumerate([9.5, 12.0, 26.0, 30.0, 32.0]):
-        box(f"WinR{i}", x, x + 1.4, 29.0, 29.08, 0.4, 2.6, "glass", c)
-        box(f"WinR2{i}", x, x + 1.4, 29.0, 29.08, 3.5, 5.2, "glass", c)
+    box("FrontDoor", 20.9, 21.8, Y_MAIN - 0.36, Y_MAIN - 0.28, 0, 2.9, "dark", c)
+    # lake facade: two-storey great-room glass either side of the chimney, game-room windows above kitchen
+    for i, x in enumerate([16.4, 18.1, 21.8, 23.5]):
+        box(f"WinGR{i}", x, x + 1.6, 29.0, 29.08, 0.2, 3.6, "glass", c)
+        box(f"WinGRt{i}", x + 0.1, x + 1.5, 29.0, 29.08, 4.0, 6.2, "glass", c)
+    for i, x in enumerate([26.3, 28.2, 30.1, 32.0]):
+        box(f"WinGame{i}", x, x + 1.3, 29.58, 29.66, 4.3, 6.2, "glass", c)
+        box(f"WinKit{i}", x, x + 1.3, 29.58, 29.66, 0.3, 3.0, "glass", c)
+    box("WinGameHigh", 29.0, 30.0, 29.58, 29.66, 7.6, 8.6, "glass", c)
+    for i, x in enumerate([9.5, 12.0]):
+        box(f"WinR{i}", x, x + 1.6, 29.0, 29.08, 0.3, 3.0, "glass", c)
+        box(f"WinR2{i}", x, x + 1.6, 29.0, 29.08, 4.4, 6.2, "glass", c)
     # garage: side-entry, doors facing east
-    gable("Garage", 34, 41.5, 20, 28.5, 3.4, "y", 0.9, 0.4, coll=c, base=-0.6)
+    gable("Garage", 34, 41.5, 20, 28.5, 3.6, "y", 0.9, 0.4, coll=c, base=-0.6)
     for i, y in enumerate([21.0, 24.9]):
-        box(f"GarageDoor{i}", 41.5, 41.58, y, y + 2.8, -0.5, 2.2, "dark", c)
+        box(f"GarageDoor{i}", 41.5, 41.58, y, y + 2.8, -0.5, 2.4, "dark", c)
     # covered patio on posts
-    quad_slab("PatioRoof", [(15, 29, 3.55), (29, 29, 3.55), (29, 33.5, 3.1), (15, 33.5, 3.1)], 0.14, "metalroof", c)
+    quad_slab("PatioRoof", [(15, 29, 4.0), (29, 29, 4.0), (29, 33.5, 3.5), (15, 33.5, 3.5)], 0.14, "metalroof", c)
     for x in (18.5, 22.0, 25.5, 28.7):
-        box(f"PatioPost{x}", x - 0.18, x + 0.18, 33.1, 33.46, 0, 3.1, "wall", c)
+        box(f"PatioPost{x}", x - 0.2, x + 0.2, 33.1, 33.5, 0, 3.5, "wall", c)
     return c
 
 
@@ -446,8 +462,8 @@ def build_terrace():
 def build_heli():
     c = collection("Helicopter")
     # hangar: barn-like, door on the lake-facing gable end
-    gable("Hangar", 53, 69, 17, 31, 5.6, "y", 0.75, 0.5, coll=c, base=-0.8)
-    box("HangarDoor", 54.5, 67.5, 31.0, 31.08, -0.5, 5.0, "dark", c)
+    gable("Hangar", 53, 69, 17, 31, 4.5, "y", 0.5, 0.5, coll=c, base=-0.8)
+    box("HangarDoor", 54.5, 67.5, 31.0, 31.08, -0.5, 4.1, "dark", c)
     terrain_strip("TowPath", 59.5, 62.5, 31, 45, "asphalt", c)
     zc = ground(66, 51)
     zp = zc + 0.25
@@ -606,17 +622,19 @@ def aim(sun_obj, azimuth, elevation):
 
 
 VIEWS = {
-    # name: (camera location, target, focal mm, resolution, sun azimuth, sun elevation)
-    "front": ((25.5, 6.5, 0.9), (17.0, 18.0, 5.2), 17, (1200, 1200), 235, 32),
+    # name: (camera location, target, focal mm, resolution, sun azimuth, sun elevation[, lens shift y])
+    "front": ((22.0, -2.5, 1.3), (18.0, 13.5, 1.3), 20, (1200, 1200), 235, 32, 0.10),
     "lake":  ((26.0, 135.0, -3.2), (27.0, 35.0, 1.0), 40, (1600, 900), 300, 18),
     "pool":  ((19.5, 37.6, 1.7), (33.0, 62.0, -2.0), 20, (1600, 900), 290, 22),
     "aerial": ((-32.0, -26.0, 52.0), (40.0, 42.0, -2.0), 30, (1600, 900), 235, 38),
 }
 
 
-def camera(name, loc, target, lens):
+def camera(name, loc, target, lens, shift_y=0.0):
+    """shift_y > 0 frames higher while the camera stays level, keeping verticals straight."""
     cam = bpy.data.cameras.new(name)
     cam.lens = lens
+    cam.shift_y = shift_y
     cam.clip_end = 3000
     obj = bpy.data.objects.new("Cam_" + name, cam)
     bpy.context.scene.collection.objects.link(obj)
@@ -653,13 +671,14 @@ def main():
     build_lake()
     render_setup(preview)
     sky, sun = world_and_light(235, 32)
-    for name, (loc, target, lens, res, az, el) in VIEWS.items():
-        camera(name, loc, target, lens)
+    for name, view in VIEWS.items():
+        loc, target, lens = view[:3]
+        camera(name, loc, target, lens, view[6] if len(view) > 6 else 0.0)
     bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND, compress=True)
     os.makedirs(OUT_DIR, exist_ok=True)
     scn = bpy.context.scene
     for i, name in enumerate(views):
-        loc, target, lens, res, az, el = VIEWS[name]
+        loc, target, lens, res, az, el = VIEWS[name][:6]
         scn.camera = bpy.data.objects["Cam_" + name]
         scale = 0.5 if preview else 1.0
         scn.render.resolution_x, scn.render.resolution_y = int(res[0] * scale), int(res[1] * scale)
