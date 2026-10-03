@@ -1,0 +1,286 @@
+<title>湖景豪宅植物清单</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* Layout: field-guide catalogue — sticky summary bar, zones as chapters, plant cards in an auto-fill grid */
+:root{
+  --bg:#f3f4ef; --surface:#ffffff; --ink:#1f2a22; --muted:#5d6b5f; --line:#d8ddd2;
+  --olive:#3f5d3a; --olive-soft:#e3ead9; --salvia:#6b4fa0; --salvia-soft:#ece6f6; --warn:#9a5b12;
+  --display:"Noto Serif SC","Songti SC","STSong",serif;
+  --body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141a16; --surface:#1c241f; --ink:#e6ece4; --muted:#9eab9f; --line:#2f3a32;
+  --olive:#9cc48a; --olive-soft:#26331f; --salvia:#b9a2e6; --salvia-soft:#2c2540; --warn:#e3a85a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141a16; --surface:#1c241f; --ink:#e6ece4; --muted:#9eab9f; --line:#2f3a32;
+  --olive:#9cc48a; --olive-soft:#26331f; --salvia:#b9a2e6; --salvia-soft:#2c2540; --warn:#e3a85a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:24px 80px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(26px,4vw,38px);letter-spacing:.02em}
+.lead{color:var(--muted);max-width:68ch;margin:.5em 0 0}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding-block:10px;margin-top:16px}
+.bar .count{font-variant-numeric:tabular-nums;font-weight:700}
+.bar .status{color:var(--muted);font-size:13px}
+.bar .status.ok{color:var(--olive)} .bar .status.err{color:var(--warn)}
+.bar nav{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.bar nav a{font-size:13px;color:var(--ink);text-decoration:none;border:1px solid var(--line);padding:2px 10px;border-radius:999px}
+.bar nav a:hover,.bar nav a:focus-visible{border-color:var(--olive);outline:none}
+section.zone{margin-top:44px}
+.zone-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;border-bottom:2px solid var(--olive);padding-bottom:6px}
+.zone-head h2{font-size:24px}
+.zone-head .where{color:var(--muted);font-size:13px}
+.styles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:14px 0 6px}
+.style{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+.style:has(input:checked){border-color:var(--salvia);background:var(--salvia-soft)}
+.style input{margin-top:5px;accent-color:var(--salvia)}
+.style b{display:block} .style span{color:var(--muted);font-size:13px}
+.label{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:16px 0 6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.card{display:grid;grid-template-columns:72px 1fr;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;min-width:0}
+.card.on{border-color:var(--olive);box-shadow:inset 0 0 0 1px var(--olive)}
+.card svg{width:72px;height:72px;border-radius:6px;background:var(--olive-soft)}
+.card .txt{min-width:0}
+.card h3{margin:0;font-size:16px;line-height:1.3}
+.card .latin{font-style:italic;color:var(--muted);font-size:12.5px}
+.card p{margin:6px 0;font-size:13.5px}
+.meta{display:flex;flex-wrap:wrap;gap:4px 6px;margin:6px 0}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 6px;color:var(--muted);white-space:nowrap}
+.chip.src{border-color:transparent;background:var(--olive-soft);color:var(--olive)}
+.row{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:6px}
+.pick{display:inline-flex;gap:6px;align-items:center;font-weight:700;cursor:pointer}
+.pick input{width:18px;height:18px;accent-color:var(--olive)}
+.row a{font-size:13px;color:var(--salvia)}
+.rec{font-size:11px;font-weight:700;color:var(--salvia);letter-spacing:.06em}
+textarea{width:100%;min-height:90px;box-sizing:border-box;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit}
+textarea:focus-visible,input:focus-visible{outline:2px solid var(--salvia);outline-offset:2px}
+.note{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:6px;padding:10px 14px;font-size:14px;margin-top:14px}
+.sources{font-size:13px;color:var(--muted)} .sources a{color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <h1>湖景豪宅植物清单</h1>
+  <p class="lead">按德州湖区气候（耐热、耐旱、石灰岩土壤）和 AI 效果图的风格挑选。每个区域先选一种布置风格，再勾选想要的植物；默认已勾上推荐项。你的选择自动保存，我会照着去建模。</p>
+
+  <div class="bar" id="bar">
+    <span>已选 <span class="count" id="count">0</span> 种植物</span>
+    <span class="status" id="status">正在连接保存服务…</span>
+    <nav id="toc"></nav>
+  </div>
+
+  <div id="zones"></div>
+
+  <section class="zone" id="z-source">
+    <div class="zone-head"><h2>3D 植物模型从哪里来</h2><span class="where">影响画质和速度</span></div>
+    <div class="styles" id="src-styles"></div>
+    <div class="note">我现在所在的云端环境打不开 Poly Haven、BlenderKit、Sketchfab 这些模型网站。选 B 需要你在环境设置里把 polyhaven.com 加进允许访问的域名；选 C 需要你购买后把插件文件传给我。选 A 我现在就能直接做。</div>
+  </section>
+
+  <section class="zone" id="z-notes">
+    <div class="zone-head"><h2>补充要求</h2><span class="where">想加的植物、不喜欢的颜色、过敏等</span></div>
+    <label class="label" for="notes">写下来，我会一起看到</label>
+    <textarea id="notes" placeholder="例如：想要更多白色的花；不要带刺的植物；草坪旁边加一排樱花……"></textarea>
+  </section>
+
+  <section class="zone">
+    <p class="sources">资料来源：
+      <a href="https://marblefallstx.gov/DocumentCenter/View/6386/Native-and-Adapted-Landscape-Plant-List-PDF">德州中部本地及适生景观植物名录</a> ·
+      <a href="https://thetexaswildflower.com/best-plants-texas-hill-country-landscape/">Best Plants for Texas Hill Country</a> ·
+      <a href="https://www.gardenia.net/guide/best-plants-for-texas-heat-top-picks-per-region">Best Plants for Texas Heat</a> ·
+      <a href="https://naturehills.com/blogs/garden-blog/gardening-in-austin-best-plants-for-every-season">Best Plants for Austin Gardens</a> ·
+      <a href="https://polyhaven.com/models/nature/trees">Poly Haven 免费树木模型</a> ·
+      <a href="https://polygoniq.com/software/botaniq/">botaniq 植物库</a>
+    </p>
+  </section>
+</div>
+
+<script>
+// form: tree | cone | weep | shrub | hedge | rosette | grass | spike | mound | vine | water | wild
+const ZONES = [
+ {id:"front", name:"前院与门廊", where:"对应 AI 图：曲线步道两侧、门廊前、主屋基础种植",
+  styles:[["ai","照 AI 图","龙舌兰 + 黄杨弧形绿篱 + 锥形冬青 + 观赏草，现代德州风"],["formal","规整对称","全部用修剪绿篱和对称盆栽，更正式"],["soft","柔和花境","步道两侧换成开花灌木和宿根花"]],
+  plants:[
+  {id:"agave",zh:"鲸舌龙舌兰",en:"Whale's Tongue Agave",la:"Agave ovatifolia",form:"rosette",leaf:"#8fb0a6",flower:null,size:"1.2 m 宽",season:"常绿",why:"AI 图前景里那种蓝灰色大莲座，德州本地种，耐旱耐寒。",src:"程序化生成",rec:1},
+  {id:"boxwood",zh:"日本黄杨",en:"Japanese Boxwood",la:"Buxus microphylla",form:"hedge",leaf:"#3f6b2a",flower:null,size:"修剪 0.5 m",season:"常绿",why:"步道两侧的弧形矮绿篱，AI 图里最显眼的线条。",src:"程序化生成",rec:1},
+  {id:"eagleston",zh:"锥形冬青 'Eagleston'",en:"Eagleston Holly",la:"Ilex × attenuata 'Eagleston'",form:"cone",leaf:"#2f5a24",flower:null,size:"高 4–6 m",season:"常绿，冬季红果",why:"门廊柱子之间那几棵深绿色锥形树，德州豪宅门前常用。",src:"程序化生成",rec:1},
+  {id:"muhly",zh:"粉黛乱子草",en:"Gulf Muhly",la:"Muhlenbergia capillaris",form:"grass",leaf:"#a9b48a",flower:"#e3a1c4",size:"0.9 m",season:"秋季粉色云雾",why:"秋天整片粉色雾状花穗，拍照非常出效果。",src:"程序化生成",rec:1},
+  {id:"featherg",zh:"细茎针茅",en:"Mexican Feather Grass",la:"Nassella tenuissima",form:"grass",leaf:"#c8c08a",flower:null,size:"0.5 m",season:"随风飘动",why:"柔软的金色细草，穿插在龙舌兰之间做对比。",src:"程序化生成",rec:0},
+  {id:"yucca",zh:"软叶丝兰",en:"Soft Leaf Yucca",la:"Yucca recurvifolia",form:"rosette",leaf:"#4f7a52",flower:"#f4f1ea",size:"1.2 m",season:"夏季白花",why:"比龙舌兰柔和、不扎人，适合门口靠近人走动的地方。",src:"程序化生成",rec:0},
+  {id:"magnolia",zh:"小宝石荷花玉兰",en:"Little Gem Magnolia",la:"Magnolia grandiflora 'Little Gem'",form:"tree",leaf:"#2f4f2a",flower:"#f7f3e6",size:"高 6 m",season:"常绿，夏季大白花",why:"南方豪宅经典，放在主屋两侧角落，柔化建筑边缘。",src:"botaniq 近似 / 程序化",rec:1},
+ ]},
+ {id:"formal", name:"① 规则式花园", where:"主卧窗外，四块黄杨围边花床 + 喷泉",
+  styles:[["classic","经典玫瑰园","粉、红、白玫瑰配紫色薰衣草"],["white","白色花园","全白：白玫瑰、白绣球、白山桃草，月光下很美"],["herb","香草花园","薰衣草、迷迭香、鼠尾草为主，香气重、更耐旱"]],
+  plants:[
+  {id:"rose",zh:"玫瑰 'Knock Out'",en:"Knock Out Rose",la:"Rosa 'Radrazz'",form:"mound",leaf:"#3f6b2a",flower:"#d9476b",size:"1 m",season:"春到秋反复开",why:"最耐热、抗病的灌木玫瑰，德州几乎家家都种。",src:"botaniq / 程序化",rec:1},
+  {id:"lavender",zh:"薰衣草 'Phenomenal'",en:"Phenomenal Lavender",la:"Lavandula × intermedia",form:"spike",leaf:"#9aa98f",flower:"#8f6fd0",size:"0.6 m",season:"初夏",why:"少数能扛住德州湿热的薰衣草品种。",src:"程序化生成",rec:1},
+  {id:"hydrangea",zh:"绣球",en:"Bigleaf Hydrangea",la:"Hydrangea macrophylla",form:"mound",leaf:"#3d6b33",flower:"#9db4e8",size:"1.2 m",season:"春末夏初",why:"大花球，放在花园半阴的一侧和侧院花径。",src:"botaniq / 程序化",rec:1},
+  {id:"gaura",zh:"山桃草",en:"Whirling Butterflies",la:"Oenothera lindheimeri",form:"spike",leaf:"#6d8a55",flower:"#f6eef2",size:"0.9 m",season:"春到秋",why:"德州本地，细长花枝上像蝴蝶的小白花，适合白色花园。",src:"程序化生成",rec:0},
+  {id:"rosemary",zh:"迷迭香",en:"Rosemary",la:"Salvia rosmarinus",form:"mound",leaf:"#52714f",flower:"#9fb2e0",size:"0.9 m",season:"常绿",why:"做花床边缘也行，可以剪来做菜。",src:"程序化生成",rec:0},
+ ]},
+ {id:"border", name:"③ 宿根花境 · ② 紫藤廊架", where:"碎石小路两侧长花带，尽头长椅；廊架顶上爬藤",
+  styles:[["hill","德州山地自然风","鼠尾草、松果菊、观赏草成片混种，最耐热，管理省事"],["cottage","英式村舍风","颜色更丰富、高低层次多，需要更多浇水打理"],["cool","冷色系","只用紫、蓝、白、银灰，安静优雅"]],
+  plants:[
+  {id:"salviag",zh:"秋鼠尾草",en:"Autumn Sage",la:"Salvia greggii",form:"mound",leaf:"#4f7238",flower:"#d9534f",size:"0.8 m",season:"几乎全年",why:"德州花境的主力，红、粉、白都有，几乎一直开。",src:"程序化生成",rec:1},
+  {id:"salvial",zh:"墨西哥鼠尾草",en:"Mexican Bush Sage",la:"Salvia leucantha",form:"spike",leaf:"#7d8f74",flower:"#7d4fb0",size:"1.2 m",season:"夏末到秋",why:"天鹅绒质感的紫色长花穗，秋天花境的主角。",src:"程序化生成",rec:1},
+  {id:"coneflower",zh:"紫松果菊",en:"Purple Coneflower",la:"Echinacea purpurea",form:"mound",leaf:"#4f7238",flower:"#d77fb0",size:"0.8 m",season:"初夏到夏末",why:"招蝴蝶，花型经典，和金光菊配色很好看。",src:"Poly Haven 近似 / 程序化",rec:1},
+  {id:"rudbeckia",zh:"黑心金光菊",en:"Black-eyed Susan",la:"Rudbeckia hirta",form:"mound",leaf:"#4f7238",flower:"#f2c94c",size:"0.7 m",season:"夏季",why:"成片金黄色，给花境提亮。",src:"程序化生成",rec:1},
+  {id:"catmint",zh:"猫薄荷 'Walker's Low'",en:"Catmint",la:"Nepeta × faassenii",form:"mound",leaf:"#93a78a",flower:"#8f9be0",size:"0.6 m",season:"春到夏",why:"蓝紫色软垫，适合放在花带最前排、碎石路边。",src:"程序化生成",rec:1},
+  {id:"perovskia",zh:"俄罗斯鼠尾草",en:"Russian Sage",la:"Salvia yangii",form:"spike",leaf:"#b7c2b4",flower:"#9b8fd6",size:"1.2 m",season:"夏季",why:"银灰枝干配淡紫小花，后排的高度和轻盈感。",src:"程序化生成",rec:0},
+  {id:"lantana",zh:"马缨丹 'New Gold'",en:"Lantana",la:"Lantana camara",form:"mound",leaf:"#4f7a2c",flower:"#f2b233",size:"0.5 m",season:"夏到霜降",why:"越热越开，适合最晒的地方。",src:"程序化生成",rec:0},
+  {id:"texassage",zh:"德州银叶灌木",en:"Texas Sage",la:"Leucophyllum frutescens",form:"shrub",leaf:"#b8c2b0",flower:"#b47fd1",size:"1.5 m",season:"雨后开紫花",why:"银灰叶子的本地灌木，给花境做背景墙。",src:"程序化生成",rec:1},
+  {id:"daylily",zh:"萱草",en:"Daylily",la:"Hemerocallis",form:"grass",leaf:"#5d8a3e",flower:"#e8833a",size:"0.7 m",season:"初夏",why:"橙黄大花，几乎不用管。",src:"程序化生成",rec:0},
+  {id:"wisteria",zh:"美国紫藤",en:"American Wisteria",la:"Wisteria frutescens 'Amethyst Falls'",form:"vine",leaf:"#4f7a2c",flower:"#a28ad8",size:"爬满廊架",season:"春季",why:"廊架顶上垂下的紫色花串；选美国种，不像中国紫藤那样疯长压垮廊架。",src:"程序化生成",rec:1},
+  {id:"jessamine",zh:"卡罗来纳茉莉",en:"Carolina Jessamine",la:"Gelsemium sempervirens",form:"vine",leaf:"#3f6b2a",flower:"#f2d24c",size:"爬藤",season:"早春黄花，常绿",why:"可以和紫藤搭配，冬天廊架也是绿的。",src:"程序化生成",rec:0},
+ ]},
+ {id:"pond", name:"④ 睡莲池与凉亭", where:"椭圆水池、八角凉亭、垂柳",
+  styles:[["natural","自然水景","池边种鸢尾和蕨类，像天然池塘"],["formal","规整水景","池边铺石材压顶，只放盆栽，干净利落"]],
+  plants:[
+  {id:"waterlily",zh:"睡莲",en:"Hardy Water Lily",la:"Nymphaea",form:"water",leaf:"#4f8a3c",flower:"#f6b6cf",size:"浮叶",season:"夏季",why:"粉白色睡莲是这个池子的主角。",src:"botaniq 有 lilypad / 程序化",rec:1},
+  {id:"iris",zh:"路易斯安那鸢尾",en:"Louisiana Iris",la:"Iris (Louisiana group)",form:"grass",leaf:"#4f7a3c",flower:"#5b4fd6",size:"0.9 m",season:"春季",why:"能长在浅水和池边，紫蓝色大花。",src:"程序化生成",rec:1},
+  {id:"willow",zh:"垂柳",en:"Weeping Willow",la:"Salix babylonica",form:"weep",leaf:"#9cbc6a",flower:null,size:"高 10 m",season:"落叶",why:"池边经典画面；离房子和管道够远，不用担心根系。",src:"botaniq 有柳树",rec:1},
+  {id:"fern",zh:"南方盾蕨",en:"Southern Wood Fern",la:"Thelypteris kunthii",form:"mound",leaf:"#5e9a46",flower:null,size:"0.6 m",season:"夏季翠绿",why:"凉亭背阴处的绿色地被。",src:"botaniq 有蕨类",rec:0},
+ ]},
+ {id:"kitchen", name:"⑤ 菜园香草园 · ⑥ 果园", where:"6 个抬高种植床、温室、香草螺旋；果树下蓝帽花草地",
+  styles:[["potager","法式菜园","蔬菜、香草、花混种，好看也能吃"],["practical","实用菜园","一床一种，整齐好打理"]],
+  plants:[
+  {id:"tomato",zh:"番茄、辣椒、生菜",en:"Vegetables",la:"Solanum, Capsicum, Lactuca",form:"mound",leaf:"#4f8a3c",flower:"#c9403b",size:"0.5–1.2 m",season:"春秋两季",why:"抬高种植床的基本组合，红绿相间画面好看。",src:"程序化生成",rec:1},
+  {id:"herbs",zh:"罗勒、薄荷、百里香",en:"Herbs",la:"Ocimum, Mentha, Thymus",form:"mound",leaf:"#6a9a4f",flower:null,size:"0.3 m",season:"春到秋",why:"种在香草螺旋上，厨房随手剪。",src:"程序化生成",rec:1},
+  {id:"peach",zh:"桃树",en:"Peach",la:"Prunus persica",form:"tree",leaf:"#5f8f3e",flower:"#f2a6c2",size:"高 4 m",season:"早春粉花，夏季结果",why:"德州山地是有名的桃子产区。",src:"botaniq 近似（樱桃/苹果）",rec:1},
+  {id:"fig",zh:"无花果",en:"Fig",la:"Ficus carica",form:"tree",leaf:"#4f7a2c",flower:null,size:"高 3–4 m",season:"夏季结果",why:"耐热好养，大叶子很有地中海感。",src:"botaniq 有无花果",rec:1},
+  {id:"lemon",zh:"梅尔柠檬（盆栽）",en:"Meyer Lemon",la:"Citrus × meyeri",form:"shrub",leaf:"#3f6b2a",flower:"#f2d24c",size:"盆栽 1.5 m",season:"冬季结果",why:"德州冬天偶有霜冻，种在大陶盆里，冷了可以搬进温室。",src:"botaniq 有柠檬",rec:1},
+  {id:"bluebonnet",zh:"德州蓝帽花",en:"Texas Bluebonnet",la:"Lupinus texensis",form:"wild",leaf:"#6a8f55",flower:"#4f74d6",size:"0.3 m",season:"3–4 月",why:"德州州花，春天果园下面一片蓝。",src:"程序化生成",rec:1},
+  {id:"paintbrush",zh:"印第安画笔花",en:"Indian Paintbrush",la:"Castilleja indivisa",form:"wild",leaf:"#6a8f55",flower:"#e0503a",size:"0.3 m",season:"3–5 月",why:"橙红色，和蓝帽花混在一起是德州春天的经典画面。",src:"程序化生成",rec:1},
+ ]},
+ {id:"lawn", name:"活动草坪", where:"中间大草坪、橡树秋千、紫薇树丛、围合花境",
+  styles:[["zoysia","结缕草 'Palisades'","质感细密、颜色深绿，耐踩，豪宅草坪首选"],["staug","钝叶草 'Palmetto'","叶片宽、耐半阴，大树下长得好"],["bermuda","狗牙根","最耐踩最耐晒，但冬天会枯黄"]],
+  plants:[
+  {id:"liveoak",zh:"南方活橡树",en:"Southern Live Oak",la:"Quercus virginiana",form:"tree",leaf:"#3f6b2a",flower:null,size:"高 12 m · 冠幅 20 m",season:"常绿",why:"挂秋千、搭野餐桌的那棵大树，德州最有代表性的树。",src:"botaniq 有橡树",rec:1},
+  {id:"crape",zh:"紫薇 'Natchez'（白）/ 'Muskogee'（淡紫）",en:"Crape Myrtle",la:"Lagerstroemia indica × fauriei",form:"tree",leaf:"#4f7a2c",flower:"#d987ad",size:"高 6 m",season:"整个夏天开花",why:"草坪西侧的花树丛；树皮光滑好看，冬天也有观赏性。",src:"程序化生成",rec:1},
+  {id:"redbud",zh:"德州紫荆",en:"Texas Redbud",la:"Cercis canadensis var. texensis",form:"tree",leaf:"#4f7a2c",flower:"#d45aa0",size:"高 5 m",season:"早春满树紫红",why:"放在野餐区和儿童区旁边，早春第一抹颜色。",src:"程序化生成",rec:1},
+  {id:"cedarelm",zh:"雪松榆",en:"Cedar Elm",la:"Ulmus crassifolia",form:"tree",leaf:"#5f8f3e",flower:null,size:"高 15 m",season:"秋季变黄",why:"本地遮荫树，给烧烤亭和儿童区遮阴。",src:"botaniq 有榆树",rec:0},
+  {id:"hawthorn",zh:"车轮梅",en:"Indian Hawthorn",la:"Rhaphiolepis indica",form:"shrub",leaf:"#2f5a24",flower:"#f4d2de",size:"1 m",season:"春季粉白花，常绿",why:"围合花境的常绿骨架，一年四季都有形。",src:"程序化生成",rec:1},
+  {id:"yaupon",zh:"矮生代茶冬青",en:"Dwarf Yaupon Holly",la:"Ilex vomitoria 'Nana'",form:"hedge",leaf:"#3f6b2a",flower:null,size:"0.9 m",season:"常绿",why:"比黄杨更耐德州高温的矮绿篱，适合花园和草坪的分隔。",src:"程序化生成",rec:1},
+ ]},
+ {id:"shore", name:"湖岸与野花草地", where:"沙滩、码头两侧护岸；直升机进近区的低矮野花",
+  styles:[["native","本地护岸","落羽杉 + 观赏草，自然又防冲刷"],["open","开阔草岸","只种低矮草和花，湖景最通透"]],
+  plants:[
+  {id:"cypress",zh:"落羽杉",en:"Bald Cypress",la:"Taxodium distichum",form:"cone",leaf:"#5d7d3a",flower:null,size:"高 15–20 m",season:"秋季变铜红",why:"德州湖边和河边标志性的树，根部能泡在水里。",src:"botaniq 有柏类近似",rec:1},
+  {id:"switch",zh:"柳枝稷",en:"Switchgrass",la:"Panicum virgatum",form:"grass",leaf:"#8aa070",flower:null,size:"1.2 m",season:"秋季金黄",why:"湖岸护坡草，根很深，防止岸边被浪冲掉。",src:"程序化生成",rec:1},
+  {id:"coreopsis",zh:"金鸡菊、天人菊",en:"Coreopsis & Gaillardia",la:"Coreopsis, Gaillardia pulchella",form:"wild",leaf:"#6a8f55",flower:"#f2b233",size:"0.4 m",season:"春到夏",why:"野花草地的黄色和橙色，保持低矮，不影响直升机起降。",src:"程序化生成",rec:1},
+ ]},
+];
+const SOURCES = [["proc","A. 程序化生成（推荐先用）","我用 Blender 节点直接生成：龙舌兰、草、绿篱、花丛效果最好；大乔木中上水平。免费，现在就能做。"],
+ ["polyhaven","B. Poly Haven 免费扫描模型","真实扫描，画质高，但德州品种少，主要用于草、灌木、部分树。需要放开网络。"],
+ ["botaniq","C. botaniq 付费植物库","700+ 种成品植物，有橡树、柳树、柏树、无花果、柠檬等，画质最好。需要你购买后发给我。"]];
+
+const state = {picks:new Set(), styles:{}, source:"proc", notes:""};
+ZONES.forEach(z=>{ z.plants.forEach(p=>{ if(p.rec) state.picks.add(p.id) }); state.styles[z.id]=z.styles[0][0]; });
+
+function silhouette(p){
+  const L=p.leaf, F=p.flower||p.leaf, t="#7a5a3e";
+  const s={
+    tree:`<rect x="33" y="44" width="6" height="22" fill="${t}"/><circle cx="36" cy="32" r="22" fill="${L}"/>${p.flower?`<g fill="${F}"><circle cx="26" cy="24" r="4"/><circle cx="44" cy="22" r="4"/><circle cx="36" cy="36" r="4"/><circle cx="48" cy="38" r="3"/><circle cx="22" cy="38" r="3"/></g>`:""}`,
+    cone:`<rect x="33" y="56" width="6" height="12" fill="${t}"/><polygon points="36,6 54,60 18,60" fill="${L}"/>`,
+    weep:`<rect x="33" y="30" width="6" height="36" fill="${t}"/><path d="M10 64 Q14 18 36 14 Q58 18 62 64 Z" fill="${L}"/>`,
+    shrub:`<ellipse cx="36" cy="46" rx="26" ry="18" fill="${L}"/>${p.flower?`<g fill="${F}"><circle cx="24" cy="40" r="3"/><circle cx="40" cy="34" r="3"/><circle cx="50" cy="44" r="3"/></g>`:""}`,
+    hedge:`<rect x="8" y="34" width="56" height="28" rx="10" fill="${L}"/>`,
+    rosette:[...Array(9)].map((_,i)=>{const a=(i/9)*Math.PI-Math.PI;return `<path d="M36 62 L${36+30*Math.cos(a)} ${62+40*Math.sin(a)} L${36+6*Math.cos(a+.5)} ${58}" fill="${L}"/>`}).join("")+(p.flower?`<rect x="35" y="6" width="2" height="30" fill="${t}"/><circle cx="36" cy="8" r="4" fill="${F}"/>`:""),
+    grass:[...Array(11)].map((_,i)=>`<path d="M36 64 Q${18+i*3.6} 30 ${8+i*5.6} ${10+(i%3)*6}" stroke="${L}" stroke-width="2.5" fill="none"/>`).join("")+(p.flower?`<ellipse cx="36" cy="22" rx="24" ry="12" fill="${F}" opacity=".55"/>`:""),
+    spike:`<ellipse cx="36" cy="56" rx="22" ry="10" fill="${L}"/>`+[14,24,36,48,58].map((x,i)=>`<rect x="${x-1}" y="${18+(i%2)*6}" width="2" height="34" fill="${L}"/><rect x="${x-3}" y="${14+(i%2)*6}" width="6" height="18" rx="3" fill="${F}"/>`).join(""),
+    mound:`<ellipse cx="36" cy="50" rx="26" ry="16" fill="${L}"/><g fill="${F}">${[[22,40],[34,36],[46,40],[28,48],[42,48],[52,50],[18,50]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="4.5"/>`).join("")}</g>`,
+    vine:`<rect x="10" y="10" width="52" height="5" fill="${t}"/><rect x="12" y="10" width="4" height="56" fill="${t}"/><rect x="56" y="10" width="4" height="56" fill="${t}"/><g fill="${F}">${[18,26,34,42,50].map((x,i)=>`<ellipse cx="${x}" cy="${26+(i%2)*6}" rx="3.5" ry="${9+(i%3)*3}"/>`).join("")}</g>`,
+    water:`<ellipse cx="36" cy="44" rx="30" ry="18" fill="#6fb3c9"/><g fill="${L}"><circle cx="24" cy="44" r="8"/><circle cx="46" cy="40" r="7"/><circle cx="40" cy="54" r="6"/></g><circle cx="26" cy="42" r="4" fill="${F}"/>`,
+    wild:`<rect x="0" y="48" width="72" height="24" fill="${L}"/>`+[...Array(16)].map((_,i)=>`<circle cx="${5+i*4.3}" cy="${44-(i*7%9)}" r="3" fill="${F}"/>`).join(""),
+  };
+  return `<svg viewBox="0 0 72 72" aria-hidden="true">${s[p.form]||s.shrub}</svg>`;
+}
+
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function render(){
+  const toc=document.getElementById("toc"), root=document.getElementById("zones");
+  toc.innerHTML=ZONES.map(z=>`<a href="#z-${z.id}">${esc(z.name.replace(/^[①-⑥ ·]+/,""))}</a>`).join("")+`<a href="#z-source">模型来源</a>`;
+  root.innerHTML=ZONES.map(z=>`
+  <section class="zone" id="z-${z.id}">
+    <div class="zone-head"><h2>${esc(z.name)}</h2><span class="where">${esc(z.where)}</span></div>
+    <div class="label">布置风格（选一种）</div>
+    <div class="styles">${z.styles.map(([k,t,d],i)=>`
+      <label class="style"><input type="radio" name="st-${z.id}" id="st-${z.id}-${k}" value="${k}" ${state.styles[z.id]===k?"checked":""}>
+      <div><b>${esc(t)}${i===0?' <span class="rec">推荐</span>':""}</b><span>${esc(d)}</span></div></label>`).join("")}</div>
+    <div class="label">植物</div>
+    <div class="grid">${z.plants.map(p=>`
+      <article class="card ${state.picks.has(p.id)?"on":""}" id="card-${p.id}">
+        ${silhouette(p)}
+        <div class="txt">
+          <h3>${esc(p.zh)}</h3>
+          <div class="latin">${esc(p.en)} · ${esc(p.la)}</div>
+          <p>${esc(p.why)}</p>
+          <div class="meta"><span class="chip">${esc(p.size)}</span><span class="chip">${esc(p.season)}</span><span class="chip src">3D：${esc(p.src)}</span></div>
+          <div class="row">
+            <label class="pick"><input type="checkbox" id="pk-${p.id}" data-id="${p.id}" ${state.picks.has(p.id)?"checked":""}>选用</label>
+            ${p.rec?'<span class="rec">推荐</span>':""}
+            <a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(p.la+" "+p.en)}" target="_blank" rel="noopener">看照片 ↗</a>
+          </div>
+        </div>
+      </article>`).join("")}</div>
+  </section>`).join("");
+  document.getElementById("src-styles").innerHTML=SOURCES.map(([k,t,d])=>`
+    <label class="style"><input type="radio" name="src" id="src-${k}" value="${k}" ${state.source===k?"checked":""}>
+    <div><b>${esc(t)}</b><span>${esc(d)}</span></div></label>`).join("");
+  document.getElementById("notes").value=state.notes;
+  document.getElementById("count").textContent=state.picks.size;
+}
+
+// ---- persistence (db): one shared document the owner edits and Claude reads
+let ref=null, saveTimer=null, saving=Promise.resolve(), lastSaved="";
+const statusEl=document.getElementById("status");
+function setStatus(t,cls){statusEl.textContent=t;statusEl.className="status "+(cls||"")}
+function snapshotState(){return {picks:[...state.picks].sort(),styles:state.styles,source:state.source,notes:state.notes}}
+function scheduleSave(){
+  document.getElementById("count").textContent=state.picks.size;
+  if(!ref){setStatus("保存服务不可用：选择只在本页暂存","err");return}
+  setStatus("正在保存…");
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    const body=snapshotState(), key=JSON.stringify(body);
+    if(key===lastSaved){setStatus("已保存","ok");return}
+    saving=saving.then(()=>ref.set({...body,updatedAt:new Date().toISOString()}))
+      .then(()=>{lastSaved=key;setStatus("已保存","ok")})
+      .catch(e=>setStatus(e&&e.code==="invalid_argument"?"你没有编辑权限，选择不会保存":"保存失败，稍后再改一次试试","err"));
+  },600);
+}
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.matches('input[type=checkbox][data-id]')){
+    t.checked?state.picks.add(t.dataset.id):state.picks.delete(t.dataset.id);
+    document.getElementById("card-"+t.dataset.id).classList.toggle("on",t.checked);
+  } else if(t.name&&t.name.startsWith("st-")){ state.styles[t.name.slice(3)]=t.value; }
+  else if(t.name==="src"){ state.source=t.value; }
+  else return;
+  scheduleSave();
+});
+document.getElementById("notes").addEventListener("input",e=>{state.notes=e.target.value;scheduleSave()});
+
+render();
+(async()=>{
+  const db = window.claude ? await window.claude.use("db") : null;
+  if(!db){setStatus("保存服务不可用：选择只在本页暂存","err");return}
+  ref=db.doc("picks/main");
+  let first=true;
+  ref.onSnapshot(snap=>{
+    if(snap.exists){
+      const d=snap.data();
+      const key=JSON.stringify({picks:d.picks,styles:d.styles,source:d.source,notes:d.notes});
+      if(key===lastSaved && !first) return;
+      lastSaved=key;
+      state.picks=new Set(d.picks||[]); state.styles={...state.styles,...(d.styles||{})};
+      state.source=d.source||state.source;
+      if(document.activeElement!==document.getElementById("notes")) state.notes=d.notes||"";
+      render();
+      setStatus("已载入你上次的选择","ok");
+    } else if(first){ setStatus("还没保存过：改动后会自动保存","") }
+    first=false;
+  },()=>setStatus("连接中断，刷新页面后再试","err"));
+})();
+</script>
