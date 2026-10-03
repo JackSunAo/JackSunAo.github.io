@@ -20,7 +20,9 @@ import details  # noqa: E402
 import facade  # noqa: E402
 import front_yard  # noqa: E402
 import interiors  # noqa: E402
+import armory  # noqa: E402
 import rear_yard  # noqa: E402
+import outdoor  # noqa: E402
 import house_real  # noqa: E402
 import materials_pbr  # noqa: E402
 
@@ -32,10 +34,22 @@ OUT_BLEND = os.path.join(HERE, "final.blend")
 LIGHT = {
     "front": ("dusk", 200), "front_close": ("dusk", 200), "lake": ("dusk", 15), "pool": ("day", 250), "lawn": ("day", 235),
     "garden": ("day", 250), "aerial": ("day", 225),
+    "int_great": ("inside", 235), "int_loft": ("inside", 235), "int_stair": ("inside", 160),
+    "int_game": ("inside", 235), "int_kitchen": ("inside", 235), "int_media": ("inside", 160),
+    "int_armory": ("inside", 235), "int_secret": ("inside", 235),
 }
 EXTRA_VIEWS = {
     # name: (location, target, lens, resolution, shift_y)
     "front_close": ((24.0, 2.0, 1.5), (17.0, 13.5, 4.8), 20, (1600, 1600), 0.08),
+    # interiors, framed like the video: great room from the 2F gallery, the loft over the void, stair + rings ...
+    "int_great": ((18.3, 20.55, 5.75), (21.3, 29.0, 2.3), 15, (1600, 1100), 0.0),
+    "int_loft": ((18.2, 19.9, 5.65), (29.5, 27.3, 5.3), 16, (1600, 1100), 0.0),
+    "int_stair": ((16.0, 13.85, 1.5), (19.6, 17.0, 4.6), 14, (1200, 1600), 0.0),
+    "int_game": ((25.9, 22.35, 5.6), (31.5, 29.3, 6.2), 14, (1600, 1100), 0.0),
+    "int_kitchen": ((25.95, 22.45, 1.65), (31.5, 27.8, 1.1), 16, (1600, 1100), 0.0),
+    "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
+    "int_armory": ((12.55, 19.45, 1.65), (8.6, 22.5, 1.25), 14, (1600, 1100), 0.0),
+    "int_secret": ((13.2, 14.6, 1.55), (10.3, 19.4, 1.3), 18, (1200, 1500), 0.0),
 }
 
 REPLACED_PREFIX = ("Main_", "StoneGable_", "BrickWing_", "EastGable_", "RearGable_", "Dormer2", "Dormer3")
@@ -173,9 +187,12 @@ def build(opt):
     details.build_landscape(M, bm.collection("Hardscape"))
     if "--no-interior" not in sys.argv:
         interiors.build(M, bm.collection("Interiors"))
+        armory.build(M, bm.collection("Interiors"))
+        armory.secret_door(hinge_xy=(10.97, 18.565))
     if "--no-plants" not in sys.argv:
         front_yard.build(bm, M, bm.collection("FrontYard"))
         rear_yard.build(bm, M, bm.collection("RearYard"))
+    outdoor.build(bm, M, bm.collection("Outdoor"))
     lights = bm.collection("Lights")
     room_lights(info["rooms"], lights)
     porch_lights(lights)
@@ -211,12 +228,14 @@ def render(opt, M):
         if mode == "dusk":
             set_world(os.environ.get("DUSK_HDRI", "dusk"), int(os.environ.get("DUSK_AZ", az)), 1.0,
                       float(os.environ.get("DUSK_EXPOSURE", "-0.2")))
+        elif mode == "inside":          # daylight through the windows, house lights on (as in the video)
+            set_world("day", az, 1.0, float(os.environ.get("INSIDE_EXPOSURE", "1.3")))
         else:
             set_world("day", az, 1.0, 0.0)
         dusk_sun(mode == "dusk", int(os.environ.get("SUN_AZ", az)), float(os.environ.get("SUN_EL", 7)))
         for o in bpy.data.objects:
-            if o.type == "LIGHT" and (o.name.startswith(("RL_", "LanternL", "PorchCan"))):
-                o.hide_render = (mode != "dusk")
+            if o.type == "LIGHT" and (o.name.startswith(("RL_", "LanternL", "PorchCan")) or o.get("dusk_only")):
+                o.hide_render = (mode == "day") or (mode == "inside" and bool(o.get("dusk_only")))
         scn.render.filepath = os.path.join(OUT_DIR, f"{name}{'_preview' if opt['preview'] else ''}.png")
         bpy.ops.render.render(write_still=True)
         print("rendered", scn.render.filepath, flush=True)

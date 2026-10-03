@@ -380,7 +380,10 @@ def study():
     P.place("ArmChair_01", (11.6, 17.35, z), 180, coll=COLL, name="StudyChair")
     P.place("mid_century_lounge_chair", (9.3, 14.7, z), 35, coll=COLL, name="StudyLounge")
     table_lamp("StudyLamp", 12.25, 16.4, 0.79, 0.5)
-    bookcase("StudyShelvesN", "y", 18.925, 8.4, 14.85, 0.0, 3.6, -1)
+    bookcase("StudyShelvesN", "y", 18.925, 8.4, 10.0, 0.0, 3.6, -1)
+    bookcase("StudyShelvesN2", "y", 18.925, 11.0, 14.85, 0.0, 3.6, -1)
+    bookcase("StudyShelvesNtop", "y", 18.925, 10.0, 11.0, 2.46, 3.6, -1)
+    bookcase("SecretDoor", "y", 18.925, 10.03, 10.97, 0.0, 2.43, -1)     # hidden door to the armory
     bookcase("StudyShelvesW", "x", 8.3, 17.4, 18.8, 0.0, 3.6, 1, books=False)
     P.place("Chandelier_02", (11.6, 16.3, F1 - 0.3 - 0.85), 0, coll=COLL, name="StudyChand")
     point_light("StudyChandL", (11.6, 16.3, F1 - 0.3 - 0.5), 60, 0.15)
@@ -485,3 +488,213 @@ def build(materials, coll):
     bedroom2()
     bedroom4()
     media_room()
+    build_rear()
+
+
+# ---------------------------------------------------------------- rear rooms (video): great room, kitchen, game room, master
+def _pendant_rings(name, cx, cy, z_top, drop=2.4, radii=(0.75, 0.55)):
+    black = mat("RingBlack", "#141414", 0.35, 0.6)
+    led = mat("RingLED", "#fff3e0", 0.4, emit=((1.0, 0.82, 0.6), 18.0))
+    for k, r in enumerate(radii):
+        z = z_top - drop - k * 0.35
+        for nm, rr, mm in ((f"{name}{k}", 0.028, black), (f"{name}{k}led", 0.011, led)):
+            bpy.ops.mesh.primitive_torus_add(major_radius=r - (0.026 if mm is led else 0), minor_radius=rr,
+                                             major_segments=96, minor_segments=10, location=(cx, cy, z - (0.01 if mm is led else 0)))
+            t = bpy.context.active_object
+            t.name = nm
+            t.data.materials.append(mm)
+            for c in t.users_collection:
+                c.objects.unlink(t)
+            COLL.objects.link(t)
+        for j in range(3):
+            a = j * 2 * math.pi / 3
+            cyl(f"{name}{k}cab{j}", cx + r * math.cos(a), cy + r * math.sin(a), z, z_top, 0.003, black, 6)
+        point_light(f"{name}{k}L", (cx, cy, z - 0.05), 70, 0.3)
+
+
+def fireplace(x1, x2, y_wall, inward=-1):
+    stone = M["stone"]
+    d = lambda v: y_wall + inward * v
+    box("FireSurround", x1 - 0.45, x2 + 0.45, d(0.0), d(0.35), 0.0, 2.6, stone)
+    box("FireBox", x1, x2, d(0.3), d(0.37), 0.35, 1.25, mat("Firebox", "#141210", 0.9))
+    box("FireMantel", x1 - 0.6, x2 + 0.6, d(0.0), d(0.45), 1.45, 1.55, mat("MantelOak", "#6b4c33", 0.5))
+    box("FireHearth", x1 - 0.6, x2 + 0.6, d(0.0), d(0.75), 0.0, 0.25, stone)
+    box("FireGlow", x1 + 0.15, x2 - 0.15, d(0.31), d(0.33), 0.4, 0.75, mat("Embers", "#ff7a2a", 0.6, emit=((1.0, 0.45, 0.15), 6.0)))
+    point_light("FireL", ((x1 + x2) / 2, d(0.7), 0.6), 80, 0.3, (1.0, 0.5, 0.2))
+
+
+def great_room():
+    z = 0.0
+    fireplace(20.05, 21.55, 28.7, -1)
+    rug("GreatRug", 16.6, 21.4, 22.4, 27.2, z, "#d3cab9", "#2c2c2c")
+    P.place("sofa_03", (18.7, 23.2, z), 0, coll=COLL, name="GreatSofa")
+    P.place("sofa_02", (16.9, 25.4, z), 270, coll=COLL, name="GreatSofa2")
+    P.place("modern_arm_chair_01", (20.9, 25.6, z), 120, coll=COLL, name="GreatChair")
+    P.place("modern_coffee_table_02", (18.9, 25.3, z), 0, coll=COLL, name="GreatTable")
+    P.place("throw_pillows_01", (18.3, 23.1, 0.45), 0, coll=COLL, name="GreatPillows")
+    # dining in front of the windows, geometric rug, ring pendants (as in the video)
+    rug("GreatDiningRug", 21.9, 25.2, 22.3, 27.6, z, "#e9e4d8", "#1d1d1d")
+    walnut = mat("DiningWalnut", "#3e2c20", 0.35)
+    box("GreatDiningTop", 22.95, 24.15, 23.2, 26.6, 0.74, 0.79, walnut, 0.012)
+    for y in (23.7, 26.1):
+        box(f"GreatDiningLeg{y}", 23.3, 23.8, y - 0.06, y + 0.06, 0.0, 0.74, walnut, 0.01)
+    for k, y in enumerate((23.5, 24.9, 26.3)):
+        P.place("dining_chair_02", (22.65, y, z), 270, coll=COLL, name=f"GDChairW{k}")
+        P.place("dining_chair_02", (24.45, y, z), 90, coll=COLL, name=f"GDChairE{k}")
+    _pendant_rings("GreatRings", 23.55, 24.9, EAVE)
+    P.place("potted_plant_01", (16.6, 28.2, z), 0, coll=COLL, name="GreatPlant")
+    P.place("potted_plant_01", (25.0, 28.2, z), 60, coll=COLL, name="GreatPlant2")
+
+
+def kitchen():
+    z = 0.0
+    white = mat("CabinetWhite", "#f1eee7", 0.35)
+    marble = mat("CalacattaTop", "#f3f1ec", 0.12)
+    brass = mat("Brass", "#b08d57", 0.3, 1.0)
+    # island
+    box("IslandBase", 28.0, 31.6, 24.6, 25.8, z, z + 0.9, white, 0.01)
+    box("IslandTop", 27.9, 31.7, 24.5, 25.9, z + 0.9, z + 0.95, marble, 0.01)
+    for k, x in enumerate((28.6, 29.8, 31.0)):
+        P.place("bar_chair_round_01", (x, 24.05, z), 0, coll=COLL, name=f"IslandStool{k}")
+        cyl(f"IslandPendant{k}", x, 25.2, 2.55, 2.85, 0.16, mat("PendantGlass", "#f6e7c8", 0.2, emit=((1.0, 0.7, 0.4), 6.0)), 24)
+        cyl(f"IslandPendantRod{k}", x, 25.2, 2.85, 3.7, 0.006, brass, 8)
+        point_light(f"IslandPendantL{k}", (x, 25.2, 2.5), 40, 0.1)
+    # perimeter: base + upper cabinets along the east wall, range and hood, south wall pantry wall
+    box("KBaseE", 33.05, 33.7, 22.3, 28.9, z, z + 0.9, white, 0.01)
+    box("KTopE", 32.95, 33.7, 22.3, 28.9, z + 0.9, z + 0.94, marble)
+    box("KUpperE", 33.35, 33.7, 22.3, 28.9, 1.5, 2.4, white, 0.01)
+    box("KHood", 33.0, 33.7, 24.9, 26.3, 1.9, 3.0, white, 0.02)
+    box("KRange", 33.05, 33.7, 25.0, 26.2, z + 0.9, z + 0.95, mat("Stainless", "#b8bcc0", 0.25, 1.0))
+    box("KTallSouth", 25.9, 30.2, 22.1, 22.75, z, 3.0, white, 0.01)
+    box("KFridge", 30.2, 31.6, 22.1, 22.75, z, 2.2, mat("Stainless", "#b8bcc0", 0.25, 1.0), 0.01)
+    for k, x in enumerate(range(26, 30)):
+        box(f"KPull{k}", x + 0.45, x + 0.5, 22.76, 22.78, 1.0, 1.4, brass)
+
+
+def game_room():
+    z = F1
+    teal = M["teal"]
+    beam = M["beam"]
+    plaster = M["plaster_int"]
+    xL, xR, xm = 25.6, 33.7, 29.75
+    yS, yN = 22.1, 29.28
+    ridge_z = EAVE + (xm - 25.5) * 1.0 - 0.32
+    # vaulted plaster ceiling under the lake gable
+    for nm, (xa, xb) in (("VaultW", (xL, xm)), ("VaultE", (xm, xR))):
+        za = EAVE + (0.0 if xa == xL else (xm - 25.5) - 0.32)
+        zb = EAVE + ((xm - 25.5) - 0.32 if xa == xL else 0.0)
+        bmm = bmesh.new()
+        v = [bmm.verts.new(c) for c in ((xa, yS, za), (xb, yS, zb), (xb, yN, zb), (xa, yN, za))]
+        bmm.faces.new(v)
+        me = bpy.data.meshes.new(nm)
+        bmm.to_mesh(me)
+        bmm.free()
+        o = bpy.data.objects.new(nm, me)
+        o.data.materials.append(plaster)
+        COLL.objects.link(o)
+    # teal accent wall on the lake gable (wall + triangle), windows cut out
+    bmm = bmesh.new()
+    pts = [(xL, z), (xR, z), (xR, EAVE), (xm, ridge_z), (xL, EAVE)]
+    f0 = [bmm.verts.new((x, yN, zz)) for x, zz in pts]
+    f1 = [bmm.verts.new((x, yN - 0.02, zz)) for x, zz in pts]
+    bmm.faces.new(f0)
+    bmm.faces.new(list(reversed(f1)))
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bmm.faces.new((f0[i], f1[i], f1[j], f0[j]))
+    me = bpy.data.meshes.new("TealWall")
+    bmm.to_mesh(me)
+    bmm.free()
+    tw = bpy.data.objects.new("TealWall", me)
+    tw.data.materials.append(teal)
+    COLL.objects.link(tw)
+    boxes = [(a, b, yN - 0.5, yN + 0.5, z1, z2) for (n, ax, pl, a, b, z1, z2, out, st) in H.WINDOWS if n.startswith("Game")]
+    cut = H._cutter_from_boxes(None, "TealCuts", boxes, COLL)
+    H._boolean(tw, cut)
+    # espresso trusses: rafters on both slopes, collar ties, ridge beam (video)
+    for k, y in enumerate((22.9, 24.7, 26.5, 28.3)):
+        for side in (-1, 1):
+            xa, xb = (xL, xm) if side < 0 else (xm, xR)
+            za, zb = (EAVE, ridge_z) if side < 0 else (ridge_z, EAVE)
+            L = math.hypot(xb - xa, zb - za)
+            o = box(f"Rafter{k}{side}", -L / 2, L / 2, -0.09, 0.09, -0.14, 0.0, beam)
+            o.location = ((xa + xb) / 2, y, (za + zb) / 2 - 0.02)
+            o.rotation_euler = (0, -math.atan2(zb - za, xb - xa), 0)
+        tie_z = EAVE + 1.25
+        dx = (tie_z - EAVE)
+        box(f"CollarTie{k}", xL + dx, xR - dx, y - 0.09, y + 0.09, tie_z - 0.22, tie_z, beam)
+    box("RidgeBeam", xm - 0.1, xm + 0.1, yS, yN, ridge_z - 0.25, ridge_z, beam)
+    # pool table (teal felt, dark wood), sputnik chandelier, window seat + Roman shades, sectional
+    wood = mat("PoolTableWood", "#3b2618", 0.35)
+    felt = mat("PoolFelt", "#1f5a66", 0.9)
+    box("PTBase", 28.7, 30.9, 24.4, 27.9, z + 0.25, z + 0.72, wood, 0.03)
+    box("PTFelt", 28.85, 30.75, 24.55, 27.75, z + 0.72, z + 0.78, felt)
+    for (x1, x2, y1, y2) in ((28.6, 31.0, 24.3, 24.55), (28.6, 31.0, 27.75, 28.0), (28.6, 28.85, 24.3, 28.0), (30.75, 31.0, 24.3, 28.0)):
+        box(f"PTRail{x1}{y1}", x1, x2, y1, y2, z + 0.72, z + 0.82, wood, 0.015)
+    for (x, y) in ((29.0, 24.7), (30.6, 24.7), (29.0, 27.6), (30.6, 27.6)):
+        box(f"PTLeg{x}{y}", x - 0.12, x + 0.12, y - 0.12, y + 0.12, z, z + 0.3, wood, 0.02)
+    gold = mat("SputnikGold", "#c7a15a", 0.25, 1.0)
+    bulb = mat("SputnikBulb", "#fff6e6", 0.2, emit=((1.0, 0.85, 0.65), 25.0))
+    cz = ridge_z - 1.6
+    cyl("SputnikRod", 29.8, 26.15, cz, ridge_z - 0.25, 0.01, gold, 8)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.09, location=(29.8, 26.15, cz))
+    s = bpy.context.active_object
+    s.name = "SputnikHub"
+    s.data.materials.append(gold)
+    for c in s.users_collection:
+        c.objects.unlink(s)
+    COLL.objects.link(s)
+    rnd = random.Random(5)
+    for k in range(28):
+        d = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))).normalized()
+        L = rnd.uniform(0.35, 0.55)
+        p = Vector((29.8, 26.15, cz)) + d * L / 2
+        o = box(f"SputnikArm{k}", -0.006, 0.006, -0.006, 0.006, -L / 2, L / 2, gold)
+        o.location = p
+        o.rotation_euler = d.to_track_quat("Z", "Y").to_euler()
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.025, segments=10, ring_count=6, location=Vector((29.8, 26.15, cz)) + d * L)
+        b = bpy.context.active_object
+        b.name = f"SputnikBulb{k}"
+        b.data.materials.append(bulb)
+        for c in b.users_collection:
+            c.objects.unlink(b)
+        COLL.objects.link(b)
+    point_light("SputnikL", (29.8, 26.15, cz), 140, 0.4)
+    seat = mat("WindowSeat", "#f1eee7", 0.4)
+    cush = mat("SeatCushion", "#e9e4da", 0.85)
+    box("WindowSeat", 26.1, 33.5, 28.75, 29.28, z, z + 0.45, seat, 0.01)
+    box("WindowSeatCush", 26.15, 33.45, 28.78, 29.25, z + 0.45, z + 0.55, cush, 0.03)
+    pillows = ["#24495a", "#f3efe7", "#9c2f2f", "#24495a", "#f3efe7", "#1f1f1f"]
+    for k, c in enumerate(pillows):
+        x = 26.5 + k * 1.2
+        o = box(f"SeatPillow{k}", x - 0.22, x + 0.22, 28.95, 29.1, z + 0.55, z + 0.95, mat("Pillow_" + c, c, 0.9), 0.06)
+    shade = mat("RomanShade", "#efe9dd", 0.85, sss=0.3)
+    for (n, ax, pl, a, b, z1, z2, out, st) in H.WINDOWS:
+        if n.startswith("Game") and n != "GameHigh" and n != "GameE":
+            for f in range(4):
+                zz = z2 - 0.05 - f * 0.1
+                box(f"Shade_{n}{f}", a - 0.05, b + 0.05, 29.2, 29.27, zz - 0.11, zz, shade, 0.02)
+    railing_line("RailLoft", (25.58, 22.62), (25.58, 28.78), z)       # loft overlooking the great room
+    P.place("sofa_03", (27.0, 25.4, z), 270, coll=COLL, name="GameSofa")
+    rug("GameRug", 28.0, 31.6, 23.8, 28.5, z, "#9aa3a8", "#2f3b40")
+    P.place("dartboard", (33.68, 23.4, z + 1.73), 270, coll=COLL, name="Dartboard")
+    box("GameRedCabinet", 33.1, 33.68, 27.6, 28.6, z, z + 1.0, mat("RedLacquer", "#8f1f1f", 0.3), 0.01)
+
+
+def master():
+    z = 0.0
+    rug("MasterRug", 9.4, 14.6, 23.6, 27.6, z, "#ddd5c6", "#8a7c66")
+    bed("MasterBed", 12.0, 23.15, z, 0, 2.05, 2.2, head="#c9bfae")
+    nightstand("MasterNSL", 10.55, 23.5, z)
+    nightstand("MasterNSR", 13.45, 23.5, z)
+    P.place("Ottoman_01", (12.0, 26.1, z), 0, coll=COLL, name="MasterBench")
+    P.place("mid_century_lounge_chair", (9.2, 27.8, z), 140, coll=COLL, name="MasterLounge")
+    P.place("Chandelier_02", (12.0, 25.0, F1 - 0.3 - 0.85), 0, coll=COLL, name="MasterChand")
+    point_light("MasterChandL", (12.0, 25.0, F1 - 0.3 - 0.5), 50, 0.15)
+
+
+def build_rear():
+    great_room()
+    kitchen()
+    game_room()
+    master()

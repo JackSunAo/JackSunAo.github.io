@@ -117,8 +117,8 @@ PARTITIONS = [
     (22, 13.2, 22, 20, F1, EAVE, [(18.5, 1.0)]),                # stair hall | media
     (22, 20, 25.5, 20, F1, EAVE, []),
     (28.5, 10.5, 28.5, 22, F1, EAVE, [(20.8, 0.9)]),            # media/hall | bed4
-    (25.5, 22, 34, 22, F1, EAVE, [(24.0, 2.4)]),                # hall | game room (wide)
-    (25.5, 22, 25.5, 29.6, F1, EAVE, []),                       # game room | great-room void
+    (25.5, 22, 34, 22, F1, EAVE, [(27.0, 2.4)]),                # hall | game room (wide)
+    (25.5, 22, 25.5, 29.6, F1, EAVE, [(25.7, 6.2)]),            # game-room loft overlooking the great room
 ]
 
 # slab holes: great-room double height, curved-stair void
