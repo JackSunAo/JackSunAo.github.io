@@ -671,6 +671,101 @@ def heli_area(bm):
         I.box("HangarDoorTrack", x1 - 0.3, x2 + 0.3, y, y + 0.12, z2, z2 + 0.18, seam)
 
 
+def lily_pond(bm):
+    """Natural lily pond: dark still water, notched lily pads in clusters, pink and white water lilies,
+    and a slatted teak bench at the end of the border walk instead of the massing block."""
+    water = bpy.data.objects.get("PondWater")
+    if water:
+        dark = _m("PondWaterDark", "#0b1a14", 0.02)
+        dark.node_tree.nodes["Principled BSDF"].inputs["Specular IOR Level"].default_value = 0.6
+        water.data.materials.clear()
+        water.data.materials.append(dark)
+    for o in list(bpy.data.objects):
+        if o.name.startswith(("LilyPad", "Lily")) and o.type == "MESH":
+            bpy.data.objects.remove(o, do_unlink=True)
+    z = bm.ground(6.5, 68) + 0.165
+    pad_m = _m("LilyPadLeaf", "#3f6a2a", 0.35, sss=0.1)
+    pad_m.node_tree.nodes["Principled BSDF"].inputs["Coat Weight"].default_value = 0.5
+    rnd = random.Random(21)
+    bmm = bmesh.new()
+    clusters = [(5.0, 69.2), (8.0, 66.6), (8.6, 69.8), (4.3, 66.5), (9.6, 67.9)]
+    pads = []
+    for cx, cy in clusters:
+        for _ in range(rnd.randint(5, 9)):
+            x, y = cx + rnd.gauss(0, 0.5), cy + rnd.gauss(0, 0.45)
+            if ((x - 6.5) / 4.3) ** 2 + ((y - 68) / 3.9) ** 2 > 1:
+                continue
+            r = rnd.uniform(0.12, 0.26)
+            if any((x - a) ** 2 + (y - b) ** 2 < (r + rr) ** 2 * 0.8 for a, b, rr in pads):
+                continue
+            pads.append((x, y, r))
+            notch = rnd.uniform(0, 2 * math.pi)
+            n = 20
+            ring = []
+            for k in range(n + 1):
+                a = notch + 0.32 + (2 * math.pi - 0.64) * k / n
+                ring.append(bmm.verts.new((x + r * math.cos(a), y + r * math.sin(a), z + rnd.uniform(0, 0.004))))
+            c = bmm.verts.new((x, y, z + 0.006))
+            for k in range(n):
+                bmm.faces.new((c, ring[k], ring[k + 1]))
+    me = bpy.data.meshes.new("LilyPads")
+    bmm.to_mesh(me)
+    bmm.free()
+    lp = bpy.data.objects.new("LilyPads", me)
+    lp.data.materials.append(pad_m)
+    COLL.objects.link(lp)
+    # blossoms: two rings of cupped petals with a yellow centre
+    pink = _m("WaterLilyPink", "#f0a6c4", 0.45, sss=0.4)
+    white = _m("WaterLilyWhite", "#f6f2ec", 0.45, sss=0.4)
+    gold = _m("WaterLilyCentre", "#e8b62c", 0.5)
+    bmm = bmesh.new()
+    for j, (x, y, r) in enumerate(pads[::3]):
+        fx, fy = x + r * 0.3, y - r * 0.2
+        mi = j % 2
+        for ring_i, (cnt, L, tilt) in enumerate(((10, 0.075, 0.55), (8, 0.06, 0.95))):
+            for k in range(cnt):
+                a = 2 * math.pi * k / cnt + ring_i * 0.3
+                d = Vector((math.cos(a), math.sin(a), 0))
+                up = Vector((0, 0, 1))
+                tip = d * math.cos(tilt) * L + up * math.sin(tilt) * L
+                side = Vector((-d.y, d.x, 0)) * 0.016
+                b0 = Vector((fx, fy, z + 0.01))
+                v = [bmm.verts.new(b0), bmm.verts.new(b0 + tip * 0.5 + side), bmm.verts.new(b0 + tip),
+                     bmm.verts.new(b0 + tip * 0.5 - side)]
+                bmm.faces.new(v).material_index = mi
+        cen = bmesh.ops.create_icosphere(bmm, subdivisions=1, radius=0.014)
+        bmesh.ops.translate(bmm, vec=(fx, fy, z + 0.03), verts=cen["verts"])
+        for f in {f for vv in cen["verts"] for f in vv.link_faces}:
+            f.material_index = 2
+    me = bpy.data.meshes.new("WaterLilies")
+    bmm.to_mesh(me)
+    bmm.free()
+    wl = bpy.data.objects.new("WaterLilies", me)
+    for m in (pink, white, gold):
+        wl.data.materials.append(m)
+    COLL.objects.link(wl)
+    # teak garden bench (replaces the massing blocks)
+    for n in ("GardenBench", "GardenBenchBack"):
+        o = bpy.data.objects.get(n)
+        if o:
+            o.hide_render = True
+    teak = _m("TeakBench", "#9a7650", 0.55)
+    x1, x2, yb = 6.4, 8.6, 60.55
+    zb = bm.ground(7.5, 60.6)
+    for k in range(5):
+        y = yb - 0.22 + k * 0.1
+        I.box(f"BenchSeatSlat{k}", x1, x2, y, y + 0.075, zb + 0.43, zb + 0.46, teak, 0.004)
+    for k in range(4):
+        zz = zb + 0.58 + k * 0.1
+        I.box(f"BenchBackSlat{k}", x1, x2, yb + 0.28 + k * 0.012, yb + 0.30 + k * 0.012, zz, zz + 0.07, teak, 0.004)
+    for x in (x1 + 0.06, (x1 + x2) / 2, x2 - 0.06):
+        I.box(f"BenchFrame{x:.2f}", x - 0.03, x + 0.03, yb - 0.24, yb + 0.26, zb + 0.38, zb + 0.43, teak, 0.004)
+    for x in (x1 + 0.06, x2 - 0.06):
+        I.box(f"BenchLegF{x:.2f}", x - 0.03, x + 0.03, yb - 0.24, yb - 0.18, zb, zb + 0.66, teak, 0.004)
+        I.box(f"BenchLegB{x:.2f}", x - 0.03, x + 0.03, yb + 0.26, yb + 0.32, zb, zb + 0.98, teak, 0.004)
+        I.box(f"BenchArm{x:.2f}", x - 0.035, x + 0.035, yb - 0.26, yb + 0.3, zb + 0.64, zb + 0.68, teak, 0.004)
+
+
 def build(bm, materials, coll):
     global COLL, M
     COLL, M = coll, materials
@@ -683,3 +778,4 @@ def build(bm, materials, coll):
     bbq_pavilion(bm)
     heli_area(bm)
     lake_water()
+    lily_pond(bm)
