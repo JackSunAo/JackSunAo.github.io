@@ -134,7 +134,7 @@ def siding(name, color, exposure=0.18, rough=0.6):
     wave.wave_type = "BANDS"
     wave.bands_direction = "Y"
     wave.wave_profile = "SAW"
-    wave.inputs["Scale"].default_value = 1.0 / exposure / 3.14159 * 0.5 * 3.14159 * 2
+    wave.inputs["Scale"].default_value = 0.31416 / exposure   # band period = 0.314 / scale
     wave.inputs["Distortion"].default_value = 0.0
     nt.links.new(fc.outputs[0], wave.inputs["Vector"])
     ramp = nt.nodes.new("ShaderNodeValToRGB")
@@ -182,7 +182,7 @@ def standing_seam(name, color, seam=0.45):
     wave.wave_type = "BANDS"
     wave.bands_direction = "X"
     wave.wave_profile = "SIN"
-    wave.inputs["Scale"].default_value = 1.0 / seam
+    wave.inputs["Scale"].default_value = 0.31416 / seam
     wave.inputs["Distortion"].default_value = 0.0
     nt.links.new(tc.outputs["Object"], wave.inputs["Vector"])
     pw = nt.nodes.new("ShaderNodeMath"); pw.operation = "POWER"
@@ -192,6 +192,26 @@ def standing_seam(name, color, seam=0.45):
     bsdf.inputs["Metallic"].default_value = 0.6
     bsdf.inputs["Roughness"].default_value = 0.38
     _bump(nt, bsdf, pw.outputs[0], 0.8, 0.02)
+    return m
+
+
+def pavers(name, color, size):
+    """Square pavers on horizontal surfaces (Object coords = world for meshes built at the origin)."""
+    m, nt, bsdf = _new(name)
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    br = nt.nodes.new("ShaderNodeTexBrick")
+    br.offset = 0.5
+    br.inputs["Scale"].default_value = 1.0
+    br.inputs["Brick Width"].default_value = size
+    br.inputs["Row Height"].default_value = size
+    br.inputs["Mortar Size"].default_value = 0.006
+    br.inputs["Color1"].default_value = shade(color, 0.94)
+    br.inputs["Color2"].default_value = shade(color, 1.04)
+    br.inputs["Mortar"].default_value = shade(color, 0.8)
+    nt.links.new(tc.outputs["Object"], br.inputs["Vector"])
+    nt.links.new(br.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 0.75
+    _bump(nt, bsdf, br.outputs["Fac"], 0.2, 0.005)
     return m
 
 
@@ -275,7 +295,7 @@ def build_all(dusk=True):
         "trim": plain("Trim", P["trim"], 0.5),
         "frame": plain("WindowFrame", P["frame"], 0.4, 0.3),
         "door": plain("EntryDoor", P["door"], 0.45),
-        "glass": glass("Glass", "#ffb866" if dusk else None, 2.2 if dusk else 0.0),
+        "glass": glass("Glass", "#ffa64a" if dusk else None, 1.4 if dusk else 0.0),
         "glass_dark": glass("GlassDark"),
         "aggregate": aggregate("Aggregate", P["aggregate"]),
         "paver": plain("Paver", P["paver"], 0.8, 0.0, 30.0),
@@ -283,6 +303,14 @@ def build_all(dusk=True):
         "pool": water("PoolWater", "#2f9fb8", 3.0),
         "lake": water("LakeWater", "#2d5566", 0.8),
         "lantern": plain("LanternGlow", "#ffcf8a", 0.4),
+        "column": plain("Column", "#a29684", 0.6),
+        "brick_dark": plain("BrickAccent", "#d6c8ae", 0.85),
+        "limestone_paver": pavers("LimestonePaver", "#e3dacb", 0.6),
+        "drive": plain("Concrete", "#d6d0c4", 0.85, 0.0, 12.0),
+        "foliage": plain("Foliage", "#5d7c43", 0.9, 0.0, 8.0),
+        "far_foliage": plain("FarFoliage", "#6f8463", 1.0),
+        "boxwood": plain("Boxwood", "#3d6328", 0.9, 0.0, 25.0),
+        "agave": plain("Agave", "#7c9a8c", 0.6),
     }
     lg = mats["lantern"].node_tree.nodes["Principled BSDF"]
     lg.inputs["Emission Color"].default_value = lin("#ffb35c")

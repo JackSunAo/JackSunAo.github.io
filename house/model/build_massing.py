@@ -352,6 +352,21 @@ def build_site():
 
 
 # ---------------------------------------------------------------- house
+
+# Window specs recorded by the massing so the detail pass can build real frames in their place.
+WINDOWS = []
+
+
+def win(name, a, b, plane, z1, z2, coll, out=-1, style="siding", axis="y"):
+    """Dark panel on a facade. `plane` = wall face coordinate, `out` = outward direction (+1/-1),
+    `style` picks the surround in the detail pass: siding (cream casing), brick/stone (black head),
+    door, glasswall (frameless-ish slider)."""
+    WINDOWS.append(dict(name=name, a=a, b=b, plane=plane, z1=z1, z2=z2, out=out, style=style, axis=axis))
+    lo, hi = (plane - 0.06, plane + 0.02) if out < 0 else (plane - 0.02, plane + 0.06)
+    if axis == "y":
+        return box(name, a, b, lo, hi, z1, z2, "dark" if style == "door" else "glass", coll)
+    return box(name, lo, hi, a, b, z1, z2, "dark" if style == "door" else "glass", coll)
+
 def build_house():
     """Proportions follow the reference image: tall 3.7 m + 3.2 m storeys, steep gables,
     brick wing flush with the porch front and the east gable projecting further."""
@@ -372,7 +387,7 @@ def build_house():
         z0 = EAVE + (y0 - Y_MAIN) * 1.1
         box(f"Dormer{i}", x, x + w, y0 - 0.2, y0 + 1.8, z0 - 0.6, z0 + 1.6, "wall", c)
         gable(f"Dormer{i}R", x, x + w, y0 - 0.2, y0 + 1.8, z0 + 1.6, "y", 1.6, 0.15, coll=c)
-        box(f"DormerWin{i}", x + 0.3, x + w - 0.3, y0 - 0.26, y0 - 0.18, z0, z0 + 1.3, "glass", c)
+        win(f"DormerWin{i}", x + 0.3, x + w - 0.3, y0 - 0.2, z0, z0 + 1.3, c)
     # porch: shed metal roof on posts across the west wing and stone gable
     yp = Y_MAIN - 3.2
     quad_slab("PorchRoof", [(8.2, yp, 3.5), (22, yp, 3.5), (22, Y_MAIN, 4.05), (8.2, Y_MAIN, 4.05)], 0.14, "metalroof", c)
@@ -383,29 +398,32 @@ def build_house():
     box("Chimney", 20.0, 21.6, 29.0, 30.2, base, 16.2, "wall", c)
     box("ChimneyPatio", 15.0, 16.4, 31.6, 33.2, 0, 6.6, "wall", c)
     # key windows as dark inset panels so the massing reads (x1, x2, facade y, z1, z2)
-    win = [
-        (16.8, 20.2, Y_MAIN - 0.3, 4.4, 6.9),                                     # stone gable 2F
-        (16.0, 17.8, Y_MAIN - 0.3, 0.2, 3.0), (18.6, 20.4, Y_MAIN - 0.3, 0.2, 3.0),  # stone gable 1F
-        (9.0, 13.8, Y_MAIN, 4.6, 6.4),                                             # west wing 2F triple
-        (9.2, 11.8, Y_MAIN, 0.2, 3.0), (12.6, 14.4, Y_MAIN, 0.2, 3.0),             # porch glass doors
-        (23.0, 23.8, Y_BRICK, 4.3, 6.3), (24.85, 25.65, Y_BRICK, 4.3, 6.3), (26.7, 27.5, Y_BRICK, 4.3, 6.3),
-        (22.7, 25.0, Y_BRICK, 0.4, 3.0), (25.5, 27.8, Y_BRICK, 0.4, 3.0),         # brick wing 1F pair
-        (29.9, 32.6, Y_EGABLE, 0.4, 3.0), (30.8, 31.8, Y_EGABLE, 4.3, 6.3), (31.0, 31.6, Y_EGABLE, 7.8, 8.7),
+    win_front = [
+        (16.8, 20.2, Y_MAIN - 0.3, 4.4, 6.9, "stone"),                                       # stone gable 2F
+        (16.0, 17.8, Y_MAIN - 0.3, 0.2, 3.0, "stone"), (18.6, 20.4, Y_MAIN - 0.3, 0.2, 3.0, "stone"),
+        (9.0, 10.5, Y_MAIN, 4.6, 6.4, "siding"), (10.65, 12.15, Y_MAIN, 4.6, 6.4, "siding"),   # west wing 2F triple
+        (12.3, 13.8, Y_MAIN, 4.6, 6.4, "siding"),
+        (9.2, 11.8, Y_MAIN, 0.2, 3.0, "siding"), (12.6, 14.4, Y_MAIN, 0.2, 3.0, "siding"),     # porch glass doors
+        (23.0, 23.8, Y_BRICK, 4.3, 6.3, "brick"), (24.85, 25.65, Y_BRICK, 4.3, 6.3, "brick"),
+        (26.7, 27.5, Y_BRICK, 4.3, 6.3, "brick"),
+        (22.7, 25.0, Y_BRICK, 0.4, 3.0, "brick"), (25.5, 27.8, Y_BRICK, 0.4, 3.0, "brick"),   # brick wing 1F pair
+        (29.9, 32.6, Y_EGABLE, 0.4, 3.0, "brick"), (30.8, 31.8, Y_EGABLE, 4.3, 6.3, "brick"),
+        (31.0, 31.6, Y_EGABLE, 7.8, 8.7, "brick"),
     ]
-    for i, (a, b, y, z1, z2) in enumerate(win):
-        box(f"WinF{i}", a, b, y - 0.06, y + 0.02, z1, z2, "glass", c)
-    box("FrontDoor", 20.9, 21.8, Y_MAIN - 0.36, Y_MAIN - 0.28, 0, 2.9, "dark", c)
+    for i, (a, b, y, z1, z2, st) in enumerate(win_front):
+        win(f"WinF{i}", a, b, y, z1, z2, c, -1, st)
+    win("FrontDoor", 20.9, 21.8, Y_MAIN - 0.3, 0, 2.9, c, -1, "door")
     # lake facade: two-storey great-room glass either side of the chimney, game-room windows above kitchen
     for i, x in enumerate([16.4, 18.1, 21.8, 23.5]):
-        box(f"WinGR{i}", x, x + 1.6, 29.0, 29.08, 0.2, 3.6, "glass", c)
-        box(f"WinGRt{i}", x + 0.1, x + 1.5, 29.0, 29.08, 4.0, 6.2, "glass", c)
+        win(f"WinGR{i}", x, x + 1.6, 29.0, 0.2, 3.6, c, 1, "siding")
+        win(f"WinGRt{i}", x + 0.1, x + 1.5, 29.0, 4.0, 6.2, c, 1, "siding")
     for i, x in enumerate([26.3, 28.2, 30.1, 32.0]):
-        box(f"WinGame{i}", x, x + 1.3, 29.58, 29.66, 4.3, 6.2, "glass", c)
-        box(f"WinKit{i}", x, x + 1.3, 29.58, 29.66, 0.3, 3.0, "glass", c)
-    box("WinGameHigh", 29.0, 30.0, 29.58, 29.66, 7.6, 8.6, "glass", c)
+        win(f"WinGame{i}", x, x + 1.3, 29.6, 4.3, 6.2, c, 1, "brick")
+        win(f"WinKit{i}", x, x + 1.3, 29.6, 0.3, 3.0, c, 1, "brick")
+    win("WinGameHigh", 29.0, 30.0, 29.6, 7.6, 8.6, c, 1, "brick")
     for i, x in enumerate([9.5, 12.0]):
-        box(f"WinR{i}", x, x + 1.6, 29.0, 29.08, 0.3, 3.0, "glass", c)
-        box(f"WinR2{i}", x, x + 1.6, 29.0, 29.08, 4.4, 6.2, "glass", c)
+        win(f"WinR{i}", x, x + 1.6, 29.0, 0.3, 3.0, c, 1, "siding")
+        win(f"WinR2{i}", x, x + 1.6, 29.0, 4.4, 6.2, c, 1, "siding")
     # garage: side-entry, doors facing east
     gable("Garage", 34, 41.5, 20, 28.5, 3.6, "y", 0.9, 0.4, coll=c, base=-0.6)
     for i, y in enumerate([21.0, 24.9]):
