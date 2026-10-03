@@ -1,0 +1,260 @@
+{
+ "agave": {
+  "taxon": "Agave ovatifolia",
+  "attr": "(c) Michael J. Papay, some rights reserved (CC BY), uploaded by Michael J. Papay",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/122338"
+ },
+ "boxwood": {
+  "taxon": "Buxus microphylla",
+  "attr": "(c) janmomsen, some rights reserved (CC BY-NC), uploaded by janmomsen",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/208757"
+ },
+ "eagleston": {
+  "taxon": "Ilex × attenuata",
+  "attr": "(c) intrepid_tar_heel, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/181581"
+ },
+ "muhly": {
+  "taxon": "Muhlenbergia capillaris",
+  "attr": "(c) Lauren McLaurin, some rights reserved (CC BY), uploaded by Lauren McLaurin",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/165543"
+ },
+ "featherg": {
+  "taxon": "Nassella tenuissima",
+  "attr": "(c) Mike Lusk, some rights reserved (CC BY-NC), uploaded by Mike Lusk",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/165660"
+ },
+ "yucca": {
+  "taxon": "Yucca recurvifolia",
+  "attr": "(c) manuel m. v., some rights reserved (CC BY-NC-ND)",
+  "license": "cc-by-nc-nd",
+  "page": "https://www.inaturalist.org/taxa/372245"
+ },
+ "magnolia": {
+  "taxon": "Magnolia grandiflora",
+  "attr": "(c) 潘立傑 LiChieh Pan, some rights reserved (CC BY-NC-SA)",
+  "license": "cc-by-nc-sa",
+  "page": "https://www.inaturalist.org/taxa/83074"
+ },
+ "lavender": {
+  "taxon": "Lavandula × intermedia",
+  "attr": "(c) Raphael Michel, all rights reserved, uploaded by Raphael Michel",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/469711"
+ },
+ "hydrangea": {
+  "taxon": "Hydrangea macrophylla",
+  "attr": "(c) miyuu, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/122034"
+ },
+ "gaura": {
+  "taxon": "Oenothera lindheimeri",
+  "attr": "(c) Grant Reed, some rights reserved (CC BY-NC), uploaded by Grant Reed",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/590726"
+ },
+ "rosemary": {
+  "taxon": "Rosmarinus",
+  "attr": "(c) faluke, some rights reserved (CC BY-NC), uploaded by faluke",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/82927"
+ },
+ "salviag": {
+  "taxon": "Salvia greggii",
+  "attr": "(c) David Mercado-Morales, some rights reserved (CC BY-NC), uploaded by David Mercado-Morales",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/168380"
+ },
+ "salvial": {
+  "taxon": "Salvia leucantha",
+  "attr": "(c) Eric Hunt, some rights reserved (CC BY-NC-ND)",
+  "license": "cc-by-nc-nd",
+  "page": "https://www.inaturalist.org/taxa/120488"
+ },
+ "coneflower": {
+  "taxon": "Echinacea purpurea",
+  "attr": "(c) Virginia (Ginny) Sanderson, some rights reserved (CC BY-NC-ND)",
+  "license": "cc-by-nc-nd",
+  "page": "https://www.inaturalist.org/taxa/48627"
+ },
+ "rudbeckia": {
+  "taxon": "Rudbeckia hirta",
+  "attr": "(c) germangirl, some rights reserved (CC BY-NC), uploaded by germangirl",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/62741"
+ },
+ "catmint": {
+  "taxon": "Nepeta × faassenii",
+  "attr": "(c) David Hocken, some rights reserved (CC BY-NC), uploaded by David Hocken",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/410913"
+ },
+ "perovskia": {
+  "taxon": "Salvia yangii",
+  "attr": "(c) Caterina Verde, all rights reserved, uploaded by Caterina Verde",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/941713"
+ },
+ "lantana": {
+  "taxon": "Lantana camara",
+  "attr": "(c) Rudy, all rights reserved, uploaded by Rudy",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/50333"
+ },
+ "texassage": {
+  "taxon": "Leucophyllum frutescens",
+  "attr": "(c) gioco, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/123118"
+ },
+ "daylily": {
+  "taxon": "Hemerocallis fulva",
+  "attr": "(c) Susan Elliott, some rights reserved (CC BY-NC), uploaded by Susan Elliott",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/126583"
+ },
+ "wisteria": {
+  "taxon": "Wisteria frutescens",
+  "attr": "(c) Robert Ambrose, all rights reserved, uploaded by Robert Ambrose",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/51266"
+ },
+ "jessamine": {
+  "taxon": "Gelsemium sempervirens",
+  "attr": "(c) dogtooth77, some rights reserved (CC BY-NC-SA)",
+  "license": "cc-by-nc-sa",
+  "page": "https://www.inaturalist.org/taxa/83070"
+ },
+ "waterlily": {
+  "taxon": "Nymphaea odorata",
+  "attr": "(c) lvconrad1977, some rights reserved (CC BY-NC), uploaded by lvconrad1977",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/51119"
+ },
+ "iris": {
+  "taxon": "Iris fulva",
+  "attr": "(c) Thomas Shahan, some rights reserved (CC BY-NC), uploaded by Thomas Shahan",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/127558"
+ },
+ "willow": {
+  "taxon": "Salix babylonica",
+  "attr": "(c) Carlos Eduardo Simental Crespo, some rights reserved (CC BY-NC), uploaded by Carlos Eduardo Simental Crespo",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/58316"
+ },
+ "fern": {
+  "taxon": "Pelazoneuron kunthii",
+  "attr": "(c) Michael J. Papay, some rights reserved (CC BY), uploaded by Michael J. Papay",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/1413422"
+ },
+ "tomato": {
+  "taxon": "Solanum lycopersicum",
+  "attr": "(c) alexkehl, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/51737"
+ },
+ "herbs": {
+  "taxon": "Ocimum basilicum",
+  "attr": "(c) Sune Holt, some rights reserved (CC BY-NC), uploaded by Sune Holt",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/61398"
+ },
+ "peach": {
+  "taxon": "Prunus persica",
+  "attr": "(c) Yair Haklai, some rights reserved (CC BY-SA)",
+  "license": "cc-by-sa",
+  "page": "https://www.inaturalist.org/taxa/78755"
+ },
+ "fig": {
+  "taxon": "Ficus carica",
+  "attr": "(c) richardpatters, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/60218"
+ },
+ "lemon": {
+  "taxon": "Citrus × limon",
+  "attr": "(c) Nick Saville, all rights reserved, uploaded by Nick Saville",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/331124"
+ },
+ "bluebonnet": {
+  "taxon": "Lupinus texensis",
+  "attr": "(c) Greg Lasley, some rights reserved (CC BY-NC), uploaded by Greg Lasley",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/49564"
+ },
+ "paintbrush": {
+  "taxon": "Castilleja indivisa",
+  "attr": "(c) Aidan Campos, some rights reserved (CC BY-NC), uploaded by Aidan Campos",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/123956"
+ },
+ "liveoak": {
+  "taxon": "Quercus virginiana",
+  "attr": "(c) John Winder, some rights reserved (CC BY-NC-SA)",
+  "license": "cc-by-nc-sa",
+  "page": "https://www.inaturalist.org/taxa/49013"
+ },
+ "crape": {
+  "taxon": "Lagerstroemia indica",
+  "attr": "(c) Rich_Yang, some rights reserved (CC BY-NC), uploaded by Rich_Yang",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/135394"
+ },
+ "redbud": {
+  "taxon": "Cercis canadensis texensis",
+  "attr": "(c) Chuck Sexton, some rights reserved (CC BY-NC), uploaded by Chuck Sexton",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/48500"
+ },
+ "cedarelm": {
+  "taxon": "Ulmus crassifolia",
+  "attr": "(c) Suzette Rogers, all rights reserved",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/128823"
+ },
+ "hawthorn": {
+  "taxon": "Rhaphiolepis indica",
+  "attr": "(c) WK Cheng, all rights reserved, uploaded by WK Cheng",
+  "license": null,
+  "page": "https://www.inaturalist.org/taxa/179305"
+ },
+ "yaupon": {
+  "taxon": "Ilex vomitoria",
+  "attr": "(c) Laura Clark, some rights reserved (CC BY), uploaded by Laura Clark",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/119955"
+ },
+ "cypress": {
+  "taxon": "Taxodium distichum",
+  "attr": "(c) Annika Lindqvist, some rights reserved (CC BY), uploaded by Annika Lindqvist",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/49666"
+ },
+ "switch": {
+  "taxon": "Panicum virgatum",
+  "attr": "(c) aarongunnar, some rights reserved (CC BY), uploaded by aarongunnar",
+  "license": "cc-by",
+  "page": "https://www.inaturalist.org/taxa/125727"
+ },
+ "coreopsis": {
+  "taxon": "Gaillardia pulchella",
+  "attr": "(c) TexasEagle, some rights reserved (CC BY-NC)",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/51768"
+ },
+ "rose": {
+  "taxon": "Rosa chinensis",
+  "attr": "(c) eec, some rights reserved (CC BY-NC), uploaded by eec",
+  "license": "cc-by-nc",
+  "page": "https://www.inaturalist.org/taxa/133614"
+ }
+}
