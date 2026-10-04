@@ -39,7 +39,7 @@ LIGHT = {
     "garden": ("day", 250), "aerial": ("day", 225),
     "int_great": ("inside", 235), "int_loft": ("inside", 235), "int_stair": ("inside", 160),
     "int_game": ("inside", 235), "int_kitchen": ("inside", 235), "int_media": ("inside", 160),
-    "int_armory": ("inside", 235), "int_secret": ("inside", 235),
+    "int_armory": ("inside", 235), "int_secret": ("inside", 235), "int_living": ("inside", 235),
     "heli": ("day", 60), "dock": ("day", 300),
     "int_cinema": ("inside", 0, 0.8), "int_wine": ("inside", 0, 0.6), "int_gym": ("inside", 0, 0.6),
 }
@@ -53,6 +53,7 @@ EXTRA_VIEWS = {
     "int_game": ((25.9, 22.35, 5.6), (31.5, 29.3, 6.2), 14, (1600, 1100), 0.0),
     "int_kitchen": ((26.05, 28.95, 1.6), (33.0, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
+    "int_living": ((16.45, 21.75, 1.5), (21.0, 27.7, 1.15), 17, (1600, 1100), 0.0),
     "int_armory": ((12.55, 19.95, 1.65), (8.6, 22.6, 1.2), 14, (1600, 1100), 0.0),
     "int_secret": ((11.0, 14.9, 1.5), (10.45, 21.5, 1.3), 20, (1200, 1500), 0.0),
     "heli": ((79.0, 63.5, -1.75), (65.0, 49.0, -2.0), 28, (1600, 900), 0.0),
