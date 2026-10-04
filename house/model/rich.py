@@ -101,6 +101,15 @@ def sphere(name, x, y, z, r, m, parent=None, seg=16):
     return o
 
 
+def hollow(target, cutter):
+    """Boolean-subtract `cutter` from `target` (real cavities for tubs and basins); cutter is hidden."""
+    md = target.modifiers.new("hollow", "BOOLEAN")
+    md.operation, md.solver, md.object = "DIFFERENCE", "EXACT", cutter
+    cutter.hide_render = True
+    cutter.display_type = "WIRE"
+    return target
+
+
 def remove(prefixes):
     for o in list(bpy.data.objects):
         if o.name.startswith(prefixes):
@@ -121,12 +130,13 @@ def mats():
 
 
 # ---------------------------------------------------------------- consoles & media
-def tv(name, x, y, z_bottom, side, inches=85, mt=None, picture=(0.45, 0.52)):
+def tv(name, x, y, z_bottom, side, inches=85, mt=None, picture=None):
     w = inches * 0.0254 * 0.872
     h = inches * 0.0254 * 0.49
     r = wall(name, x, y, z_bottom, side)
     R(name + "_body", 0, 0.035, 0, w + 0.02, 0.05, h + 0.02, mt["black"], 0.004, r)
-    panel(name + "_pic", w - 0.01, h - 0.01, screen_mat(name + "_scr", picture), r, 0.0605, 0.005)
+    scr = screen_mat(name + "_scr", picture) if picture else glossy("TVOff", "#060708", 0.04, 0.0, 1.0)
+    panel(name + "_pic", w - 0.01, h - 0.01, scr, r, 0.0605, 0.005)      # bedroom TVs are switched off
     R(name + "_glow", 0, 0.004, 0.05, w * 0.9, 0.004, h * 0.85, glow("TVBacklight", "#a8c4ff", 3.0), 0.0, r)
     return r
 
@@ -473,7 +483,7 @@ def dresser(name, x, y, z, side, mt, w=1.6, tv_in=0, decor=True):
         Fu._cyl(name + "_candle", w / 2 - 0.36, 0.25, 0.885, 0.98, 0.04, M("Candle", "#f1ebe0", 0.5, sss=0.4), r, 20)
         R(name + "_frame", w / 2 - 0.2, 0.18, 0.885, 0.18, 0.02, 0.23, M("PhotoFrame", "#161616", 0.4), 0.003, r).rotation_euler.x = math.radians(-8)
     if tv_in:
-        tv(name + "_TV", x, y, z + 1.35, side, tv_in, mt, (0.3, 0.5))
+        tv(name + "_TV", x, y, z + 1.35, side, tv_in, mt)
     return r
 
 
@@ -583,9 +593,12 @@ def vanity(name, x, y, z, side, mt, w=1.6, sinks=2, mirror_h=1.0):
     R(name + "_top", 0, 0.29, 0.85, w + 0.04, 0.58, 0.04, mt["marble"], 0.004, r)
     xs = [0.0] if sinks == 1 else [-w / 4, w / 4]
     for k, sx in enumerate(xs):
-        R(f"{name}_basin{k}", sx, 0.3, 0.86, 0.46, 0.34, 0.03, M("BasinShadow", "#cfcac2", 0.15), 0.06, r)
-        Fu._cyl(f"{name}_faucet{k}", sx, 0.06, 0.89, 1.15, 0.014, mt["brass"], r, 16)
-        R(f"{name}_spout{k}", sx, 0.13, 1.12, 0.025, 0.16, 0.025, mt["brass"], 0.01, r)
+        bowl = R(f"{name}_basin{k}", sx, 0.32, 0.89, 0.46, 0.36, 0.14, mt["ceramic"], 0.06, r)
+        cav = R(f"{name}_basinCut{k}", sx, 0.32, 0.92, 0.4, 0.3, 0.2, mt["ceramic"], 0.05, r)
+        hollow(bowl, cav)
+        Fu._cyl(f"{name}_drain{k}", sx, 0.32, 0.92, 0.925, 0.02, mt["brass"], r, 16)
+        Fu._cyl(f"{name}_faucet{k}", sx, 0.06, 0.89, 1.2, 0.014, mt["brass"], r, 16)
+        R(f"{name}_spout{k}", sx, 0.15, 1.17, 0.025, 0.2, 0.025, mt["brass"], 0.01, r)
         R(f"{name}_mirror{k}", sx, 0.025, 1.05, min(0.9, w / len(xs) - 0.15), 0.02, mirror_h, mt["brass"], 0.01, r)
         R(f"{name}_mglass{k}", sx, 0.036, 1.08, min(0.9, w / len(xs) - 0.15) - 0.05, 0.004, mirror_h - 0.06, mt["mirror"], 0.0, r)
         for s in (-1, 1):
@@ -639,13 +652,16 @@ def shower(name, x1, y1, x2, y2, z, h, glass_sides, mt, head_wall="S"):
 
 def tub(name, x, y, z, rot, mt):
     r = root(name, x, y, z, rot)
-    R(name + "_shell", 0, 0, 0, 0.8, 1.7, 0.58, mt["ceramic"], 0.25, r)
-    R(name + "_inner", 0, 0, 0.3, 0.66, 1.52, 0.285, M("TubInner", "#e6e4df", 0.08), 0.2, r)
-    R(name + "_water", 0, 0, 0.3, 0.64, 1.5, 0.22, bpy.data.materials.get("PoolWaterReal") or mt["glass"], 0.2, r)
+    shell = R(name + "_shell", 0, 0, 0, 0.82, 1.72, 0.6, mt["ceramic"], 0.3, r)
+    cav = R(name + "_cav", 0, 0, 0.12, 0.68, 1.56, 0.7, mt["ceramic"], 0.28, r)
+    hollow(shell, cav)
+    R(name + "_water", 0, 0, 0.12, 0.66, 1.54, 0.3, bpy.data.materials.get("PoolWaterReal") or mt["glass"], 0.26, r)
+    R(name + "_towel", 0.43, -0.45, 0.35, 0.05, 0.45, 0.28, M("TowelWhite", "#f1efea", 0.95), 0.02, r)
     Fu._cyl(name + "_filler", 0, 1.05, 0, 0.95, 0.025, mt["brass"], r, 16)
     R(name + "_spout", 0, 0.95, 0.9, 0.04, 0.22, 0.04, mt["brass"], 0.015, r)
-    R(name + "_tray", 0, 0.0, 0.58, 0.85, 0.22, 0.02, Fu.fabric("wood", "#8a6444"), 0.005, r)
-    Fu._cyl(name + "_candle", 0.2, 0.0, 0.6, 0.7, 0.04, M("Candle", "#f1ebe0", 0.5, sss=0.4), r, 20)
+    R(name + "_tray", 0, 0.2, 0.6, 0.86, 0.22, 0.02, Fu.fabric("wood", "#8a6444"), 0.005, r)
+    Fu._cyl(name + "_candle", 0.2, 0.2, 0.62, 0.72, 0.04, M("Candle", "#f1ebe0", 0.5, sss=0.4), r, 20)
+    R(name + "_book", -0.15, 0.2, 0.62, 0.15, 0.2, 0.025, Fu.fabric("linen", "#1d2b3a"), 0.003, r)
     return r
 
 
@@ -680,7 +696,7 @@ def master_suite(mt):
     for sx in (-1, 1):
         R(f"MBenchLeg{sx}", sx * 0.68, 0, 0, 0.04, 0.4, 0.3, mt["brass"], 0.004, bn)
     dresser("MDresser", 15.92, 26.3, z, "E", mt, 1.6, tv_in=65)
-    armchair_lamp("MChair", 12.3, 28.0, z, 205, mt, "#1d2b3a")
+    armchair_lamp("MChair", 15.25, 28.25, z, 220, mt, "#1d2b3a")
     I.point_light("MasterFill", (13.8, 26.0, ZC1 - 0.3), 80, 0.8)
     # master bath (8–11.5 x 23–29): tub under the west window, shower NW corner, double vanity on the partition
     bath_floor("MBathFloor", 8.15, 23.15, 11.42, 28.85, z)
@@ -709,6 +725,29 @@ def ensuite(prefix, x1, y1, x2, y2, z, zc, mt, door_side, layout):
     I.point_light(prefix + "Fill", ((x1 + x2) / 2, (y1 + y2) / 2, zc - 0.3), 45, 0.6)
 
 
+def sitting_area(tag, x, y, z, rot, mt, sofa_col="#22392f", rug=("#2e2e30", "#8a7550")):
+    """Loveseat + two chairs + round table on a rug, centred at (x, y); rot turns the group."""
+    st = dict(Fu.style())
+    st["sofa"] = ("velvet", sofa_col)
+    a = math.radians(rot)
+    def at(dx, dy):
+        return x + dx * math.cos(a) - dy * math.sin(a), y + dx * math.sin(a) + dy * math.cos(a)
+    I.rug(tag + "SitRug", x - 1.3, x + 1.3, y - 1.1, y + 1.1, z, *rug)
+    sx, sy = at(0, -0.65)
+    s = Fu.sofa(tag + "Loveseat", sx, sy, z, rot, 1.8, 0.9, st)
+    Fu.pillow(tag + "LSPil0", -0.45, -0.24, 0.5, "#b08d57", s)
+    Fu.pillow(tag + "LSPil1", 0.45, -0.24, 0.5, "#e9e4da", s)
+    tx, ty = at(0, 0.35)
+    Fu.coffee_table(tag + "SitTable", tx, ty, z, st, 0.9, 0.6)
+    for k, dx in enumerate((-0.75, 0.75)):
+        cx, cy = at(dx, 1.05)
+        Fu.accent_chair(f"{tag}SitChair{k}", cx, cy, z, rot + 180 + (25 if k == 0 else -25), st)
+
+
+def plant(name, x, y, z, s=1.0, kind="potted_plant_01"):
+    P.place(kind, (x, y, z), random.Random(hash(name) & 0xff).uniform(0, 360), s, coll=COLL, name=name)
+
+
 def bedrooms(mt):
     remove(("Bed2Bed", "Bed2NS", "Bed2Rug", "Bed2Bench", "Bed4Bed", "Bed4NS", "Bed4Rug", "Bed4Chair",
             "GuestBed", "GuestNS", "GuestRug", "GuestChair", "GuestPlant"))
@@ -727,7 +766,11 @@ def bedrooms(mt):
     P.place("desk_lamp_arm_01", (8.3, 15.9, z + 0.78), 90, coll=COLL, name="B2DeskLamp")
     Fu.accent_chair("B2DeskChair", 9.0, 16.4, z, 90, dict(Fu.style(), chair=("velvet", "#b08d57")))
     dresser("B2Dresser", 14.92, 16.3, z, "E", mt, 1.6, tv_in=55)
-    armchair_lamp("B2Chair", 9.5, 14.3, z, 315, mt, "#6b2e2a")
+    armchair_lamp("B2Chair", 14.3, 14.2, z, 225, mt, "#6b2e2a")
+    sitting_area("B2", 11.4, 15.2, z, 0, mt, "#1d2b3a")
+    art("B2Art", 12.7, 20.92, z + 1.65, "N", 1.4, 0.8, (0.7, 0.55))
+    plant("B2Plant", 14.55, 20.5, z, 1.2, "potted_plant_02")
+    plant("B2Plant2", 8.5, 14.0, z, 1.1)
     # ---- bed 3: teen gamer room (upper, 8–16 x 21–29; bath 8–10.6 x 21–23.4)
     I.rug("B3Rug", 12.0, 15.6, 24.2, 27.8, z, "#2e2e30", "#3a6ea5")
     big_bed("B3Bed", 15.92, 26.0, z, "E", 1.6, 2.05, head_col="#2e2e30", duvet="#e9edf2", throw_col="#3a6ea5",
@@ -765,7 +808,7 @@ def bedrooms(mt):
         leg = R(f"GCLeg{k}", 0.17 * math.cos(a), 0.17 * math.sin(a), 0.05, 0.34, 0.04, 0.03, mt["black"], 0.01, gc)
         leg.rotation_euler.z = a
     ps5_pro("B3PS5", 11.3, 28.62, z + 0.48, 180, mt)
-    tv("B3TV", 11.75, 28.86, z + 0.85, "N", 55, mt, (0.6, 0.5))
+    tv("B3TV", 11.75, 28.86, z + 0.85, "N", 55, mt)
     tc = wall("B3TVConsole", 11.75, 28.86, z, "N")
     R("B3TVConsoleBody", 0, 0.22, 0.08, 1.2, 0.42, 0.4, mt["oak"], 0.005, tc)
     shelf = wall("B3Shelf", 11.9, 21.08, z, "S")
@@ -780,9 +823,22 @@ def bedrooms(mt):
             xx += w_ + 0.004
             if rnd.random() < 0.08:
                 xx += 0.2
-    bb = root("B3BeanBag", 12.4, 25.2, z, 30)
+    s3 = Fu.sofa("B3Couch", 11.75, 25.9, z, 0, 2.0, 0.9, dict(Fu.style(), sofa=("velvet", "#2e2e30")))
+    Fu.pillow("B3CouchPil0", -0.5, -0.24, 0.5, "#3a6ea5", s3)
+    Fu.pillow("B3CouchPil1", 0.5, -0.24, 0.5, "#b3161d", s3)
+    ot = root("B3Ottoman", 11.75, 27.2, z, 0)
+    R("B3OttomanBody", 0, 0, 0.04, 1.0, 0.55, 0.36, Fu.fabric("leather", "#3a2a1e"), 0.05, ot)
+    controller("B3Pad", 11.6, 27.15, z + 0.4, 25, mt["plastic_w"], mt["plastic_b"])
+    switch("B3Switch", 12.0, 28.62, z + 0.48, 180, mt)
+    R("B3LEDStrip", 11.75, 28.84, z + 2.6, 4.0, 0.02, 0.02, glow("RGBStripBlue", "#4d7dff", 5.0), 0.0)
+    shelf2 = wall("B3WallShelf", 15.92, 23.7, z + 1.6, "E")
+    R("B3WallShelfBoard", 0, 0.12, 0, 0.9, 0.24, 0.025, mt["oak"], 0.003, shelf2)
+    for k, col in enumerate(("#b3161d", "#f2c700", "#3a6ea5", "#2e2e30")):
+        R(f"B3Figure{k}", -0.3 + k * 0.2, 0.12, 0.025, 0.07, 0.07, 0.16 + 0.03 * k, glossy("Fig" + col, col, 0.3), 0.02, shelf2)
+    plant("B3Plant", 9.0, 28.5, z, 1.1, "potted_plant_02")
+    bb = root("B3BeanBag", 11.3, 22.7, z, 30)
     R("B3BeanBagBody", 0, 0, 0, 0.9, 0.9, 0.55, Fu.fabric("velvet", "#3a6ea5"), 0.3, bb)
-    for k, (yy, uv) in enumerate(((23.8, (0.2, 0.55)), (27.8, (0.7, 0.5)))):
+    for k, (yy, uv) in enumerate(((27.9, (0.2, 0.55)), (28.55, (0.7, 0.5)))):
         art(f"B3Poster{k}", 15.92, yy, z + 1.35, "E", 0.6, 0.85, uv)
     # ---- bed 4 (upper) and guest (ground): same footprint, en-suite at 32.1–34 x 18.8–22
     for tag, zz, head, thr in (("B4", F1, "#1d2b3a", "#b08d57"), ("GS", 0.0, "#22392f", "#6b2e2a")):
@@ -791,7 +847,6 @@ def bedrooms(mt):
         nightstand2(tag + "NSL", 28.86, 21.92, zz, "N", mt)
         nightstand2(tag + "NSR", 31.25, 21.92, zz, "N", mt, phone=False)
         dresser(tag + "Dresser", 28.58, 11.0, zz, "W", mt, 1.6, tv_in=55)
-        armchair_lamp(tag + "Chair", 33.1, 12.2, zz, 200, mt, "#b08d57" if tag == "B4" else "#1d2b3a")
         wardrobe(tag + "Wardrobe", 28.58, 14.2, zz, "W", mt, 2.4, 2.4 if zz else 2.6)
         lr = root(tag + "Luggage", 33.0, 17.4, zz, 90)
         R(tag + "LuggageRack", 0, 0, 0.45, 0.65, 0.45, 0.04, mt["oak"], 0.004, lr)
@@ -799,6 +854,9 @@ def bedrooms(mt):
             R(f"{tag}LugLeg{sx}", sx * 0.3, 0, 0, 0.03, 0.42, 0.45, mt["oak"], 0.004, lr)
         R(tag + "Suitcase", 0, 0, 0.49, 0.55, 0.38, 0.24, glossy("Suitcase", "#9a7b55", 0.3), 0.03, lr)
         I.point_light(tag + "Fill", (30.6, 16.0, zz + 3.0), 70, 0.8)
+        sitting_area(tag, 31.0, 13.4, zz, 90, mt, "#22392f" if tag == "B4" else "#1d2b3a")
+        art(tag + "Art", 30.05, 21.92, zz + 1.65, "N", 1.3, 0.75, (0.3 + (0.3 if tag == "B4" else 0), 0.55))
+        plant(tag + "Plant", 28.95, 9.45, zz, 1.2, "potted_plant_02")
 
 
 def baths(mt):
