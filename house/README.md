@@ -4,7 +4,11 @@
 
 ## 效果图
 
-`renders/final/` 里是最终效果图（JPG）。外景：
+![外景总览](renders/final/sheet_exterior.jpg)
+
+![室内总览](renders/final/sheet_interior.jpg)
+
+`renders/final/` 里是最终效果图（JPG，Cycles 128 采样 + 降噪）。外景：
 
 | 文件 | 画面 |
 |---|---|
