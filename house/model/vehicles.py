@@ -66,6 +66,50 @@ def loft(name, sections, seg, mats, zone=None, cap0=True, cap1=True, subsurf=1):
     return o
 
 
+def _section_at(secs, y):
+    """Linear interpolation of (half_w, half_h, zc, n) along y in a loft section list (sorted by y, either way)."""
+    pts = sorted(secs, key=lambda q: q[0])
+    if y <= pts[0][0]:
+        return pts[0][1:]
+    for a, b in zip(pts, pts[1:]):
+        if a[0] <= y <= b[0]:
+            t = (y - a[0]) / (b[0] - a[0])
+            return tuple(a[k] + (b[k] - a[k]) * t for k in range(1, 5))
+    return pts[-1][1:]
+
+
+def skin_patch(name, secs, y0, y1, a0, a1, scale, m, ny=24, na=40):
+    """A surface patch on a lofted superellipse body between y0..y1 and angles a0..a1, pushed out by `scale`."""
+    bm = bmesh.new()
+    rows = []
+    for j in range(ny + 1):
+        y = y0 + (y1 - y0) * j / ny
+        w, h, zc, n = _section_at(secs, y)
+        row = []
+        for k in range(na + 1):
+            a = a0 + (a1 - a0) * k / na
+            c, s_ = math.cos(a), math.sin(a)
+            x = w * scale * math.copysign(abs(c) ** (2 / n), c)
+            z = zc + h * scale * math.copysign(abs(s_) ** (2 / n), s_)
+            row.append(bm.verts.new((x, y, z)))
+        rows.append(row)
+    for j in range(ny):
+        for k in range(na):
+            bm.faces.new((rows[j][k], rows[j][k + 1], rows[j + 1][k + 1], rows[j + 1][k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    o = bpy.data.objects.new(name, me)
+    o.data.materials.append(m)
+    sol = o.modifiers.new("t", "SOLIDIFY")
+    sol.thickness, sol.offset = 0.004, 1.0
+    COLL.objects.link(o)
+    return o
+
+
 def tube_path(name, pts, r, m):
     cu = bpy.data.curves.new(name, "CURVE")
     cu.dimensions = "3D"
@@ -126,16 +170,18 @@ def helicopter(x, y, z, heading):
             (-2.20, 0.26, 0.26, 2.08, 2.0)]
 
     def zone(c, i):
-        yy, zz = c.y, c.z
-        zc = 1.5 if yy > 1.5 else 1.58
-        if zz < zc - 0.42:
-            return 1                                   # bronze belly stripe
-        if yy > 0.55 and zz > zc - 0.28:
-            return 2                                   # wrap-around windscreen and chin bubble
-        if -0.75 < yy < 0.45 and zc + 0.02 < zz < zc + 0.62 and abs(c.x) > 0.55:
-            return 2                                   # cabin door windows
-        return 0
-    objs.append(loft("Heli_Fuselage", secs, 40, [cream, bronze, glass], zone))
+        return 1 if c.z < 1.12 else 0                  # bronze belly band below the waterline
+    objs.append(loft("Heli_Fuselage", secs, 48, [cream, bronze], zone))
+    # glazing as smooth patches laid just proud of the skin (clean edges, no per-face stair-steps):
+    # wrap-around windscreen with chin bubble, and a window in each cabin door; slim black frames
+    frame = _m("HeliFrame", "#141414", 0.4, 0.3)
+    objs.append(skin_patch("Heli_Windscreen", secs, 0.62, 2.36, -0.62, math.pi + 0.62, 1.006, glass))
+    objs.append(skin_patch("Heli_WindscreenFrame", secs, 0.56, 0.64, -0.66, math.pi + 0.66, 1.009, frame))
+    objs.append(skin_patch("Heli_Pillar", secs, 0.62, 2.0, math.pi / 2 - 0.035, math.pi / 2 + 0.035, 1.009, frame))
+    for side, (a0, a1) in (("R", (0.12, 0.78)), ("L", (math.pi - 0.78, math.pi - 0.12))):
+        objs.append(skin_patch(f"Heli_DoorWin{side}", secs, -0.72, 0.42, a0, a1, 1.006, glass))
+        objs.append(skin_patch(f"Heli_DoorSeam{side}", secs, -0.78, -0.75, -0.75, 0.95, 1.004, frame) if side == "R" else
+                    skin_patch(f"Heli_DoorSeam{side}", secs, -0.78, -0.75, math.pi - 0.95, math.pi + 0.75, 1.004, frame))
     objs.append(loft("Heli_Cowling", [(0.35, 0.22, 0.08, 2.40, 2.5), (0.0, 0.46, 0.24, 2.46, 2.8), (-1.0, 0.48, 0.28, 2.48, 2.8),
                                       (-1.6, 0.40, 0.22, 2.42, 2.6), (-1.98, 0.18, 0.10, 2.32, 2.2)], 28, [cream]))
     objs.append(loft("Heli_Boom", [(-2.15, 0.26, 0.26, 2.08, 2.0), (-4.4, 0.18, 0.18, 2.14, 2.0), (-6.75, 0.11, 0.12, 2.20, 2.0)],
@@ -271,6 +317,46 @@ def yacht(x, y, z_water, heading=0.0):
     return root
 
 
+def jet_ski(name, x, y, z, heading):
+    """Personal watercraft: deep-V hull, deck, seat, handlebar, on a dock lift."""
+    gel = _paint("JetSkiPaint", "#eef0f2", 0.12, 0.0)
+    accent = _paint("JetSkiAccent", "#1c2b44", 0.2, 0.2)
+    black = _m("JetSkiBlack", "#151515", 0.5)
+    secs = [(1.55, 0.05, 0.05, 0.42, 2.0), (1.3, 0.38, 0.25, 0.38, 2.2), (0.8, 0.56, 0.32, 0.36, 2.6), (0.0, 0.6, 0.33, 0.35, 2.8),
+            (-0.8, 0.58, 0.32, 0.34, 2.8), (-1.45, 0.52, 0.28, 0.34, 2.6), (-1.6, 0.45, 0.22, 0.36, 2.4)]
+    objs = [loft(name + "_hull", secs, 32, [gel, accent], lambda c, i: 1 if c.z < 0.2 else 0)]
+    objs.append(loft(name + "_seat", [(0.35, 0.05, 0.05, 0.75, 2.0), (0.2, 0.22, 0.1, 0.76, 2.5), (-0.9, 0.22, 0.1, 0.76, 2.5),
+                                      (-1.05, 0.05, 0.05, 0.74, 2.0)], 20, [black]))
+    objs.append(loft(name + "_cowl", [(1.2, 0.05, 0.05, 0.66, 2.0), (1.0, 0.32, 0.12, 0.72, 2.4), (0.45, 0.34, 0.16, 0.78, 2.6),
+                                      (0.35, 0.05, 0.05, 0.8, 2.0)], 24, [gel]))
+    objs.append(tube_path(name + "_bar", [(-0.38, 0.55, 0.98), (0.38, 0.55, 0.98)], 0.018, black))
+    root = bpy.data.objects.new(name, None)
+    COLL.objects.link(root)
+    _parent(objs, root)
+    root.location = (x, y, z)
+    root.rotation_euler = (0, 0, math.radians(heading))
+    return root
+
+
+def boathouse_finish(bm):
+    """Boathouse upper-deck railing as glass with a black cap (the massing rail was a solid slab)."""
+    rail = bpy.data.objects.get("BH_Rail")
+    if rail is None:
+        return
+    bb = [rail.matrix_world @ Vector(c) for c in rail.bound_box]
+    x1, x2 = min(v.x for v in bb), max(v.x for v in bb)
+    y1, y2 = min(v.y for v in bb), max(v.y for v in bb)
+    z1, z2 = min(v.z for v in bb), max(v.z for v in bb)
+    rail.hide_render = True
+    glass = bpy.data.materials.get("ArchGlass") or _m("RailGlass", "#cfdde0", 0.03, transmission=1.0)
+    black = _m("SteelFrame", "#121212", 0.4, 0.8)
+    I.box("BH_RailGlass", x1, x2, (y1 + y2) / 2 - 0.006, (y1 + y2) / 2 + 0.006, z1 + 0.06, z2 - 0.05, glass)
+    I.box("BH_RailCap", x1, x2, y1 - 0.02, y2 + 0.02, z2 - 0.05, z2, black)
+    for k in range(int((x2 - x1) / 1.6) + 1):
+        x = x1 + k * (x2 - x1) / int((x2 - x1) / 1.6)
+        I.box(f"BH_RailPost{k}", x - 0.03, x + 0.03, y1 - 0.02, y2 + 0.02, z1, z2, black)
+
+
 def build(bm, M, coll):
     global COLL
     COLL = coll
@@ -280,8 +366,8 @@ def build(bm, M, coll):
     # yacht easing out of the boathouse slip toward the open lake
     yacht(40.5, 122.0, bm.LAKE + 0.05, 0.0)
     for o in list(bpy.data.objects):
-        if o.name.startswith("JetSki"):
-            o.data.materials.clear()
-            o.data.materials.append(_paint("JetSkiPaint", "#e9ecef", 0.12, 0.0))
-            sd = o.modifiers.new("smooth", "SUBSURF")
-            sd.levels = sd.render_levels = 2
+        if o.name.startswith("JetSki") and o.type == "MESH" and "_" not in o.name:
+            loc = o.location.copy()
+            bpy.data.objects.remove(o, do_unlink=True)
+            jet_ski(f"PWC{loc.x:.0f}", loc.x, loc.y, bm.LAKE + 0.45, 0.0)
+    boathouse_finish(bm)
