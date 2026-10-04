@@ -27,14 +27,18 @@ STYLES = {
                     pillows=["#c0704b", "#ece6db", "#a99581", "#d8cbb8", "#8a5a3c"], rug=("#e9e3d7", "#dad1c2"),
                     table=("travertine", "#d8c9ac"), throw="#c9b9a2", dining=("#cbb59a", ("boucle", "#e6dfd3"))),
     "moody": dict(sofa=("velvet", "#22392f"), chair=("leather", "#161616"), wood="#2e231c", metal="#b08d57",
-                  pillows=["#b08d57", "#e9e4da", "#1d2b3a", "#6b2e2a", "#22392f"], rug=("#2e2e30", "#8a7550"),
+                  pillows=["#b08d57", "#e9e4da", "#1d2b3a", "#6b2e2a", "#3a3a3d"], rug=("#2e2e30", "#8a7550"),
                   table=("marble", "#f0eee9"), throw="#6b2e2a", dining=("#2e231c", ("velvet", "#1d2b3a"))),
 }
 NAMES = {"farmhouse": "温润现代农舍", "lake": "湖畔度假", "ranch": "德州精致牧场", "minimal": "现代侘寂暖白", "moody": "经典深色对比"}
 
 
 def style():
-    return STYLES[os.environ.get("STYLE", "farmhouse")]
+    st = dict(STYLES[os.environ.get("STYLE", "farmhouse")])
+    if os.environ.get("SOFA"):                      # e.g. SOFA=velvet:#1f2c44 overrides the sofa upholstery
+        kind, col = os.environ["SOFA"].split(":")
+        st["sofa"] = (kind, col)
+    return st
 
 
 # ---------------------------------------------------------------- materials
