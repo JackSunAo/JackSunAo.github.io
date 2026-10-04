@@ -5,3 +5,4 @@ house/model/final.blend
 
 # render outputs: previews and raw PNGs stay local; final JPGs are committed
 house/renders/final/*.png
+house/renders/style/*.png
