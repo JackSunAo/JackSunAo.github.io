@@ -34,7 +34,7 @@ NAMES = {"farmhouse": "温润现代农舍", "lake": "湖畔度假", "ranch": "�
 
 
 def style():
-    st = dict(STYLES[os.environ.get("STYLE", "farmhouse")])
+    st = dict(STYLES[os.environ.get("STYLE", "moody")])
     if os.environ.get("SOFA"):                      # e.g. SOFA=velvet:#1f2c44 overrides the sofa upholstery
         kind, col = os.environ["SOFA"].split(":")
         st["sofa"] = (kind, col)

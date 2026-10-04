@@ -80,7 +80,12 @@ ROOMS = {
     "study": (8, 13.5, 15, 19, 0, F1 - SLAB, "study"),
     "armory": (8, 19, 13, 23, 0, F1 - SLAB, "armory"),
     "closet": (13, 19, 16, 23, 0, F1 - SLAB, "closet"),
-    "master": (8, 23, 16, 29, 0, F1 - SLAB, "bedroom"),
+    "master": (11.5, 23, 16, 29, 0, F1 - SLAB, "bedroom"),
+    "mbath": (8, 23, 11.5, 29, 0, F1 - SLAB, "bath"),
+    "gbath": (32.1, 18.8, 34, 22, 0, F1 - SLAB, "bath"),
+    "bath2": (8, 18.4, 10.4, 21, F1, EAVE, "bath"),
+    "bath3": (8, 21, 10.6, 23.4, F1, EAVE, "bath"),
+    "bath4": (32.1, 18.8, 34, 22, F1, EAVE, "bath"),
     "foyer": (15, 13.2, 22, 21, 0, EAVE, "foyer"),
     "great": (16, 21, 25.5, 29, 0, EAVE, "great"),
     "dining": (22, 10.5, 28.5, 19, 0, F1 - SLAB, "dining"),
@@ -102,18 +107,27 @@ PARTITIONS = [
     (8, 19, 15, 19, 0, F1 - SLAB, [(10.5, 0.9)]),               # study | armory (hidden door)
     (13, 19, 13, 23, 0, F1 - SLAB, []),                         # armory | closet
     (8, 23, 16, 23, 0, F1 - SLAB, [(14.5, 0.9)]),               # master | closet
-    (16, 21, 16, 29, 0, F1 - SLAB, [(22.5, 1.0)]),              # master | great room
+    (16, 21, 16, 29, 0, F1 - SLAB, []),                         # master / walk-in closet | great room
+    (11.5, 23, 11.5, 29, 0, F1 - SLAB, [(23.55, 0.9)]),         # master bath | master bedroom
+    (32.1, 18.8, 34, 18.8, 0, F1 - SLAB, [(32.55, 0.8)]),       # guest en-suite
+    (32.1, 18.8, 32.1, 22, 0, F1 - SLAB, []),
     (15, 19, 15, 21, 0, F1 - SLAB, []),
     (22, 13.2, 22, 19, 0, F1 - SLAB, [(16.0, 1.6)]),            # foyer | dining (wide cased opening)
     (22, 19, 25.5, 19, 0, F1 - SLAB, [(23.6, 0.9)]),            # dining | powder
     (25.5, 19, 25.5, 22, 0, F1 - SLAB, []),
     (28.5, 10.5, 28.5, 22, 0, F1 - SLAB, [(18.5, 0.9)]),        # dining | guest
-    (25.5, 22, 34, 22, 0, F1 - SLAB, [(27.0, 1.2), (31.5, 0.9)]),  # kitchen | powder/guest
+    (25.5, 22, 34, 22, 0, F1 - SLAB, [(27.0, 1.2)]),  # kitchen | powder/guest
     (25.5, 22, 25.5, 29.6, 0, F1 - SLAB, [(25.5, 3.2)]),        # kitchen | great room (wide opening)
     # upper floor
     (15, 13.5, 15, 21, F1, EAVE, [(19.5, 0.9)]),                # bed2 | stair hall
     (8, 21, 16, 21, F1, EAVE, [(15.2, 0.9)]),                   # bed2 | bed3
     (16, 21, 16, 29, F1, EAVE, []),                              # bed3 | great-room void
+    (8, 18.4, 10.4, 18.4, F1, EAVE, []),                         # bed2 en-suite
+    (10.4, 18.4, 10.4, 21, F1, EAVE, [(20.4, 0.8)]),
+    (8, 23.4, 10.6, 23.4, F1, EAVE, []),                         # bed3 en-suite
+    (10.6, 21, 10.6, 23.4, F1, EAVE, [(21.55, 0.8)]),
+    (32.1, 18.8, 34, 18.8, F1, EAVE, [(32.55, 0.8)]),            # bed4 en-suite
+    (32.1, 18.8, 32.1, 22, F1, EAVE, []),
     (22, 13.2, 22, 20, F1, EAVE, [(18.5, 1.0)]),                # stair hall | media
     (22, 20, 28.5, 20, F1, EAVE, []),                            # media room | upstairs hall
     (28.5, 10.5, 28.5, 22, F1, EAVE, [(20.8, 0.9)]),            # media/hall | bed4

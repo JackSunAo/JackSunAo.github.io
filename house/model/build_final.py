@@ -22,6 +22,7 @@ import front_yard  # noqa: E402
 import interiors  # noqa: E402
 import armory  # noqa: E402
 import lowerlevel  # noqa: E402
+import rich  # noqa: E402
 import rear_yard  # noqa: E402
 import outdoor  # noqa: E402
 import outdoor2  # noqa: E402
@@ -40,6 +41,10 @@ LIGHT = {
     "int_great": ("inside", 235), "int_loft": ("inside", 235), "int_stair": ("inside", 160),
     "int_game": ("inside", 235), "int_kitchen": ("inside", 235), "int_media": ("inside", 160),
     "int_armory": ("inside", 235), "int_secret": ("inside", 235), "int_living": ("inside", 235),
+    "int_game2": ("inside", 235), "int_master": ("inside", 235), "int_mbath": ("inside", 235),
+    "int_bed2": ("inside", 235), "int_bed3": ("inside", 235), "int_bed4": ("inside", 160), "int_guest": ("inside", 160),
+    "int_powder": ("inside", 235), "int_bath2": ("inside", 235), "int_bath4": ("inside", 160), "int_dining": ("inside", 160),
+    "int_closet": ("inside", 235),
     "heli": ("day", 60), "dock": ("day", 300),
     "int_cinema": ("inside", 0, 0.8), "int_wine": ("inside", 0, 0.6), "int_gym": ("inside", 0, 0.6),
 }
@@ -54,6 +59,18 @@ EXTRA_VIEWS = {
     "int_kitchen": ((26.05, 28.95, 1.6), (33.0, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
     "int_living": ((16.45, 21.75, 1.5), (21.0, 27.7, 1.15), 17, (1600, 1100), 0.0),
+    "int_game2": ((26.2, 28.4, 5.65), (31.2, 22.6, 4.85), 16, (1600, 1100), 0.0),
+    "int_master": ((12.0, 28.55, 1.6), (14.4, 23.4, 0.95), 16, (1600, 1100), 0.0),
+    "int_mbath": ((11.15, 23.45, 1.6), (8.6, 27.6, 1.0), 15, (1600, 1100), 0.0),
+    "int_closet": ((14.5, 22.85, 1.6), (14.2, 19.3, 1.2), 15, (1600, 1100), 0.0),
+    "int_bed2": ((14.7, 14.0, 5.6), (11.5, 20.6, 4.85), 16, (1600, 1100), 0.0),
+    "int_bed3": ((14.9, 22.0, 5.6), (9.5, 27.6, 4.9), 16, (1600, 1100), 0.0),
+    "int_bed4": ((33.5, 10.0, 5.6), (30.0, 20.8, 4.85), 16, (1600, 1100), 0.0),
+    "int_guest": ((33.5, 10.0, 1.6), (30.0, 20.8, 0.85), 16, (1600, 1100), 0.0),
+    "int_powder": ((25.3, 19.3, 1.6), (22.5, 21.6, 1.15), 14, (1600, 1100), 0.0),
+    "int_bath2": ((10.2, 18.6, 5.6), (8.4, 20.7, 4.9), 13, (1600, 1100), 0.0),
+    "int_bath4": ((32.3, 18.95, 5.6), (33.6, 21.7, 4.9), 13, (1600, 1100), 0.0),
+    "int_dining": ((27.9, 11.2, 1.6), (24.2, 16.8, 1.0), 18, (1600, 1100), 0.0),
     "int_armory": ((12.55, 19.95, 1.65), (8.6, 22.6, 1.2), 14, (1600, 1100), 0.0),
     "int_secret": ((11.0, 14.9, 1.5), (10.45, 21.5, 1.3), 20, (1200, 1500), 0.0),
     "heli": ((79.0, 63.5, -1.75), (65.0, 49.0, -2.0), 28, (1600, 900), 0.0),
@@ -256,6 +273,7 @@ def build(opt):
         armory.build(M, bm.collection("Interiors"))
         armory.secret_door(hinge_xy=(10.03, 18.565), angle_deg=-72.0)
         lowerlevel.build(M, bm.collection("LowerLevel"))
+        rich.build(M, bm.collection("RichInteriors"))
     if "--no-plants" not in sys.argv:
         front_yard.build(bm, M, bm.collection("FrontYard"))
         rear_yard.build(bm, M, bm.collection("RearYard"))
