@@ -756,6 +756,8 @@ def bedrooms(mt):
     z = F1
     I.rug("Bed2Rug2", 11.0, 14.4, 17.0, 20.2, z, "#d9d0c1", "#1d2b3a")
     big_bed("B2Bed", 12.7, 20.92, z, "N", 1.8, 2.1, head_col="#1d2b3a", throw_col="#b08d57")
+    import lamb                                   # the five BabaDoll lambs lined up in front of the pillows
+    lamb.on_bed(12.7, 20.08, z + 0.655, 0.0, 1.8, COLL)
     nightstand2("B2NSL", 11.35, 20.92, z, "N", mt)
     nightstand2("B2NSR", 14.05, 20.92, z, "N", mt, phone=False)
     d = wall("B2Desk", 8.08, 16.4, z, "W")

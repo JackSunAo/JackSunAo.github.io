@@ -44,7 +44,7 @@ LIGHT = {
     "int_game2": ("inside", 235), "int_master": ("inside", 235), "int_mbath": ("inside", 235),
     "int_bed2": ("inside", 235), "int_bed3": ("inside", 235), "int_bed4": ("inside", 160), "int_guest": ("inside", 160),
     "int_powder": ("inside", 235), "int_bath2": ("inside", 235), "int_bath4": ("inside", 160), "int_dining": ("inside", 160),
-    "int_closet": ("inside", 235),
+    "int_closet": ("inside", 235), "int_lambs": ("inside", 235),
     "heli": ("day", 60), "dock": ("day", 300),
     "int_cinema": ("inside", 0, 0.8), "int_wine": ("inside", 0, 0.6), "int_gym": ("inside", 0, 0.6),
 }
@@ -59,6 +59,7 @@ EXTRA_VIEWS = {
     "int_kitchen": ((26.05, 28.95, 1.6), (33.0, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_media": ((27.9, 10.95, 5.55), (24.6, 19.9, 5.3), 16, (1600, 1100), 0.0),
     "int_living": ((16.45, 21.75, 1.5), (21.0, 27.7, 1.15), 17, (1600, 1100), 0.0),
+    "int_lambs": ((12.85, 18.55, 5.12), (12.7, 20.15, 4.82), 30, (1600, 1100), 0.0),
     "int_game2": ((26.2, 28.4, 5.65), (31.2, 22.6, 4.85), 16, (1600, 1100), 0.0),
     "int_master": ((12.05, 28.6, 1.6), (14.3, 23.4, 1.0), 16, (1600, 1100), 0.0),
     "int_mbath": ((11.15, 23.45, 1.6), (8.6, 27.6, 1.0), 15, (1600, 1100), 0.0),
@@ -80,6 +81,7 @@ EXTRA_VIEWS = {
     "int_gym": ((28.6, 9.75, -2.15), (30.6, 21.0, -2.75), 16, (1600, 1100), 0.0),
 }
 
+CLOSEUPS = {"int_lambs"}
 REPLACED_PREFIX = ("Main_", "StoneGable_", "BrickWing_", "EastGable_", "RearGable_", "Dormer2", "Dormer3")
 KEEP = {"DormerWin0", "DormerWin1"}      # replaced by dormer_windows() once the facade is built
 
@@ -335,6 +337,14 @@ def render(opt, M):
                     o["base_energy"] = o.data.energy
                 # by day the room fill is only a bounce stand-in: windows must stay the brightest thing
                 o.data.energy = o["base_energy"] * (float(os.environ.get("INSIDE_RL", "0.3")) if mode == "inside" else 1.0)
+        # close-ups that see no window: drop the landscape so fur-heavy shots fit in memory
+        heavy = ("FrontYard", "RearYard", "PlantLibrary")
+        for c in bpy.data.collections:
+            if c.name.startswith(heavy):
+                c.hide_render = name in CLOSEUPS
+        for o in bpy.data.objects:
+            if o.name.startswith(("FarForest", "Woodland", "RY_", "FY_")):
+                o.hide_render = name in CLOSEUPS
         scn.render.filepath = os.path.join(OUT_DIR, f"{name}{'_preview' if opt['preview'] else ''}.png")
         bpy.ops.render.render(write_still=True)
         print("rendered", scn.render.filepath, flush=True)
