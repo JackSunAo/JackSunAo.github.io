@@ -76,10 +76,33 @@ kbd { font-family: var(--sans); font-size: 11px; letter-spacing: 0.04em; display
 #labels { position: absolute; inset: 0; overflow: hidden; }
 .flabel { position: absolute; left: 0; top: 0; font: 900 15px var(--serif); letter-spacing: 0.12em; color: var(--ink); text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 0 2px #000; white-space: nowrap; will-change: transform; }
 .flabel.heavy { color: #f0b36b; font-size: 18px; } .flabel.tough { color: #9fb6d4; }
+.flabel.roar { color: #f08a70; font-size: 14px; font-weight: 600; letter-spacing: 0.1em; }
 .ebar { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 3px; opacity: 0; transition: opacity 0.3s; }
+.ebar .eicon { font: 900 20px var(--serif); line-height: 1; color: #e7cf9a; text-shadow: 0 0 8px #000, 0 0 2px #000; min-height: 20px; }
+.ebar .eicon.alert { color: #e8553f; }
 .ebar .ename { font-size: 10px; letter-spacing: 0.2em; color: #c9c0b0; text-shadow: 0 0 4px #000; }
 .ebar i { display: block; width: 64px; height: 3px; background: rgba(0, 0, 0, 0.55); outline: 1px solid rgba(255, 255, 255, 0.1); }
-.ebar b { display: block; height: 100%; background: #d8cfb9; }
+.ebar i.bal { height: 2px; }
+.ebar b { display: block; height: 100%; background: #d8cfb9; transition: width 0.12s linear; }
+.ebar i.hp b { background: var(--blood); }
+.ebar.iconOnly .ename, .ebar.iconOnly i { display: none; }
+#threats { position: absolute; inset: 0; overflow: hidden; }
+.threat { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: 18px solid rgba(214, 120, 90, 0.75); border-top: 10px solid transparent; border-bottom: 10px solid transparent;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9)); opacity: 0; transition: opacity 0.15s; }
+.threat.hot { border-left-color: #ff4a32; }
+#splat { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#splat i { position: absolute; display: block; border-radius: 50% 46% 52% 44%; background: radial-gradient(circle at 45% 40%, rgba(110, 8, 8, 0.85), rgba(70, 4, 4, 0.7) 45%, rgba(50, 2, 2, 0) 72%);
+  opacity: 0.95; transition: opacity 2.2s ease-in, transform 2.4s ease-in; }
+#splat i.run { opacity: 0; transform: translateY(26px) scaleY(1.25); }
+.bar .lab { display: flex; justify-content: space-between; gap: 8px; }
+.bar .lab em { font-style: normal; color: var(--ember); letter-spacing: 0.08em; white-space: nowrap; }
+.bar i { position: relative; }
+#barFat { position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: repeating-linear-gradient(45deg, rgba(180, 72, 60, 0.6) 0 2px, rgba(0, 0, 0, 0) 2px 4px); }
+#barAdr { background: var(--blood); }
+#adrRow.hot b { box-shadow: 0 0 8px rgba(214, 70, 50, 0.8); }
+#bars.spent #barSta { background: var(--blood); animation: staPulse 0.6s infinite alternate; }
+@keyframes staPulse { from { opacity: 1; } to { opacity: 0.45; } }
+#stealth { font-size: 11px; letter-spacing: 0.2em; color: var(--moon); min-height: 1em; }
 #qte { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); display: grid; gap: 10px; justify-items: center; text-align: center; opacity: 0; transition: opacity 0.2s;
   font: 600 18px var(--serif); letter-spacing: 0.16em; color: #f3d8cf; text-shadow: 0 0 12px rgba(0, 0, 0, 0.9); }
 #qte.on { opacity: 1; animation: pulse 0.5s infinite alternate; }
@@ -113,7 +136,7 @@ kbd { font-family: var(--sans); font-size: 11px; letter-spacing: 0.04em; display
 body.cine #help, body.cine #bars, body.cine #topleft { opacity: 0; transition: opacity 0.6s; }
 #help, #bars, #topleft { transition: opacity 0.6s; }
 @media (max-width: 640px) { #help { display: none; } .keys { grid-template-columns: minmax(0, 1fr); } }
-@media (prefers-reduced-motion: reduce) { #qte.on, #dlgText.broken { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #qte.on, #dlgText.broken, #bars.spent #barSta { animation: none; } }
 </style>
 
 </head>
@@ -123,27 +146,33 @@ body.cine #help, body.cine #bars, body.cine #topleft { opacity: 0; transition: o
 <div id="hud" class="layer">
   <div id="topleft"><div class="loc">林场小屋 · 第 21 天 · <span id="wx">暴雨</span></div><div id="obj"></div></div>
   <div id="bars">
-    <div class="bar">体力<i><b id="barSta"></b></i></div>
-    <div class="bar">强光手电<i><b id="barBat"></b></i></div>
-    <div class="bar"><span id="durLabel">球棍耐久</span><i><b id="barDur"></b></i></div>
+    <div id="stealth"></div>
+    <div class="bar" id="adrRow"><span class="lab">肾上腺素</span><i><b id="barAdr"></b></i></div>
+    <div class="bar"><span class="lab">体力<em id="staState"></em></span><i><b id="barSta"></b><s id="barFat"></s></i></div>
+    <div class="bar"><span class="lab">强光手电</span><i><b id="barBat"></b></i></div>
+    <div class="bar"><span class="lab" id="durLabel">钉头球棍 · 耐久</span><i><b id="barDur"></b></i></div>
   </div>
   <div id="prompt"></div>
   <div id="toast"></div>
   <div id="help">
     <div class="ttl">操作 · H 隐藏</div>
-    <div class="row"><kbd>WASD</kbd>移动　<kbd>Shift</kbd>跑</div>
-    <div class="row"><kbd>左键</kbd>挥棍　按住蓄力重击</div>
+    <div class="row"><kbd>WASD</kbd>移动　<kbd>Shift</kbd>跑　<kbd>C</kbd>潜行</div>
+    <div class="row"><kbd>左键</kbd>挥击　按住蓄力重击（<kbd>J</kbd><kbd>K</kbd>）</div>
+    <div class="row"><kbd>Q</kbd>/右键轻点 踢开：推开、打断扑击</div>
+    <div class="row"><kbd>1</kbd>球棍　<kbd>2</kbd>消防斧（能断肢）</div>
     <div class="row"><kbd>空格</kbd>闪避　被按住时连按挣脱</div>
-    <div class="row"><kbd>F</kbd>强光手电（只能逼退一瞬间）</div>
+    <div class="row"><kbd>F</kbd>强光手电　<kbd>V</kbd>遮住提灯　<kbd>X</kbd>口哨引诱</div>
     <div class="row"><kbd>E</kbd>互动　<kbd>Tab</kbd>切换镜头</div>
     <div class="row"><kbd>←→</kbd>/右键拖动 转镜头　滚轮缩放</div>
     <div class="row"><kbd>L</kbd>让泛光灯熄灭　<kbd>T</kbd>天气</div>
     <div class="row"><kbd>G</kbd>画质　<kbd>M</kbd>静音　<kbd>R</kbd>重来</div>
   </div>
   <div id="labels"></div>
-  <div id="qte">被按住了！<small>连按 空格 挣脱 · 或按 F 用手电照它的脸</small><div class="track"><div id="qteBar"></div></div></div>
+  <div id="threats"></div>
+  <div id="qte">被按住了！<small>连按 空格 挣脱（肾上腺素越高越有力）· 或按 F 用手电照它的脸</small><div class="track"><div id="qteBar"></div></div></div>
 </div>
 
+<div id="splat"></div>
 <div id="dlg"><div id="dlgName"></div><div id="dlgText"></div><div id="choices"></div><div class="dlgHint">空格 / 点击 继续</div></div>
 <div id="card"><h2 id="cardTitle"></h2><p id="cardText"></p><p class="cardHint">点击继续</p></div>
 
@@ -162,9 +191,10 @@ body.cine #help, body.cine #bars, body.cine #topleft { opacity: 0; transition: o
     <p class="hint">建议戴耳机。需要键盘和鼠标，Mac 上用 Safari 或 Chrome。</p>
     <p class="touchnote">这个原型需要键盘和鼠标，手机上只能看画面。</p>
     <div class="keys">
-      <div><kbd>WASD</kbd>移动</div><div><kbd>左键</kbd>挥棍 · 按住重击</div>
-      <div><kbd>F</kbd>强光手电</div><div><kbd>空格</kbd>闪避 / 挣脱</div>
-      <div><kbd>E</kbd>互动</div><div><kbd>Tab</kbd>切换镜头</div>
+      <div><kbd>WASD</kbd>移动</div><div><kbd>左键</kbd>挥击 · 按住重击</div>
+      <div><kbd>Q</kbd>踢开</div><div><kbd>空格</kbd>闪避 / 挣脱</div>
+      <div><kbd>1</kbd><kbd>2</kbd>球棍 / 消防斧</div><div><kbd>C</kbd>潜行</div>
+      <div><kbd>F</kbd>强光手电</div><div><kbd>Tab</kbd>切换镜头</div>
     </div>
   </div>
 </div>
@@ -1062,30 +1092,59 @@ function makeHuman(o) {
       add(seg, new THREE.Mesh(new THREE.BoxGeometry(0.075 * s, 0.09 * s, 0.022 * s), sm), 0, -0.042 * s, 0); tail.push(seg); par = seg; }
     o._scarf = tail;
   }
-  const h = { root, body, pelvis, pelvisY0, spine, chest, head, L, R, armL, armR, mouth, eyes, s, o, cur: Object.assign({}, NEUTRAL), skinMat, topMat };
+  const h = { root, body, pelvis, pelvisY0, spine, chest, head, neck, L, R, armL, armR, mouth, eyes, s, o, cur: Object.assign({}, NEUTRAL), skinMat, topMat, botMat, coatMat, faceMat, cut: {} };
   root.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
   applyPose(h);
   return h;
 }
 
+/* physical layer: damped springs added on top of the animated pose (hit reactions, recoil, bumps) */
+const SPRING_KEYS = ['spX', 'spY', 'spZ', 'chX', 'chY', 'headX', 'headY', 'headZ', 'shLx', 'shRx', 'shLz', 'shRz', 'elL', 'elR', 'knL', 'knR', 'pelY', 'bodyX', 'bodyZ', 'bodyY'];
+const ZERO_SPR = {}; SPRING_KEYS.forEach(k => { ZERO_SPR[k] = 0; });
+function initSprings(h) { h.spr = Object.assign({}, ZERO_SPR); h.sprV = Object.assign({}, ZERO_SPR); }
+function springKick(h, k, v) { if (h.sprV) h.sprV[k] += v; }
+function springStep(h, dt, stiff = 115, damping = 10) {
+  if (!h.spr) return; const n = Math.max(1, Math.ceil(dt / 0.016)), sdt = dt / n;
+  for (const k of SPRING_KEYS) {
+    let x = h.spr[k], v = h.sprV[k]; if (x === 0 && v === 0) continue;
+    for (let i = 0; i < n; i++) { v += (-stiff * x - damping * v) * sdt; x += v * sdt; }
+    if (Math.abs(x) < 1e-4 && Math.abs(v) < 1e-3) { x = 0; v = 0; }
+    h.spr[k] = clamp(x, -1.3, 1.3); h.sprV[k] = v;
+  }
+}
+// lx/lz: push direction in the body's own frame (+x its left, +z its front); p ≈ 0.2 … 1.6
+function impactReact(h, lx, lz, p, kind) {
+  const back = -lz, side = lx;
+  springKick(h, 'spX', -back * 5.5 * p); springKick(h, 'bodyX', -back * 1.5 * p); springKick(h, 'headX', -back * 8 * p);
+  springKick(h, 'spZ', -side * 5 * p); springKick(h, 'bodyZ', -side * 1.3 * p); springKick(h, 'headZ', -side * 8 * p);
+  springKick(h, 'chY', side * 6 * p); springKick(h, 'headY', rnd(-3, 3) * p);
+  springKick(h, 'shLx', -back * 6 * p + rnd(-2, 2) * p); springKick(h, 'shRx', -back * 6 * p + rnd(-2, 2) * p);
+  springKick(h, 'shLz', (3 - side * 4) * p); springKick(h, 'shRz', (-3 - side * 4) * p);
+  springKick(h, 'elL', rnd(2, 5) * p); springKick(h, 'elR', rnd(2, 5) * p);
+  if (kind === 'heavy') { springKick(h, 'headX', 5 * p); springKick(h, 'knL', 5 * p); springKick(h, 'knR', 4 * p); springKick(h, 'pelY', -1.1 * p); }
+  if (kind === 'kick') { springKick(h, 'spX', 9 * p); springKick(h, 'headX', 9 * p); springKick(h, 'pelY', -0.5 * p); springKick(h, 'knL', 3 * p); }
+}
 function applyPose(h) {
-  const c = h.cur;
+  const c = h.cur, s = h.spr || ZERO_SPR;
   h.L.hip.rotation.set(c.hipLx, 0, c.hipLz); h.R.hip.rotation.set(c.hipRx, 0, c.hipRz);
-  h.L.knee.rotation.x = c.knL; h.R.knee.rotation.x = c.knR;
+  const cut = h.cut || {};
+  if (!cut.knL) h.L.knee.rotation.x = Math.max(0, c.knL + s.knL); if (!cut.knR) h.R.knee.rotation.x = Math.max(0, c.knR + s.knR);
   h.L.ankle.rotation.x = c.ankL; h.R.ankle.rotation.x = c.ankR;
-  h.spine.rotation.set(c.spX, c.spY, c.spZ); h.chest.rotation.set(c.chX, c.chY, 0);
-  h.head.rotation.set(c.headX, c.headY, c.headZ);
-  h.armL.sh.rotation.set(c.shLx, c.shLy, c.shLz); h.armR.sh.rotation.set(c.shRx, c.shRy, c.shRz);
-  h.armL.el.rotation.x = -c.elL; h.armR.el.rotation.x = -c.elR;
-  h.body.position.y = c.bodyY; h.body.rotation.set(c.bodyX, 0, c.bodyZ);
-  h.pelvis.position.y = h.pelvisY0 + c.pelY; h.pelvis.rotation.x = c.pelX;
+  h.spine.rotation.set(c.spX + s.spX, c.spY + s.spY, c.spZ + s.spZ); h.chest.rotation.set(c.chX + s.chX, c.chY + s.chY, 0);
+  if (!cut.head) h.head.rotation.set(c.headX + s.headX, c.headY + s.headY, c.headZ + s.headZ);
+  h.armL.sh.rotation.set(c.shLx + s.shLx, c.shLy, c.shLz + s.shLz); h.armR.sh.rotation.set(c.shRx + s.shRx, c.shRy, c.shRz + s.shRz);
+  if (!cut.elL) h.armL.el.rotation.x = -Math.max(0, c.elL + s.elL); if (!cut.elR) h.armR.el.rotation.x = -Math.max(0, c.elR + s.elR);
+  h.body.position.y = c.bodyY + s.bodyY; h.body.rotation.set(c.bodyX + s.bodyX, 0, c.bodyZ + s.bodyZ);
+  h.pelvis.position.y = h.pelvisY0 + c.pelY + s.pelY; h.pelvis.rotation.x = c.pelX;
   h.mouth.scale.y = 0.12 + c.jaw * 1.3;
 }
-function poseTo(h, target, k, dt) {
+// hard: keys driven directly by physics (a falling body), not damped toward a target
+function poseTo(h, target, k, dt, hard) {
   for (const key in NEUTRAL) {
     const t = key in target ? target[key] : NEUTRAL[key];
     h.cur[key] = damp(h.cur[key], t, k, dt);
   }
+  if (hard) for (const key in hard) h.cur[key] = hard[key];
   applyPose(h);
 }
 function walkPose(ph, amt, run = 0) {
@@ -1109,7 +1168,28 @@ function makeClub() {
   const shaft = mesh(new THREE.CylinderGeometry(0.035, 0.022, 0.82, 10), wd, 0, -0.33, 0); g.add(shaft);
   const grip = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 1 }), 0, 0.02, 0); g.add(grip);
   for (let i = 0; i < 6; i++) { const n = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 4), matIron, 0, -0.52 - i * 0.04, 0); n.rotation.z = Math.PI / 2; n.rotation.y = i * 1.1; g.add(n); }
-  g.userData.shaft = shaft;
+  g.userData = { shaft, tip: new V3(0, -0.74, 0), stain: [wd] };
+  return g;
+}
+// fire axe: red head, ground steel edge facing the hand's -z (it leads the overhead chop), pick at +z
+function makeAxe() {
+  const g = new THREE.Group();
+  const hm = new THREE.MeshStandardMaterial({ map: toTex(woodCanvas('#8a5a32', 22, 128, 128, 77, 0.6)), roughness: 0.7 });
+  const shaft = mesh(new THREE.CylinderGeometry(0.021, 0.025, 0.8, 10), hm, 0, -0.32, 0); g.add(shaft);
+  g.add(mesh(new THREE.CylinderGeometry(0.027, 0.027, 0.14, 8), new THREE.MeshStandardMaterial({ color: 0x1d1a17, roughness: 1 }), 0, 0.02, 0));
+  const red = new THREE.MeshStandardMaterial({ color: 0x8e1f18, roughness: 0.45, metalness: 0.35 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0xaeb2b6, roughness: 0.28, metalness: 0.9 });
+  const head = new THREE.Group(); head.position.y = -0.68; g.add(head);
+  head.add(mesh(new THREE.BoxGeometry(0.048, 0.08, 0.1), red));
+  const plate = (x0, x1, y0, y1, mat, curve) => {
+    const sh = new THREE.Shape(); sh.moveTo(x0, y0 * 0.5); sh.lineTo(x1, y1); if (curve) sh.quadraticCurveTo(x1 + 0.03, 0, x1, -y1); else sh.lineTo(x1, -y1); sh.lineTo(x0, -y0 * 0.5); sh.closePath();
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 1 });
+    geo.translate(0, 0, -0.006); geo.rotateY(Math.PI / 2); const m = mesh(geo, mat); head.add(m); return m;
+  };
+  plate(0.04, 0.125, 0.07, 0.062, red, false);
+  plate(0.122, 0.15, 0.124, 0.072, steel, true);
+  const pick = mesh(new THREE.ConeGeometry(0.018, 0.11, 6), red, 0, 0, 0.1); pick.rotation.x = Math.PI / 2; head.add(pick);
+  g.userData = { shaft, tip: new V3(0, -0.68, -0.17), stain: [steel, hm] };
   return g;
 }
 function makeLantern() {
@@ -1151,7 +1231,7 @@ function makeBaby() {
 const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 const SND = {
   ctx: null, ready: false, listener: { pos: new V3(), right: new V3(1, 0, 0), indoor: false },
-  humGain: 0, humDegrade: 0, tension: 0, rainLevel: 1,
+  humGain: 0, humDegrade: 0, tension: 0, rainLevel: 1, exertion: 0, adr: 0, nextBreath: 0, nextBeat: 0,
   init() {
     if (this.ready) return;
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -1332,6 +1412,71 @@ const SND = {
     }
   },
   babyCoo(pos) { if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, 0.25, 0.3); const s = this.osc('triangle', 520, t, t + 0.4); s.frequency.linearRampToValueAtTime(720, t + 0.2); s.frequency.linearRampToValueAtTime(600, t + 0.35); const b = this.filt('bandpass', 1200, 2), g = this.gain(0); this.env(g, t, 0.03, 0.3, 0.3); this.chain(s, b, g, o); },
+  /* ---- infected voices: each roar is a different message ---- */
+  voiceLayer(o, t0, dur, pts, { bp = 1100, q = 1.2, peak = 0.45, am = 30, amDepth = 0.35, v = 1, wave = 'sawtooth' } = {}) {
+    const b = this.filt('bandpass', bp * Math.sqrt(v), q), pk = this.filt('peaking', bp * 2.1 * Math.sqrt(v), 2); pk.gain.value = 7;
+    const amg = this.gain(1), g = this.gain(0);
+    [-13, 13].forEach(dc => { const s = this.osc(wave, pts[0][1] * v, t0, t0 + dur + 0.05); s.detune.value = dc; pts.forEach(([dt, f], i) => { if (i) s.frequency.exponentialRampToValueAtTime(f * v, t0 + dt); }); s.connect(b); });
+    if (am) { const a = this.osc('sine', am, t0, t0 + dur + 0.05), ag = this.gain(amDepth); a.connect(ag); ag.connect(amg.gain); }
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.09, dur * 0.25)); g.gain.setValueAtTime(peak * 0.82, t0 + dur * 0.7); g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+    this.chain(b, pk, amg, g, o);
+  },
+  rasp(o, t0, dur, f, peak = 0.3, f1) {
+    const n = this.noise(t0, dur + 0.05), b = this.filt('bandpass', f, 1.1), g = this.gain(0);
+    if (f1) { b.frequency.setValueAtTime(f, t0); b.frequency.exponentialRampToValueAtTime(f1, t0 + dur); }
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(peak, t0 + 0.07); g.gain.linearRampToValueAtTime(0.0001, t0 + dur); this.chain(n, b, g, o);
+  },
+  roar(pos, type, v = 1) {
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, 1.05, 0.65);
+    if (type === 'spot') { this.voiceLayer(o, t, 1.05, [[0, 170], [0.26, 640], [1.0, 360]], { bp: 1250, peak: 0.5, am: 34, v }); this.rasp(o, t, 1.0, 2300 * v, 0.32); }
+    else if (type === 'flank') { for (let i = 0; i < 3; i++) { const t0 = t + i * 0.24; this.voiceLayer(o, t0, 0.18, [[0, 140], [0.07, 215], [0.17, 115]], { bp: 680, q: 1.6, peak: 0.6, am: 0, v }); this.rasp(o, t0, 0.15, 1100 * v, 0.22); } }
+    else if (type === 'wail') { this.voiceLayer(o, t, 1.8, [[0, 430], [0.35, 480], [1.7, 150]], { bp: 900, peak: 0.42, am: 7, amDepth: 0.6, v }); const n = this.noise(t, 1.6), lp = this.filt('lowpass', 520), am = this.osc('sine', 21, t, t + 1.6), ag = this.gain(0.5), g = this.gain(0.0); am.connect(ag); ag.connect(g.gain); g.gain.setValueAtTime(0.25, t); g.gain.linearRampToValueAtTime(0.0001, t + 1.6); this.chain(n, lp, g, o); }
+    else if (type === 'rally') { this.voiceLayer(o, t, 2.1, [[0, 150], [0.9, 520], [1.7, 470], [2.1, 300]], { bp: 1000, peak: 0.5, am: 5, amDepth: 0.2, v }); this.voiceLayer(o, t + 0.05, 2.0, [[0, 75], [0.9, 260], [2.0, 150]], { bp: 500, peak: 0.25, am: 0, v }); this.rasp(o, t, 2.0, 1800 * v, 0.18); }
+    else if (type === 'retreat') { this.rasp(o, t, 0.95, 3200, 0.38, 1000); this.voiceLayer(o, t, 0.9, [[0, 320], [0.9, 120]], { bp: 800, peak: 0.22, am: 0, v }); }
+  },
+  /* ---- impacts & bodies ---- */
+  impact(pos, kind, power = 1, blade) {
+    if (!this.ready) return; const t = this.ctx.currentTime, heavy = kind === 'heavy', o = this.out(pos, (heavy ? 1.25 : 0.95) * (0.7 + 0.3 * power), 0.22);
+    const k = this.osc('sine', heavy ? 88 : 115, t, t + 0.35), kg = this.gain(0); k.frequency.exponentialRampToValueAtTime(38, t + 0.25); this.env(kg, t, 0.002, blade ? 0.6 : 1.0, 0.26); this.chain(k, kg, o);
+    const n = this.noise(t, 0.18), lp = this.filt('lowpass', heavy ? 1300 : 1900), ng = this.gain(0); this.env(ng, t, 0.001, 0.85, 0.12); this.chain(n, lp, ng, o);
+    if (blade) { const c = this.noise(t, 0.12), hp = this.filt('bandpass', 3800, 1.5), cg = this.gain(0); hp.frequency.setValueAtTime(4800, t); hp.frequency.exponentialRampToValueAtTime(1600, t + 0.1); this.env(cg, t, 0.001, 0.5, 0.1); this.chain(c, hp, cg, o); }
+    else { const c = this.noise(t, 0.05), bp = this.filt('bandpass', 2900, 2.5), cg = this.gain(0); this.env(cg, t, 0.0008, heavy ? 0.55 : 0.35, 0.04); this.chain(c, bp, cg, o); }
+    const w = this.noise(t + 0.015, 0.18), wb = this.filt('bandpass', 750, 3), wg = this.gain(0); wb.frequency.setValueAtTime(1100, t); wb.frequency.exponentialRampToValueAtTime(380, t + 0.15); this.env(wg, t + 0.015, 0.005, blade ? 0.55 : 0.35, 0.14); this.chain(w, wb, wg, o);
+    if (heavy) this.crunch(pos, 3);
+  },
+  crunch(pos, n = 4, vol = 0.45) { // bone
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, vol, 0.15);
+    for (let i = 0; i < n; i++) { const tt = t + 0.01 + i * rnd(0.012, 0.024); const c = this.noise(tt, 0.025), b = this.filt('bandpass', rnd(1400, 2600), 5), g = this.gain(0); this.env(g, tt, 0.0005, 0.7, 0.02); this.chain(c, b, g, o); }
+  },
+  kick(pos) {
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, 0.95, 0.15);
+    const n = this.noise(t, 0.2), lp = this.filt('lowpass', 480), g = this.gain(0); this.env(g, t, 0.003, 0.95, 0.16); this.chain(n, lp, g, o);
+    const k = this.osc('sine', 72, t, t + 0.25), kg = this.gain(0); k.frequency.exponentialRampToValueAtTime(42, t + 0.2); this.env(kg, t, 0.003, 0.8, 0.18); this.chain(k, kg, o);
+  },
+  exhale(pos, v = 1, vol = 0.45) { // a body has air knocked out of it; no pain in it
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, vol, 0.2);
+    const n = this.noise(t, 0.25), b = this.filt('bandpass', 620 * v, 1.3), g = this.gain(0); this.env(g, t, 0.008, 0.5, 0.2); this.chain(n, b, g, o);
+    const s = this.osc('sawtooth', 125 * v, t, t + 0.2), sb = this.filt('bandpass', 520 * v, 2), sg = this.gain(0); s.frequency.exponentialRampToValueAtTime(85 * v, t + 0.18); this.env(sg, t, 0.006, 0.25, 0.16); this.chain(s, sb, sg, o);
+  },
+  bodyFall(pos, weight = 80) {
+    if (!this.ready) return; const t = this.ctx.currentTime, w = clamp(weight / 80, 0.6, 1.6), o = this.out(pos, 0.75 + 0.3 * w, 0.2);
+    const n = this.noise(t, 0.5), lp = this.filt('lowpass', 260 + 120 / w), g = this.gain(0); this.env(g, t, 0.005, 0.95, 0.38); this.chain(n, lp, g, o);
+    const k = this.osc('sine', 62 / Math.sqrt(w), t, t + 0.4), kg = this.gain(0); this.env(kg, t, 0.004, 0.7, 0.32); this.chain(k, kg, o);
+    const sp = this.noise(t + 0.01, 0.3), hp = this.filt('highpass', 1300), sg = this.gain(0); this.env(sg, t + 0.01, 0.004, 0.32 * this.rainLevel + 0.08, 0.24); this.chain(sp, hp, sg, o);
+  },
+  spurt(pos, vol = 0.25) { // arterial pulse
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(pos, vol, 0.1);
+    const n = this.noise(t, 0.2), b = this.filt('bandpass', 900, 1.5), g = this.gain(0); b.frequency.setValueAtTime(1400, t); b.frequency.exponentialRampToValueAtTime(500, t + 0.18); this.env(g, t, 0.01, 0.5, 0.17); this.chain(n, b, g, o);
+  },
+  whistle() {
+    if (!this.ready) return; const t = this.ctx.currentTime, o = this.out(null, 0.32, 0.5);
+    [[0, 1850, 2350, 0.16], [0.22, 2350, 1750, 0.28]].forEach(([d, f0, f1, dur]) => { const s = this.osc('sine', f0, t + d, t + d + dur + 0.03), g = this.gain(0); s.frequency.exponentialRampToValueAtTime(f1, t + d + dur); this.env(g, t + d, 0.02, 0.5, dur); this.chain(s, g, o); });
+  },
+  breathe(t0, per, vol) {
+    const o = this.out(null, vol, 0.05);
+    const n = this.noise(t0, per * 0.45), b = this.filt('bandpass', 1050, 0.8), g = this.gain(0); this.env(g, t0, per * 0.08, 0.6, per * 0.3); this.chain(n, b, g, o);
+    const n2 = this.noise(t0 + per * 0.5, per * 0.4), b2 = this.filt('bandpass', 1750, 1.1), g2 = this.gain(0); this.env(g2, t0 + per * 0.5, per * 0.12, 0.32, per * 0.25); this.chain(n2, b2, g2, o);
+  },
   /* ---- per-frame mixing & scheduling ---- */
   update(dt) {
     if (!this.ready) return;
@@ -1348,6 +1493,9 @@ const SND = {
       this.nextNote = t + rnd(2.6, 6.5);
     }
     if (this.tension > 0.05 && t > this.nextPulse) { this.pulse(t + 0.01, 0.5 * this.tension); this.pulse(t + 0.27, 0.32 * this.tension); this.nextPulse = t + (this.tension > 0.6 ? 0.62 : 0.86); }
+    // breathing scales with exertion; the heartbeat comes up with adrenaline
+    if (this.exertion > 0.08 && t > this.nextBreath) { const per = lerp(1.6, 0.55, this.exertion); this.breathe(t + 0.01, per, 0.05 + this.exertion * 0.17); this.nextBreath = t + per; }
+    if (this.adr > 0.22 && t > this.nextBeat) { this.heartbeat(0.2 + this.adr * 0.5); this.nextBeat = t + 60 / (72 + this.adr * 78); }
     if (t > this.nextHum - 0.05) {
       const [m, beats] = this.humNotes[this.humIdx % this.humNotes.length]; const dur = beats * 0.78 * (1 + this.humDegrade * 0.4);
       if (m && this.humGain > 0.002 && Math.random() > this.humDegrade * 0.3) this.humNote(m, this.nextHum, dur);
@@ -1357,23 +1505,29 @@ const SND = {
   }
 };
 
-/* ===== P5 game: actors, AI, camera, dialogue, UI, loop ===== */
+/* ===== P5 state: shared game state, the player rig, the mother & baby, small helpers ===== */
 const $ = id => document.getElementById(id);
 const G = {
-  mode: 'title', t: 0, hitStop: 0, shake: 0, camMode: 'command', rain: 1, fx: true, muted: false, tension: 0,
+  mode: 'title', t: 0, hitStop: 0, slowmo: 0, shake: 0, camMode: 'command', rain: 1, fx: true, muted: false, tension: 0,
   flood: { state: 'on', t: 0, next: 40 }, lightning: { next: 14, t: -1, power: 1 },
-  toastT: 0, babyTaken: false, openingT: 0, playT: 0, cardOnClose: null, cardT: 0, cutT: 0
+  toastT: 0, babyTaken: false, openingT: 0, playT: 0, cardOnClose: null, cardT: 0, cutT: 0,
+  camKick: new V3(), fovPunch: 0, wave: 1, waveT: -1, spentToastT: 0
 };
 const keys = {};
 const LURK_C = new V3(0, GROUND_Y, 9.4);
 const dirA = a => new V3(Math.sin(a), 0, Math.cos(a));
+const fwdOf = yaw => new V3(Math.sin(yaw), 0, Math.cos(yaw));
+// an actor's own frame: +x is its left, +z its front
+function toLocal(d, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw); return { x: d.x * c - d.z * s, z: d.x * s + d.z * c }; }
+function toWorld(lx, lz, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw); return new V3(lx * c + lz * s, 0, -lx * s + lz * c); }
 
 /* ---------------- player ---------------- */
 const P = {};
 (function initPlayer() {
   const h = makeHuman({ height: 1.76, girth: 1.06, skin: '#c38f6e', top: '#59503f', coat: '#4a4434', bottom: '#2b3035', shoes: '#1b1612', hair: '#1d140e', hairStyle: 'short', cap: '#6a3b2c', scarf: '#8a6638', backpack: '#3b382e', seed: 3 });
-  scene.add(h.root);
+  scene.add(h.root); initSprings(h);
   const club = makeClub(); h.armR.hand.add(club); club.position.set(0, -0.05, 0.01); club.rotation.set(0.32, 0, 0);
+  const axe = makeAxe(); h.armR.hand.add(axe); axe.position.set(0, -0.05, 0.01); axe.rotation.set(0.32, 0, 0); axe.visible = false;
   const lantern = makeLantern(); h.armL.hand.add(lantern); lantern.position.set(0, -0.05, 0);
   const torch = new THREE.Group(); torch.position.set(0.075 * h.s, 0.31 * h.s, 0.135); h.spine.add(torch);
   const tb = mesh(new THREE.CylinderGeometry(0.022, 0.028, 0.1, 10), matIron); tb.rotation.x = Math.PI / 2; torch.add(tb);
@@ -1384,9 +1538,10 @@ const P = {};
   const tbMat = beamMat.clone(); tbMat.uniforms.color.value = new THREE.Color(0xa8bedc); tbMat.uniforms.intensity.value = 0;
   const tbeam = new THREE.Mesh(tbGeo, tbMat); tbeam.rotation.x = Math.atan2(0.9, 5); torch.add(tbeam);
   Object.assign(P, {
-    h, club, lantern, torch, spot, tlens, tbeam, pos: new V3(0.2, GROUND_Y, 10.6), vel: new V3(), yaw: Math.PI, ph: 0, state: 'move', st: 0,
-    stamina: 100, staDelay: 0, battery: 100, torchOn: false, durability: 60, broken: false, atk: null, charging: false, chargeT: 0,
-    invuln: 0, dodgeDir: new V3(), struggle: 0, pinnedBy: null, carrying: false, indoor: false, lastStep: 1,
+    h, club, axe, weapon: 'club', lantern, torch, spot, tlens, tbeam, pos: new V3(0.2, GROUND_Y, 10.6), vel: new V3(), yaw: Math.PI, ph: 0, state: 'move', st: 0,
+    stamina: 100, staMax: 100, staDelay: 0, winded: false, adr: 0, adrPeak: 0, crash: 0, battery: 100, torchOn: false, durability: 60, broken: false,
+    atk: null, charging: false, chargeT: 0, invuln: 0, dodgeDir: new V3(), dodgeK: 1, struggle: 0, pinnedBy: null, carrying: false, indoor: false,
+    crouch: false, shutter: false, vis: 0.5, whistleCD: 0, calmT: 0, gore: 0,
     swing: { ax: 0, vx: 0, az: 0, vz: 0 }, prevVel: new V3(), dead: false
   });
 })();
@@ -1412,232 +1567,14 @@ const mother = (function () {
   return { h, baby, seat, lang: 0.15, langT: 0.15, hasBaby: true, handing: 0, t: 0, coughT: 9, coughK: 0, cooT: 6, jaw: 0, talking: false };
 })();
 
-/* ---------------- infected ---------------- */
-const INF = {
-  butcher: { name: '屠夫', height: 1.8, girth: 1.5, skin: '#b9937c', top: '#6d6658', bottom: '#2b2825', hair: '#3a2e25', hairStyle: 'sparse', apron: true, weight: 125, poise: 100, hp: 170, speed: 2.1, seed: 31, lightSens: 1, hesitate: 4.0 },
-  student: { name: '学生 · 原发型', height: 1.6, girth: 0.82, skin: '#c7a48c', top: '#273250', coat: '#273250', collar: '#d7d7d0', tie: '#7a2a2a', bottom: '#273250', hair: '#120c09', hairStyle: 'messy', backpack: '#7a3b2e', weight: 52, poise: 40, hp: 70, speed: 3.3, seed: 41, feral: true, lightSens: 0.15, hesitate: 0 },
-  office: { name: '白领', height: 1.74, girth: 1.0, skin: '#c9a084', top: '#c9ccd0', tie: '#2b3340', lanyard: true, bottom: '#1f2226', hair: '#2a1f17', hairStyle: 'short', weight: 76, poise: 60, hp: 100, speed: 2.7, seed: 51, lightSens: 1, hesitate: 2.2 }
-};
-const SAFE = [];
-const floodConeFull = floodCone;
-for (let i = 0; i < 180; i++) {
-  const a = i / 180 * Math.PI * 2, d = dirA(a); let r = 3.5, ok = false;
-  for (; r < 15; r += 0.25) { const p = LURK_C.clone().addScaledVector(d, r); if (p.z < 6.0 && Math.abs(p.x) < 4.8) continue; if (!floodConeFull(p)) { ok = true; break; } }
-  SAFE.push(ok ? r : -1);
-}
-const safeR = a => SAFE[((Math.round(a / (Math.PI * 2) * 180) % 180) + 180) % 180];
-const infected = [];
-class Infected {
-  constructor(type, ang) {
-    const T = this.T = INF[type]; this.type = type;
-    this.h = makeHuman(Object.assign({ infected: true, blood: true, topWear: 0.85, bottomWear: 0.8 }, T)); scene.add(this.h.root);
-    this.home = ang; this.reset();
-    const bar = document.createElement('div'); bar.className = 'ebar'; bar.innerHTML = '<span class="ename"></span><i><b></b></i>'; $('labels').appendChild(bar);
-    bar.querySelector('.ename').textContent = T.name; this.bar = bar; this.barFill = bar.querySelector('b');
-    infected.push(this);
-  }
-  reset() {
-    const T = this.T; this.ang = this.home; const r = Math.max(4, safeR(this.ang)); this.pos = LURK_C.clone().addScaledVector(dirA(this.ang), r + 1.5); this.pos.y = GROUND_Y;
-    this.vel = new V3(); this.yaw = this.ang + Math.PI; this.state = 'lurk'; this.st = 0; this.ph = rnd(0, 6); this.angVel = (Math.random() < 0.5 ? -1 : 1) * rnd(0.05, 0.11);
-    this.hp = T.hp; this.poise = T.poise; this.poiseT = 0; this.fear = 0; this.cool = rnd(1, 3); this.lungeT = new V3(); this.barT = 0; this.fallDir = -1; this.speed = 0;
-    this.adapt = 0; this.wasLit = false; this.shielding = false; this.hesT = 0; this.retreated = false;
-    this.voiceT = rnd(4, 10); this.dead = false; this.mood = rnd(); this.respondT = -1; this.fleeTo = new V3(); this.stagDur = 0.5; this.flinchT = 0; this.downPose = null; this.thudDone = false;
-    this.h.cur = Object.assign({}, NEUTRAL); this.h.root.visible = true;
-  }
-  fwd() { return new V3(Math.sin(this.yaw), 0, Math.cos(this.yaw)); }
-  setState(s) { this.state = s; this.st = 0; }
-  spot(silent) {
-    if (this.state !== 'lurk' && this.state !== 'porch') return;
-    this.setState('stalk');
-    if (!silent) { SND.clicks(this.pos, 4); for (const o of infected) if (o !== this && !o.dead && o.state === 'lurk' && o.pos.distanceTo(this.pos) < 18) o.respondT = rnd(0.5, 1.2); }
-  }
-  startle(from) { // strong light only works at first: a flinch, an arm over the eyes, a step back
-    if (this.state === 'pinning') releasePin(this, true);
-    this.setState('startle'); const away = this.pos.clone().sub(from).setY(0); if (away.lengthSq() < 0.01) away.set(0, 0, 1); away.normalize();
-    this.vel.copy(away).multiplyScalar(2.2); SND.shriek(this.pos, 0.55);
-    floatLabel('惊退', this.pos.clone().add(new V3(0, 1.95 * this.T.height / 1.75, 0)), 'tough');
-  }
-  flee(from) {
-    this.setState('flee'); this.fear = 0;
-    const away = this.pos.clone().sub(from); away.y = 0; away.normalize();
-    const a = Math.atan2(this.pos.x - LURK_C.x, this.pos.z - LURK_C.z); const r = Math.max(5, safeR(a)) + rnd(4, 7);
-    this.fleeTo.copy(LURK_C).addScaledVector(dirA(a), r).addScaledVector(away, 2);
-    SND.shriek(this.pos, 0.7);
-  }
-  hit(dir, heavy) {
-    if (this.dead) return;
-    const T = this.T, mul = P.broken ? 0.45 : 1, imp = (heavy ? 72 : 34) * mul, dmg = (heavy ? 42 : 18) * mul * (this.state === 'down' ? 1.2 : 1);
-    this.hp -= dmg; this.poise -= imp; this.poiseT = 1.6; this.barT = 2.5;
-    this.vel.addScaledVector(dir, imp / T.weight * 3.4);
-    const chest = this.pos.clone().add(new V3(0, 1.2 * T.height / 1.75, 0));
-    SND.hit(chest, heavy); spawnBlood(chest, dir, heavy ? 22 : 12);
-    if (this.state === 'pinning') releasePin(this, false);
-    if (this.state === 'down' || this.state === 'getup') { if (this.hp <= 0) this.die(); floatLabel(this.hp <= 0 ? '倒下了' : '倒地重击', chest, 'heavy'); return; }
-    this.fallDir = dir.dot(this.fwd()) < 0 ? -1 : 1;
-    if (this.poise <= 0 || this.hp <= 0) { this.setState('down'); this.poise = T.poise; this.thudDone = false; this.downPose = this.makeDownPose(); floatLabel('击倒', chest, 'heavy'); if (this.hp <= 0) this.dieAfterFall = true; }
-    else if (imp / T.weight > 0.42) { this.setState('stagger'); this.stagDur = 0.3 + imp / T.weight * 0.45; floatLabel('僵直', chest, ''); }
-    else { this.flinchT = 0.22; floatLabel('硬扛', chest, 'tough'); }
-    if (this.state !== 'down') this.fear = 0;
-  }
-  makeDownPose() { return { shLz: rnd(0.7, 1.3), shRz: -rnd(0.7, 1.3), shLx: rnd(-0.6, 0.2), shRx: rnd(-0.6, 0.2), elL: rnd(0.2, 1), elR: rnd(0.2, 1), hipLz: rnd(0.05, 0.3), hipRz: -rnd(0.05, 0.3), knL: rnd(0.1, 0.8), knR: rnd(0.1, 0.8), headY: rnd(-0.8, 0.8), headX: rnd(-0.3, 0.2) }; }
-  die() { this.dead = true; this.state = 'dead'; this.barT = 0; addBloodPool(this.pos); }
-  moveDir(dir, spd, dt, k = 6) { this.vel.x = damp(this.vel.x, dir.x * spd, k, dt); this.vel.z = damp(this.vel.z, dir.z * spd, k, dt); }
-  moveTo(target, spd, dt) { const d = target.clone().sub(this.pos); d.y = 0; const l = d.length(); if (l < 0.3) { this.moveDir(new V3(), 0, dt); return; } this.moveDir(d.divideScalar(l), Math.min(spd, l * 1.5), dt); }
-  face(target, dt, k = 8) { const a = Math.atan2(target.x - this.pos.x, target.z - this.pos.z); this.yaw += angDiff(this.yaw, a) * (1 - Math.exp(-k * dt)); }
-  update(dt) {
-    const T = this.T, h = this.h; this.st += dt; this.barT -= dt; this.voiceT -= dt; this.cool -= dt; this.flinchT -= dt; this.poiseT -= dt;
-    if (this.poiseT < 0) this.poise = Math.min(T.poise, this.poise + 22 * dt);
-    const toP = P.pos.clone().sub(this.pos); toP.y = 0; const dP = toP.length();
-    const lit = inFlood(this.pos), torch = torchHits(this.pos);
-    // only strong light counts (floodlight, torch). First exposure startles; then they adapt and shield their eyes.
-    const strong = lit || torch, sens = T.lightSens;
-    if (strong && !['down', 'getup', 'dead'].includes(this.state)) {
-      if (!this.wasLit && this.adapt < 0.5) {
-        if (sens > 0.5 && ['lurk', 'stalk', 'porch', 'windup', 'recover', 'pinning'].includes(this.state)) this.startle(torch ? P.pos : floodLight.position);
-        else { this.flinchT = 0.15; floatLabel('硬扛强光', this.pos.clone().add(new V3(0, 1.9 * T.height / 1.75, 0)), 'heavy'); }
-      }
-      this.adapt = Math.min(1, this.adapt + dt / (1.3 * sens));
-    } else if (!strong) this.adapt = Math.max(0, this.adapt - dt / 7);
-    this.wasLit = strong; this.shielding = strong && sens > 0.5 && this.state !== 'startle';
-    if (this.respondT > 0) { this.respondT -= dt; if (this.respondT <= 0 && this.state === 'lurk') { SND.clicks(this.pos, 3); if (!P.indoor) this.setState('stalk'); } }
-    let pose = {}; const sp = Math.hypot(this.vel.x, this.vel.z);
-    const pDark = !P.indoor && !inFlood(P.pos) && !P.dead;
-    switch (this.state) {
-      case 'lurk': {
-        this.ang += this.angVel * dt; let r = safeR(this.ang);
-        if (r < 0 || Math.random() < 0.0015) { this.angVel *= -1; this.ang += this.angVel * dt * 3; r = Math.max(4, safeR(this.ang)); }
-        const tgt = LURK_C.clone().addScaledVector(dirA(this.ang), Math.max(r, 4) + 0.9 + this.mood * 1.7);
-        this.moveTo(tgt, 0.8, dt);
-        if (sp > 0.15) this.yaw += angDiff(this.yaw, Math.atan2(this.vel.x, this.vel.z)) * (1 - Math.exp(-4 * dt));
-        if (Math.sin(G.t * 0.3 + this.mood * 9) > 0.7) this.face(P.pos, dt, 2);
-        if (G.mode === 'play' && ((pDark && dP < 9.5) || (dP < 6.5 && !P.indoor)) && (G.playT > 40 || (pDark && dP < 6))) this.spot();
-        if (floodOff()) { if (!P.indoor && !P.dead && dP < 17) this.spot(true); else if (P.indoor) this.setState('porch'); }
-        if (this.voiceT < 0) { SND.growl(this.pos, 0.3, rnd(0.8, 1.4)); this.voiceT = rnd(8, 15); }
-        pose = Object.assign(walkPose(this.ph, clamp(sp / 0.9, 0, 1) * 0.7), { spX: 0.42, knL: 0.35, knR: 0.35, pelY: -0.07, headX: -0.32, shLx: -0.35, shRx: -0.4, elL: 0.55, elR: 0.6, spZ: Math.sin(G.t * 0.9 + this.mood * 5) * 0.06 });
-        break;
-      }
-      case 'porch': {
-        const tgt = new V3(clamp(this.pos.x, -2.8, 2.8) + Math.sin(this.home * 3) * 0.6, GROUND_Y, 6.1 + this.mood * 0.6);
-        this.moveTo(tgt, 1.3, dt); this.face(new V3(0, 0, 3), dt, 3);
-        if (!floodOff()) this.setState('lurk');
-        if (!P.indoor && dP < 12) this.setState('stalk');
-        if (this.voiceT < 0) { SND.growl(this.pos, 0.5, rnd(1, 1.6)); this.voiceT = rnd(3, 6); }
-        pose = Object.assign(walkPose(this.ph, clamp(sp / 1.3, 0, 1)), { spX: 0.25, headX: -0.2, shLx: -0.6, shRx: -0.55, elL: 0.3, elR: 0.4 });
-        break;
-      }
-      case 'stalk': {
-        if (P.indoor || P.dead || G.mode !== 'play') { this.setState(floodOff() && P.indoor ? 'porch' : 'lurk'); break; }
-        const pLit = inFlood(P.pos), allowLight = T.feral || floodOff() || this.adapt > 0.8 || this.hesT > T.hesitate;
-        let dir = toP.clone().normalize();
-        if (!allowLight && inFlood(this.pos.clone().addScaledVector(dir, 0.7))) {
-          this.hesT += dt;
-          const tang = new V3(-dir.z, 0, dir.x);
-          if (inFlood(this.pos.clone().addScaledVector(tang, 0.7))) tang.negate();
-          dir = inFlood(this.pos.clone().addScaledVector(tang, 0.7)) ? new V3() : tang;
-        }
-        if (!inFlood(this.pos) && allowLight && !floodOff()) this.hesT = Math.max(0, this.hesT - dt * 0.2);
-        const spd = (dP > 5 ? T.speed : T.speed * 0.75) * (floodOff() ? 1.15 : 1) * (this.shielding ? 0.72 : 1);
-        this.moveDir(dir, spd, dt); this.face(P.pos, dt, 6);
-        if (dP < 2.6 && this.cool <= 0 && (!pLit || allowLight) && P.state !== 'pinned') { this.setState('windup'); SND.growl(this.pos, 0.8, 0.6); }
-        if (dP > 19) this.setState('lurk');
-        if (this.voiceT < 0) { SND.growl(this.pos, 0.45, rnd(0.6, 1)); this.voiceT = rnd(4, 8); }
-        pose = Object.assign(walkPose(this.ph, clamp(sp / 2.5, 0, 1), clamp((sp - 2.2) / 1.5, 0, 1)), { spX: 0.3 + clamp((sp - 2) / 2, 0, 0.2), headX: -0.25, shLx: -0.5, shRx: -0.45, elL: 0.45, elR: 0.5 });
-        break;
-      }
-      case 'windup': {
-        this.moveDir(new V3(), 0, dt, 10); this.face(P.pos, dt, 10);
-        const k = smooth(0, 0.5, this.st);
-        pose = { spX: -0.12 * k, shLx: -1.7 * k, shRx: -1.7 * k, shLz: 0.45 * k, shRz: -0.45 * k, elL: 0.35, elR: 0.35, headX: -0.25, jaw: k, knL: 0.3 * k, knR: 0.3 * k, pelY: -0.06 * k };
-        if (this.st > (this.shielding ? 0.78 : 0.5)) { this.setState('lunge'); this.lungeT.copy(P.pos).addScaledVector(P.vel, this.shielding ? 0.05 : 0.22); SND.shriek(this.pos, 0.5); }
-        break;
-      }
-      case 'lunge': {
-        const d = this.lungeT.clone().sub(this.pos); d.y = 0; d.normalize();
-        const ls = this.shielding ? 6.0 : 7.2; this.vel.x = d.x * ls; this.vel.z = d.z * ls; this.face(this.lungeT, dt, 12);
-        pose = { spX: 0.6, shLx: -1.5, shRx: -1.5, shLz: 0.2, shRz: -0.2, elL: 0.15, elR: 0.15, jaw: 1, hipLx: -0.7, hipRx: 0.5, knR: 0.6, headX: -0.4 };
-        if (dP < (this.shielding ? 0.7 : 0.85) && P.invuln <= 0 && P.state !== 'pinned' && !P.dead && G.mode === 'play') { startPin(this); break; }
-        if (this.st > 0.32) { this.setState('recover'); this.cool = rnd(1.4, 2.4); }
-        break;
-      }
-      case 'recover': {
-        this.moveDir(new V3(), 0, dt, 5);
-        pose = { spX: 0.55 - this.st * 0.4, shLx: -0.6, shRx: -0.7, elL: 0.5, elR: 0.5, knL: 0.4, knR: 0.2, headX: -0.2 };
-        if (this.st > 0.85) this.setState('stalk');
-        break;
-      }
-      case 'flee': {
-        this.moveTo(this.fleeTo, T.speed * 1.5, dt);
-        if (sp > 0.2) this.yaw += angDiff(this.yaw, Math.atan2(this.vel.x, this.vel.z)) * (1 - Math.exp(-10 * dt));
-        pose = Object.assign(walkPose(this.ph, 1, 1), { shLx: -2.3, elL: 2.1, shLz: 0.3, shRx: -1.9, elR: 2.2, shRz: -0.5, headX: 0.3, spX: 0.35 });
-        if (this.st > 4.5 || this.pos.distanceTo(this.fleeTo) < 0.6) { this.setState('lurk'); this.ang = Math.atan2(this.pos.x - LURK_C.x, this.pos.z - LURK_C.z); }
-        break;
-      }
-      case 'startle': {
-        this.vel.multiplyScalar(Math.exp(-4 * dt));
-        const k = 1 - smooth(0.45, 0.8, this.st);
-        pose = { spX: -0.25 * k, headX: 0.35 * k, headY: 0.4 * k, shLx: -2.4 * k, elL: 2.1 * k, shLz: 0.1, shRx: -1.6 * k, elR: 1.8 * k, shRz: -0.3 * k, knL: 0.3 * k, knR: 0.2 * k, hipLx: 0.3 * k, jaw: 0.7 * k };
-        if (this.st > 0.8) this.setState(P.indoor || P.dead ? (floodOff() ? 'porch' : 'lurk') : 'stalk');
-        break;
-      }
-      case 'stagger': {
-        this.vel.multiplyScalar(Math.exp(-3.5 * dt));
-        const k = 1 - smooth(this.stagDur * 0.5, this.stagDur, this.st);
-        pose = { spX: -0.4 * k, headX: -0.55 * k, headZ: 0.3 * k, shLx: -0.9 * k, shLz: 0.8 * k, shRx: -0.5 * k, shRz: -0.9 * k, elL: 0.6, elR: 0.9, knL: 0.35 * k, knR: 0.15, hipLx: 0.25 * k, jaw: 0.6 };
-        if (this.st > this.stagDur) { if (this.hp < T.hp * 0.3 && !T.feral && !this.retreated) { this.retreated = true; this.flee(P.pos); floatLabel('撤进黑暗', this.pos.clone().add(new V3(0, 1.9, 0)), ''); } else { this.setState('stalk'); this.cool = 0.6; } }
-        break;
-      }
-      case 'down': {
-        this.vel.multiplyScalar(Math.exp(-4 * dt));
-        const k = smooth(0, 0.42, this.st);
-        pose = Object.assign({}, this.downPose, { bodyX: this.fallDir * 1.5 * k, bodyY: 0.15 * k * (this.T.girth > 1.2 ? 1.3 : 1) });
-        if (!this.thudDone && this.st > 0.4) { this.thudDone = true; SND.thud(this.pos); G.shake = Math.max(G.shake, 0.12 * this.T.weight / 80); spawnBlood(this.pos.clone().add(new V3(0, 0.1, 0)), new V3(0, 1, 0), 6, true); }
-        if (this.dieAfterFall && this.st > 0.45) { this.dieAfterFall = false; this.die(); break; }
-        if (this.st > 2.4) this.setState('getup');
-        break;
-      }
-      case 'getup': {
-        const k = 1 - smooth(0, 0.9, this.st);
-        pose = Object.assign({}, this.downPose, { bodyX: this.fallDir * 1.5 * k, bodyY: 0.15 * k, spX: 0.6 * (1 - k), knL: 1.2 * (1 - k), knR: 1.0 * (1 - k), pelY: -0.25 * (1 - k) });
-        if (this.st > 0.9) this.setState('stalk');
-        break;
-      }
-      case 'pinning': {
-        this.vel.set(0, 0, 0);
-        const f = new V3(Math.sin(P.yaw), 0, Math.cos(P.yaw));
-        this.pos.copy(P.pos).addScaledVector(f, 0.62); this.yaw = P.yaw + Math.PI;
-        pose = { spX: 0.95, shLx: -1.45, shRx: -1.4, elL: 0.9 + Math.sin(G.t * 17) * 0.1, elR: 0.85, headX: 0.25 + Math.sin(G.t * 11) * 0.08, jaw: 0.6 + Math.sin(G.t * 9) * 0.4, knL: 0.7, knR: 0.9, pelY: -0.28 };
-        if (this.voiceT < 0) { SND.growl(this.pos, 0.9, 0.7); this.voiceT = 0.8; }
-        break;
-      }
-      case 'dead': { this.vel.set(0, 0, 0); pose = Object.assign({}, this.downPose, { bodyX: this.fallDir * 1.5, bodyY: 0.15 }); break; }
-    }
-    if (this.shielding && !['startle', 'down', 'getup', 'dead', 'pinning'].includes(this.state)) Object.assign(pose, { shLx: -2.35, elL: 2.15, shLz: 0.15, shLy: 0.3, headX: (pose.headX || 0) + 0.25 });
-    if (this.flinchT > 0) Object.assign(pose, { spX: (pose.spX || 0) - 0.15, headX: -0.3 });
-    // integrate + separation + keep out of the house
-    if (this.state !== 'pinning' && this.state !== 'dead') {
-      this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
-      for (const o of infected) if (o !== this && !o.dead) { const d = this.pos.clone().sub(o.pos); d.y = 0; const l = d.length(); if (l < 0.7 && l > 0.001) this.pos.addScaledVector(d, (0.7 - l) / l * 0.5); }
-      if (!P.dead && P.state !== 'pinned' && this.state !== 'down') { const d = this.pos.clone().sub(P.pos); d.y = 0; const l = d.length(); if (l < 0.6 && l > 0.001) this.pos.addScaledVector(d, (0.6 - l) / l); }
-      const minZ = this.state === 'lunge' ? 4.6 : 5.75;
-      if (Math.abs(this.pos.x) < 4.0 && this.pos.z < minZ && this.pos.z > -3.6) this.pos.z = minZ;
-      for (const c of colliders) if (c.tag === 'post' || c.tag === 'rail') pushOut(this.pos, c, 0.3);
-      const dc = this.pos.clone().sub(LURK_C); dc.y = 0; if (dc.length() > 21) this.pos.copy(LURK_C).addScaledVector(dc.normalize(), 21);
-    }
-    this.pos.y = groundY(this.pos.x, this.pos.z);
-    this.ph += dt * Math.max(sp, 0.001) * 3.3;
-    if (this.state !== 'dead' && this.state !== 'down' && this.state !== 'getup') Object.assign(pose, { headZ: (pose.headZ || 0) + Math.sin(G.t * 1.7 + this.mood * 7) * 0.08 });
-    poseTo(h, pose, this.state === 'down' ? 9 : 10, dt);
-    h.root.position.copy(this.pos); h.root.rotation.y = this.yaw;
-  }
-}
-new Infected('butcher', 0.55); new Infected('student', -0.9); new Infected('office', 2.0);
-
 /* ---------------- helpers ---------------- */
 function pushOut(p, c, r) {
   if (p.x > c.x0 - r && p.x < c.x1 + r && p.z > c.z0 - r && p.z < c.z1 + r) {
     const dl = p.x - (c.x0 - r), dr = c.x1 + r - p.x, dn = p.z - (c.z0 - r), df = c.z1 + r - p.z, m = Math.min(dl, dr, dn, df);
     if (m === dl) p.x = c.x0 - r; else if (m === dr) p.x = c.x1 + r; else if (m === dn) p.z = c.z0 - r; else p.z = c.z1 + r;
+    return true;
   }
+  return false;
 }
 function collide(p, r) {
   for (const c of colliders) pushOut(p, c, r);
@@ -1651,81 +1588,889 @@ function torchHits(p) {
   const f = new V3(Math.sin(P.yaw), -0.12, Math.cos(P.yaw)).normalize();
   return _td.normalize().dot(f) > Math.cos(0.36);
 }
-// blood particles + pools
-const BL_N = 220, blGeo = new THREE.BufferGeometry(), blPos = new Float32Array(BL_N * 3), blVel = new Float32Array(BL_N * 3), blLife = new Float32Array(BL_N);
-blGeo.setAttribute('position', new THREE.BufferAttribute(blPos, 3));
-const bloodPts = new THREE.Points(blGeo, new THREE.PointsMaterial({ color: 0x4a0606, size: 0.045, transparent: true, opacity: 0.9, depthWrite: false }));
-bloodPts.frustumCulled = false; scene.add(bloodPts); let blIdx = 0;
-for (let i = 0; i < BL_N; i++) blPos[i * 3 + 1] = -50;
-function spawnBlood(p, dir, n, ground) {
-  for (let k = 0; k < n; k++) {
-    const i = blIdx++ % BL_N; blPos[i * 3] = p.x; blPos[i * 3 + 1] = p.y; blPos[i * 3 + 2] = p.z;
-    blVel[i * 3] = dir.x * rnd(0.6, 2.4) + rnd(-0.8, 0.8); blVel[i * 3 + 1] = ground ? rnd(0.3, 1) : rnd(0.4, 2.2); blVel[i * 3 + 2] = dir.z * rnd(0.6, 2.4) + rnd(-0.8, 0.8); blLife[i] = rnd(0.5, 0.9);
-  }
-}
-const poolTex = softDisc(64, [[0, 'rgba(40,4,4,.95)'], [0.6, 'rgba(35,4,4,.8)'], [1, 'rgba(30,4,4,0)']]);
-function addBloodPool(p) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ map: poolTex, transparent: true, roughness: 0.15, metalness: 0.2, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, groundY(p.x, p.z) + 0.01, p.z); m.scale.setScalar(0.1); m.userData.grow = 1; scene.add(m); pools.push(m); }
-const pools = [];
+function bushCover(p) { for (const [x, z] of bushes) if (Math.hypot(p.x - x, p.z - z) < 1.05) return true; return false; }
 
 /* ---------------- floating labels / toasts ---------------- */
 const labels = [];
 function project(p) { const v = p.clone().project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight, vis: v.z < 1 }; }
-function floatLabel(text, pos, cls) { const el = document.createElement('div'); el.className = 'flabel ' + (cls || ''); el.textContent = text; $('labels').appendChild(el); labels.push({ el, pos: pos.clone(), t: 0 }); }
+function floatLabel(text, pos, cls, dur = 1.1) { const el = document.createElement('div'); el.className = 'flabel ' + (cls || ''); el.textContent = text; $('labels').appendChild(el); labels.push({ el, pos: pos.clone(), t: 0, dur }); }
 function toast(text, dur = 3) { const el = $('toast'); el.textContent = text; el.classList.add('on'); G.toastT = dur; }
 function setObj(text) { $('obj').textContent = text; }
 
-/* ---------------- pin / struggle ---------------- */
-function startPin(e) {
-  P.state = 'pinned'; P.st = 0; P.struggle = 0; P.pinnedBy = e; P.atk = null; P.charging = false; e.setState('pinning');
-  P.yaw = Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z);
-  $('qte').classList.add('on'); G.shake = 0.4; SND.thud(P.pos); SND.heartbeat(0.8);
+/* ===== P6 combat FX: blood, mist, decals, wounds painted on cloth, gibs, mud, impact flashes, swing trail, sound rings ===== */
+// blood droplets: fly, fall, stick; some leave a spot on the ground
+const BL_N = 420, blGeo = new THREE.BufferGeometry(), blPos = new Float32Array(BL_N * 3), blVel = new Float32Array(BL_N * 3), blLife = new Float32Array(BL_N), blMark = new Uint8Array(BL_N);
+blGeo.setAttribute('position', new THREE.BufferAttribute(blPos, 3));
+const dropTex = softDisc(32, [[0, 'rgba(255,255,255,1)'], [0.55, 'rgba(255,255,255,.9)'], [1, 'rgba(255,255,255,0)']]);
+const bloodPts = new THREE.Points(blGeo, new THREE.PointsMaterial({ color: 0x5a0707, size: 0.07, map: dropTex, transparent: true, opacity: 0.95, depthWrite: false }));
+bloodPts.frustumCulled = false; scene.add(bloodPts); let blIdx = 0;
+for (let i = 0; i < BL_N; i++) blPos[i * 3 + 1] = -50;
+function spawnBlood(p, dir, n, ground, speed = 1, mark = 0.3) {
+  for (let k = 0; k < n; k++) {
+    const i = blIdx++ % BL_N; blPos[i * 3] = p.x + rnd(-0.04, 0.04); blPos[i * 3 + 1] = p.y + rnd(-0.04, 0.04); blPos[i * 3 + 2] = p.z + rnd(-0.04, 0.04);
+    const s = rnd(0.7, 3.2) * speed;
+    blVel[i * 3] = dir.x * s + rnd(-0.8, 0.8); blVel[i * 3 + 1] = ground ? rnd(0.3, 1.1) : dir.y * s + rnd(0.2, 2.4); blVel[i * 3 + 2] = dir.z * s + rnd(-0.8, 0.8);
+    blLife[i] = rnd(0.8, 1.3); blMark[i] = Math.random() < mark ? 1 : 0;
+  }
 }
-function releasePin(e, scared) {
-  if (P.pinnedBy !== e) return;
-  P.state = 'move'; P.pinnedBy = null; P.invuln = 1.0; $('qte').classList.remove('on');
-  const away = e.pos.clone().sub(P.pos).setY(0).normalize();
-  e.vel.copy(away).multiplyScalar(scared ? 2.5 : 3.5);
-  if (!scared) { e.setState('down'); e.fallDir = -1; e.downPose = e.makeDownPose(); e.thudDone = false; floatLabel('挣脱', P.pos.clone().add(new V3(0, 1.6, 0)), 'heavy'); }
-  else floatLabel('被光逼退', e.pos.clone().add(new V3(0, 1.8, 0)), '');
+// ground spots and pools
+const poolTex = softDisc(64, [[0, 'rgba(40,4,4,.95)'], [0.6, 'rgba(35,4,4,.8)'], [1, 'rgba(30,4,4,0)']]);
+const decalMat = new THREE.MeshStandardMaterial({ map: poolTex, transparent: true, roughness: 0.18, metalness: 0.15, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const DEC_N = 110, decals = []; let decIdx = 0;
+const planeGeo = new THREE.PlaneGeometry(1, 1);
+for (let i = 0; i < DEC_N; i++) { const m = new THREE.Mesh(planeGeo, decalMat); m.rotation.x = -Math.PI / 2; m.visible = false; m.receiveShadow = true; scene.add(m); decals.push(m); }
+function addDecal(x, z, s) { const m = decals[decIdx++ % DEC_N]; m.position.set(x, groundY(x, z) + 0.008, z); m.rotation.z = rnd(0, 6.28); m.scale.set(s, s * rnd(0.55, 1), 1); m.visible = true; }
+const pools = [];
+function addBloodPool(p, size = 1.4) { const m = new THREE.Mesh(planeGeo, new THREE.MeshStandardMaterial({ map: poolTex, transparent: true, roughness: 0.12, metalness: 0.2, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 })); m.rotation.x = -Math.PI / 2; m.position.set(p.x, groundY(p.x, p.z) + 0.01, p.z); m.scale.setScalar(0.1); m.userData.grow = size; scene.add(m); pools.push(m); }
+// a soft red cloud for heavy hits
+const mistTex = softDisc(64, [[0, 'rgba(96,12,12,.6)'], [0.45, 'rgba(70,8,8,.28)'], [1, 'rgba(50,5,5,0)']]);
+const mists = []; let mistIdx = 0;
+for (let i = 0; i < 12; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; scene.add(s); mists.push({ s, t: 1, d: 0.6, v: new V3(), sz: 1 }); }
+function spawnMist(p, dir, size) { const m = mists[mistIdx++ % mists.length]; m.s.position.copy(p); m.v.copy(dir).multiplyScalar(1.1).add(new V3(0, 0.25, 0)); m.t = 0; m.d = 0.6; m.sz = size; m.s.visible = true; }
+// impact flash + shock ring at the contact point
+const flashTex = softDisc(64, [[0, 'rgba(255,248,235,1)'], [0.18, 'rgba(255,226,190,.55)'], [1, 'rgba(255,200,150,0)']]);
+const impacts = []; let impIdx = 0;
+for (let i = 0; i < 6; i++) {
+  const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0 }));
+  const r = new THREE.Sprite(new THREE.SpriteMaterial({ map: ringTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0, color: 0xffe6c8 }));
+  f.visible = r.visible = false; scene.add(f); scene.add(r); impacts.push({ f, r, t: 1, p: 1 });
+}
+function spawnImpact(p, power) { const m = impacts[impIdx++ % impacts.length]; m.f.position.copy(p); m.r.position.copy(p); m.t = 0; m.p = power; m.f.visible = m.r.visible = true; }
+// muddy water thrown up by falls, kicks and stomps
+const MUD_N = 240, mudGeo = new THREE.BufferGeometry(), mudPos = new Float32Array(MUD_N * 3), mudVel = new Float32Array(MUD_N * 3), mudLife = new Float32Array(MUD_N);
+mudGeo.setAttribute('position', new THREE.BufferAttribute(mudPos, 3));
+const mudPts = new THREE.Points(mudGeo, new THREE.PointsMaterial({ color: 0x343c44, size: 0.05, map: dropTex, transparent: true, opacity: 0.7, depthWrite: false }));
+mudPts.frustumCulled = false; scene.add(mudPts); let mudIdx = 0;
+for (let i = 0; i < MUD_N; i++) mudPos[i * 3 + 1] = -50;
+function spawnSplash(p, n, spread = 0.4, up = 1.6) {
+  for (let k = 0; k < n; k++) {
+    const i = mudIdx++ % MUD_N; mudPos[i * 3] = p.x + rnd(-spread, spread); mudPos[i * 3 + 1] = groundY(p.x, p.z) + 0.03; mudPos[i * 3 + 2] = p.z + rnd(-spread, spread);
+    mudVel[i * 3] = rnd(-1.3, 1.3); mudVel[i * 3 + 1] = rnd(0.5, 1) * up; mudVel[i * 3 + 2] = rnd(-1.3, 1.3); mudLife[i] = rnd(0.35, 0.75);
+  }
+}
+// sound made visible: a ring on the ground (white for your noise, red for their roars)
+const sRings = []; let srIdx = 0;
+for (let i = 0; i < 12; i++) { const m = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, color: 0xa8bcd4, fog: false })); m.rotation.x = -Math.PI / 2; m.visible = false; scene.add(m); sRings.push({ m, t: 1, d: 1, r: 1, a: 0.3 }); }
+function spawnRing(p, r, kind) { const s = sRings[srIdx++ % sRings.length], roar = kind === 'roar'; s.m.position.set(p.x, groundY(p.x, p.z) + 0.04, p.z); s.t = 0; s.r = r; s.d = roar ? 1.5 : 0.75; s.a = roar ? 0.32 : 0.18; s.m.material.color.setHex(roar ? 0xd25a40 : 0xa8bcd4); s.m.visible = true; }
+
+/* swing trail: a fading ribbon between the weapon head and the shaft */
+const TRAIL_N = 14, trailGeo = new THREE.BufferGeometry(), trailPos = new Float32Array(TRAIL_N * 6), trailA = new Float32Array(TRAIL_N * 2);
+trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3)); trailGeo.setAttribute('a', new THREE.BufferAttribute(trailA, 1));
+{ const idx = []; for (let i = 0; i < TRAIL_N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } trailGeo.setIndex(idx); }
+const trailMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { color: { value: new THREE.Color(0x8fa2bc) }, k: { value: 0 } },
+  vertexShader: 'attribute float a; varying float vA; void main(){ vA=a; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: 'uniform vec3 color; uniform float k; varying float vA; void main(){ gl_FragColor=vec4(color*vA*k,1.0); }'
+});
+const trail = new THREE.Mesh(trailGeo, trailMat); trail.frustumCulled = false; scene.add(trail);
+const trailPts = [], _tip = new V3(), _tbase = new V3();
+function weaponObj() { return P.weapon === 'axe' ? P.axe : P.club; }
+function updateTrail(dt) {
+  const A = P.atk, a = A ? A.t / A.dur : 0, active = A && A.kind !== 'kick' && a > A.strikeA && a < A.hitA + 0.08;
+  if (active) {
+    const w = weaponObj(); w.updateWorldMatrix(true, false);
+    w.localToWorld(_tip.copy(w.userData.tip)); if (P.broken && w === P.club) _tip.copy(w.userData.tip).multiplyScalar(0.55).applyMatrix4(w.matrixWorld);
+    w.localToWorld(_tbase.set(0, P.weapon === 'axe' ? -0.5 : -0.48, 0));
+    trailPts.unshift([_tip.clone(), _tbase.clone()]); if (trailPts.length > TRAIL_N) trailPts.pop(); trailMat.uniforms.k.value = A.kind === 'heavy' ? 0.42 : 0.3;
+  } else { trailMat.uniforms.k.value = Math.max(0, trailMat.uniforms.k.value - dt * 3); if (trailMat.uniforms.k.value <= 0) trailPts.length = 0; }
+  const n = trailPts.length;
+  for (let i = 0; i < TRAIL_N; i++) {
+    const s = trailPts[Math.min(i, n - 1)]; if (!s) break;
+    trailPos.set([s[0].x, s[0].y, s[0].z, s[1].x, s[1].y, s[1].z], i * 6);
+    trailA[i * 2] = i < n ? Math.pow(1 - i / Math.max(1, n - 1), 1.4) * 0.7 : 0; trailA[i * 2 + 1] = 0;
+  }
+  trailGeo.setDrawRange(0, Math.max(0, n - 1) * 6); trailGeo.attributes.position.needsUpdate = true; trailGeo.attributes.a.needsUpdate = true;
 }
 
-/* ---------------- player actions ---------------- */
-function startAttack(heavy, fromCharge) {
-  if (P.atk || P.state !== 'move' || P.dead || G.mode !== 'play') return;
-  const cost = heavy ? 26 : 14; if (P.stamina < cost * 0.5) { toast('体力不够'); return; }
-  P.stamina -= cost; P.staDelay = 0.9;
-  P.atk = heavy ? { heavy: true, t: fromCharge ? 0.85 * 0.45 : 0, dur: 0.85, strikeA: 0.45, hitA: 0.56 } : { heavy: false, t: 0, dur: 0.55, strikeA: 0.34, hitA: 0.45 };
+/* wounds: blood painted straight onto the clothes and skin, so a body shows every hit it took */
+function paintWound(mat, n, big, front) {
+  const tex = mat && mat.map; if (!tex || !tex.image || !tex.image.getContext) return;
+  const c = tex.image, g = c.getContext('2d'), W = c.width, H = c.height;
+  for (let i = 0; i < n; i++) {
+    const x = (front ? 0.25 + rnd(-0.09, 0.09) : rnd(0.05, 0.95)) * W, y = (front ? rnd(0.3, 0.75) : rnd(0.12, 0.8)) * H, r = rnd(0.035, big ? 0.12 : 0.065) * Math.min(W, H) * (front ? 0.6 : 1);
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(62,5,5,.92)'); gr.addColorStop(0.55, 'rgba(70,6,6,.7)'); gr.addColorStop(1, 'rgba(50,4,4,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, r, r * rnd(0.6, 1.25), rnd(0, 3), 0, 7); g.fill();
+    g.strokeStyle = 'rgba(58,5,5,.6)'; g.lineCap = 'round';
+    for (let k = 0; k < (big ? 4 : 2); k++) { const dx = x + rnd(-r, r) * 0.6; g.lineWidth = rnd(0.8, 2.2) * W / 128; g.beginPath(); g.moveTo(dx, y); g.lineTo(dx + rnd(-1.5, 1.5), y + rnd(0.06, 0.22) * H); g.stroke(); }
+  }
+  tex.needsUpdate = true;
 }
-function aimAssist() {
-  let best = null, bd = 2.8;
-  for (const e of infected) { if (e.dead) continue; const d = e.pos.clone().sub(P.pos).setY(0); const l = d.length(); if (l < bd && d.normalize().dot(new V3(Math.sin(P.yaw), 0, Math.cos(P.yaw))) > 0.25) { bd = l; best = e; } }
-  if (best) P.yaw = Math.atan2(best.pos.x - P.pos.x, best.pos.z - P.pos.z);
+function stainWeapon(w, k) { for (const m of w.userData.stain) { if (!m.userData.base) m.userData.base = m.color.clone(); m.userData.blood = Math.min(1, (m.userData.blood || 0) + k); m.color.copy(m.userData.base).lerp(new THREE.Color(0x3a0606), m.userData.blood * 0.75); } }
+function rinseWeapons(dt) { for (const w of [P.club, P.axe]) for (const m of w.userData.stain) if (m.userData.blood > 0) { m.userData.blood = Math.max(0, m.userData.blood - dt * 0.006 * G.rain); m.color.copy(m.userData.base).lerp(new THREE.Color(0x3a0606), m.userData.blood * 0.75); } }
+
+/* severed parts: rigid pieces with gravity, bounce and friction; stumps keep pumping for a while */
+const gibs = [], stumps = [];
+const meatMat = new THREE.MeshStandardMaterial({ color: 0x5a0d0d, roughness: 0.35, metalness: 0.05 });
+const boneMat = new THREE.MeshStandardMaterial({ color: 0xd9cfb8, roughness: 0.5 });
+function addStump(parent, y, r, dirLocal) {
+  const s = new THREE.Group(); s.position.y = y; parent.add(s);
+  s.add(mesh(new THREE.SphereGeometry(r, 10, 8), meatMat)); s.children[0].scale.set(1, 0.45, 1);
+  const b = mesh(new THREE.CylinderGeometry(r * 0.28, r * 0.32, r * 1.2, 6), boneMat, 0, -r * 0.35, 0); s.add(b);
+  const st = { obj: s, t: 0, life: rnd(5, 8), next: 0, dir: dirLocal || new V3(0, -1, 0) }; stumps.push(st); return st;
 }
-function strike(heavy) {
-  const f = new V3(Math.sin(P.yaw), 0, Math.cos(P.yaw)); let n = 0;
+function detachGib(part, vel, spin, opts = {}) {
+  part.updateWorldMatrix(true, true); let obj = part;
+  if (opts.center) { obj = new THREE.Group(); obj.position.copy(opts.center); scene.add(obj); obj.updateWorldMatrix(true, false); obj.attach(part); } // tumble about its own middle
+  else scene.attach(part);
+  const g = { obj, vel: vel.clone(), w: spin.clone(), r: opts.r || 0.06, rest: false, t: 0, bleed: opts.bleed ?? 2.5, roll: !!opts.roll, landed: false };
+  gibs.push(g); return g;
+}
+const _gq = new THREE.Quaternion(), _gv = new V3(), _gp = new V3();
+function updateGibs(dt) {
+  for (const g of gibs) {
+    if (g.rest) continue; g.t += dt; const o = g.obj;
+    g.vel.y -= 9.8 * dt; o.position.addScaledVector(g.vel, dt);
+    const wl = g.w.length(); if (wl > 1e-3) { _gq.setFromAxisAngle(_gv.copy(g.w).divideScalar(wl), wl * dt); o.quaternion.premultiply(_gq); }
+    const gy = groundY(o.position.x, o.position.z) + g.r;
+    if (o.position.y < gy) {
+      o.position.y = gy;
+      if (!g.landed || g.vel.y < -1.2) { SND.thud(o.position); spawnSplash(o.position, 8, 0.12, 1.1); spawnBlood(o.position, new V3(0, 0.3, 0), 5, true, 0.6, 0.8); if (!g.landed) addDecal(o.position.x, o.position.z, rnd(0.18, 0.3)); g.landed = true; }
+      g.vel.y = Math.abs(g.vel.y) * 0.28; g.vel.x *= 0.62; g.vel.z *= 0.62;
+      if (g.roll) g.w.set(g.vel.z / g.r, g.w.y * 0.6, -g.vel.x / g.r); else g.w.multiplyScalar(0.55);
+      if (g.vel.lengthSq() < 0.02 && Math.abs(o.position.y - gy) < 0.01) { g.rest = true; addDecal(o.position.x, o.position.z, rnd(0.25, 0.4)); }
+    }
+    for (const c of colliders) if (c.tag === 'post' || c.tag === 'rail' || c.tag === 'wall') if (pushOut(o.position, c, g.r)) { g.vel.x *= -0.4; g.vel.z *= -0.4; }
+    if (g.bleed > 0) { g.bleed -= dt; if (Math.random() < dt * 14) spawnBlood(o.position, new V3(0, -0.2, 0), 1, true, 0.3, 0.5); }
+  }
+}
+function updateStumps(dt) {
+  for (const s of stumps) {
+    if (s.t > s.life || !s.obj.parent) continue; s.t += dt; s.next -= dt;
+    if (s.next <= 0) { // arterial pulse, weaker each beat
+      const k = 1 - s.t / s.life; s.next = 0.42 + (1 - k) * 0.3;
+      s.obj.getWorldPosition(_gp); s.obj.getWorldQuaternion(_gq); const d = s.dir.clone().applyQuaternion(_gq);
+      spawnBlood(_gp, d, Math.round(3 + 6 * k), false, 0.5 + 1.1 * k, 0.45);
+      if (k > 0.4) SND.spurt(_gp, 0.22 * k);
+    }
+  }
+}
+function clearGore() {
+  for (const g of gibs) if (g.obj.parent) g.obj.parent.remove(g.obj); gibs.length = 0;
+  for (const s of stumps) if (s.obj.parent) s.obj.parent.remove(s.obj); stumps.length = 0;
+  decals.forEach(m => { m.visible = false; }); pools.forEach(m => scene.remove(m)); pools.length = 0;
+  for (let i = 0; i < BL_N; i++) { blLife[i] = 0; blPos[i * 3 + 1] = -50; }
+  for (const w of [P.club, P.axe]) for (const m of w.userData.stain) if (m.userData.base) { m.userData.blood = 0; m.color.copy(m.userData.base); }
+}
+
+function disposeTree(root) { root.traverse(m => { if (!m.isMesh) return; m.geometry.dispose(); const mt = m.material; if (mt === meatMat || mt === boneMat || mt === decalMat) return; if (mt.map) mt.map.dispose(); mt.dispose(); }); }
+/* hit flash on a body's materials (eyes keep their own glow) */
+function collectMats(h) { const s = new Set(); h.root.traverse(m => { if (m.isMesh && m.material && m.material.emissive && m.material.emissive.getHex() === 0) s.add(m.material); }); return [...s]; }
+function setFlash(mats, k) { for (const m of mats) m.emissive.setRGB(k * 0.2, k * 0.13, k * 0.1); }
+
+/* blood on the lens: only up close, only for the worst hits */
+function lensSplat(n) {
+  if (G.camMode !== 'close') return; const box = $('splat');
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('i'), s = rnd(40, 150);
+    d.style.cssText = `left:${rnd(5, 90)}%;top:${rnd(5, 80)}%;width:${s}px;height:${s * rnd(0.7, 1.2)}px;`;
+    box.appendChild(d); setTimeout(() => d.classList.add('run'), 30); setTimeout(() => d.remove(), 2600);
+  }
+}
+
+function updateFX(dt) {
+  for (let i = 0; i < BL_N; i++) {
+    if (blLife[i] <= 0) continue; blLife[i] -= dt;
+    if (blVel[i * 3] || blVel[i * 3 + 1] || blVel[i * 3 + 2]) {
+      blVel[i * 3 + 1] -= 9.8 * dt; blPos[i * 3] += blVel[i * 3] * dt; blPos[i * 3 + 1] += blVel[i * 3 + 1] * dt; blPos[i * 3 + 2] += blVel[i * 3 + 2] * dt;
+      const gy = groundY(blPos[i * 3], blPos[i * 3 + 2]);
+      if (blPos[i * 3 + 1] < gy + 0.01) { blPos[i * 3 + 1] = gy + 0.01; blVel[i * 3] = blVel[i * 3 + 1] = blVel[i * 3 + 2] = 0; if (blMark[i]) { addDecal(blPos[i * 3], blPos[i * 3 + 2], rnd(0.06, 0.16)); blLife[i] = Math.min(blLife[i], 0.05); } }
+    }
+    if (blLife[i] <= 0) blPos[i * 3 + 1] = -50;
+  }
+  blGeo.attributes.position.needsUpdate = true;
+  for (let i = 0; i < MUD_N; i++) {
+    if (mudLife[i] <= 0) continue; mudLife[i] -= dt; mudVel[i * 3 + 1] -= 9.8 * dt;
+    mudPos[i * 3] += mudVel[i * 3] * dt; mudPos[i * 3 + 1] += mudVel[i * 3 + 1] * dt; mudPos[i * 3 + 2] += mudVel[i * 3 + 2] * dt;
+    if (mudLife[i] <= 0 || mudPos[i * 3 + 1] < GROUND_Y - 0.05) { mudLife[i] = 0; mudPos[i * 3 + 1] = -50; }
+  }
+  mudGeo.attributes.position.needsUpdate = true;
+  for (const m of mists) { if (m.t >= 1) continue; m.t += dt / m.d; const k = Math.min(1, m.t); m.s.position.addScaledVector(m.v, dt); m.v.multiplyScalar(Math.exp(-3 * dt)); m.s.scale.setScalar(m.sz * (0.25 + k * 0.9)); m.s.material.opacity = 0.75 * (1 - k); if (m.t >= 1) m.s.visible = false; }
+  for (const m of impacts) { if (m.t >= 1) continue; m.t += dt / 0.16; const k = Math.min(1, m.t); m.f.scale.setScalar(m.p * (0.2 + k * 0.35)); m.f.material.opacity = (1 - k) * 0.55; m.r.scale.setScalar(m.p * (0.15 + k * 0.8)); m.r.material.opacity = (1 - k) * 0.3; if (m.t >= 1) m.f.visible = m.r.visible = false; }
+  for (const s of sRings) { if (s.t >= 1) continue; s.t += dt / s.d; const k = Math.min(1, s.t), e = 1 - Math.pow(1 - k, 2.2); s.m.scale.setScalar(Math.max(0.01, s.r * e / 0.41)); s.m.material.opacity = s.a * (1 - k); if (s.t >= 1) s.m.visible = false; }
+  for (const m of pools) if (m.userData.grow > 0) { const s = m.scale.x + dt * 0.45; m.scale.setScalar(Math.min(s, m.userData.grow)); if (s >= m.userData.grow) m.userData.grow = 0; }
+  updateGibs(dt); updateStumps(dt); updateTrail(dt); rinseWeapons(dt);
+}
+
+/* ===== P7 infected: senses (sight, hearing), roar signals, squad tactics, physical hit reactions, wounds ===== */
+const INF = {
+  butcher: { name: '屠夫', height: 1.8, girth: 1.5, skin: '#b9937c', top: '#6d6658', bottom: '#2b2825', hair: '#3a2e25', hairStyle: 'sparse', apron: true, weight: 125, stab: 1.6, hp: 190, speed: 2.1, seed: 31, smart: 0.5, voice: 0.78, lightSens: 1, hesitate: 4.0 },
+  student: { name: '学生 · 原发型', height: 1.6, girth: 0.82, skin: '#c7a48c', top: '#273250', coat: '#273250', collar: '#d7d7d0', tie: '#7a2a2a', bottom: '#273250', hair: '#120c09', hairStyle: 'messy', backpack: '#7a3b2e', weight: 52, stab: 0.72, hp: 80, speed: 3.3, seed: 41, smart: 0.2, voice: 1.3, feral: true, lightSens: 0.15, hesitate: 0 },
+  office: { name: '白领', height: 1.74, girth: 1.0, skin: '#c9a084', top: '#c9ccd0', tie: '#2b3340', lanyard: true, bottom: '#1f2226', hair: '#2a1f17', hairStyle: 'short', weight: 76, stab: 1.0, hp: 110, speed: 2.7, seed: 51, smart: 0.9, voice: 1.0, lightSens: 1, hesitate: 2.2 }
+};
+// the dark ring around the floodlight where they lurk
+const SAFE = [];
+const floodConeFull = floodCone;
+for (let i = 0; i < 180; i++) {
+  const a = i / 180 * Math.PI * 2, d = dirA(a); let r = 3.5, ok = false;
+  for (; r < 15; r += 0.25) { const p = LURK_C.clone().addScaledVector(d, r); if (p.z < 6.0 && Math.abs(p.x) < 4.8) continue; if (!floodConeFull(p)) { ok = true; break; } }
+  SAFE.push(ok ? r : -1);
+}
+const safeR = a => SAFE[((Math.round(a / (Math.PI * 2) * 180) % 180) + 180) % 180];
+const infected = [];
+
+/* ---------------- squad: one attacker at a time, the leader gives orders ---------------- */
+const SQUAD = { leader: null, next: null, tokenCD: 0, flankT: -99, retreatT: -99, spotT: -99 };
+const ROAR = {
+  spot: { text: '嘶吼：发现猎物', r: 22 }, flank: { text: '低吼：包抄', r: 18 }, wail: { text: '哀嚎：同伴倒下', r: 20 },
+  rally: { text: '长嚎：灯灭了，围上去', r: 30 }, retreat: { text: '嘶声：撤', r: 24 }
+};
+const HUNT = ['stalk', 'windup', 'lunge', 'recover', 'pinning'];
+const GROUNDED = ['down', 'getup', 'dead', 'crawl'];
+function releaseToken() { SQUAD.tokenCD = Math.max(SQUAD.tokenCD, rnd(0.45, 0.85)); }
+function attackersBusy() { let n = 0; for (const e of infected) if (!e.dead && (e.state === 'windup' || e.state === 'lunge' || e.state === 'pinning')) n++; return n; }
+function squadThink(dt) {
+  SQUAD.tokenCD -= dt;
+  let lead = null; for (const e of infected) if (!e.dead && e.standing && (!lead || e.T.smart > lead.T.smart)) lead = e; SQUAD.leader = lead;
+  SQUAD.next = null;
+  if (attackersBusy() >= (floodOff() ? 2 : 1) || SQUAD.tokenCD > 0 || P.state === 'pinned' || P.dead) return;
+  let best = null, bs = 1e9; const pf = fwdOf(P.yaw);
   for (const e of infected) {
-    if (e.dead) continue; const d = e.pos.clone().sub(P.pos).setY(0); const l = d.length();
-    if (l > (heavy ? 2.05 : 1.85)) continue; if (d.normalize().dot(f) < Math.cos(heavy ? 0.85 : 1.0)) continue;
-    e.hit(f, heavy); n++;
+    if (e.dead || e.state !== 'stalk' || e.cool > 0) continue; const d = e.pos.distanceTo(P.pos); if (d > 6) continue;
+    const front = pf.dot(e.pos.clone().sub(P.pos).setY(0).normalize()); // -1 = behind the prey's back: preferred
+    const s = d + front * 0.6 - (e.rage > 0 ? 1 : 0); if (s < bs) { bs = s; best = e; }
   }
+  SQUAD.next = best;
+}
+function roar(e, type, slots) {
+  const R = ROAR[type]; e.roarT = e.roarDur = type === 'rally' ? 1.7 : type === 'flank' ? 0.8 : 1.1;
+  SND.roar(e.pos, type, e.T.voice); spawnRing(e.pos, R.r, 'roar');
+  floatLabel('【' + R.text + '】', e.headPos(), 'roar', 2.2);
+  if (!P.dead && e.pos.distanceTo(P.pos) < 14) P.adr = Math.min(1, P.adr + 0.12);
+  for (const o of infected) {
+    if (o === e || o.dead) continue; const d = o.pos.distanceTo(e.pos); if (d > R.r) continue;
+    o.inbox.push({ type, from: e, at: G.t + 0.3 + d * 0.035 + rnd(0, 0.25), where: e.lastKnown.clone(), slot: slots ? slots.get(o) : undefined });
+  }
+}
+/* hearing: everything loud you do goes out as a noise event */
+function makeNoise(pos, radius, kind) {
+  const r = radius * (1 - 0.22 * G.rain);
+  for (const e of infected) {
+    if (e.dead) continue; let d = Math.hypot(e.pos.x - pos.x, e.pos.z - pos.z);
+    if (insideCabin(pos.x, pos.z) !== insideCabin(e.pos.x, e.pos.z)) d *= 1.7;
+    if (d < r) e.hear(pos, 1 - d / r, radius);
+  }
+  if (radius >= 5 && G.mode === 'play') spawnRing(pos, r, 'noise');
+}
+/* sight: the cabin blocks it (except through the door), bushes thin it out */
+const CABIN_BOX = { x0: -3.75, x1: 3.75, z0: -3.3, z1: 3.25 };
+function segHitsBox(ax, az, bx, bz, b) {
+  let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az;
+  for (const [p, d, lo, hi] of [[ax, dx, b.x0, b.x1], [az, dz, b.z0, b.z1]]) {
+    if (Math.abs(d) < 1e-6) { if (p < lo || p > hi) return false; continue; }
+    let ta = (lo - p) / d, tb = (hi - p) / d; if (ta > tb) { const s = ta; ta = tb; tb = s; }
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); if (t0 > t1) return false;
+  }
+  return true;
+}
+function distSeg(px, pz, a, b) { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz || 1, t = clamp(((px - a.x) * dx + (pz - a.z) * dz) / l2, 0, 1); return Math.hypot(px - (a.x + dx * t), pz - (a.z + dz * t)); }
+function sightLine(a, b) {
+  const inA = insideCabin(a.x, a.z), inB = insideCabin(b.x, b.z);
+  if (inA !== inB) { const o = inA ? b : a, i = inA ? a : b; if (o.z < 3.2) return 0; const t = (3.1 - o.z) / (i.z - o.z), x = o.x + (i.x - o.x) * t; return Math.abs(x) < 0.45 ? 1 : 0; }
+  if (inA) return 1;
+  if (segHitsBox(a.x, a.z, b.x, b.z, CABIN_BOX)) return 0;
+  let k = 1; for (const [bx, bz] of bushes) if (distSeg(bx, bz, a, b) < 0.75) k *= 0.5; return k;
+}
+const _eye = new V3(), _tg = new V3();
+
+class Infected {
+  constructor(type, ang) {
+    const T = this.T = INF[type]; this.type = type;
+    this.vel = new V3(); this.lastKnown = new V3(); this.lungeT = new V3(); this.fleeTo = new V3(); this.inbox = [];
+    this.h = null; this.dirty = true; this.home = ang;
+    const bar = document.createElement('div'); bar.className = 'ebar';
+    bar.innerHTML = '<span class="eicon"></span><span class="ename"></span><i class="hp"><b></b></i><i class="bal"><b></b></i>';
+    $('labels').appendChild(bar); this.nameEl = bar.querySelector('.ename'); this.nameEl.textContent = T.name; this.shownName = T.name;
+    this.bar = bar; this.barHp = bar.querySelector('.hp b'); this.barBal = bar.querySelector('.bal b'); this.icon = bar.querySelector('.eicon');
+    const ar = document.createElement('div'); ar.className = 'threat'; $('threats').appendChild(ar); this.arrow = ar;
+    this.reset(); infected.push(this);
+  }
+  rebuild() {
+    if (this.h) { scene.remove(this.h.root); disposeTree(this.h.root); }
+    this.h = makeHuman(Object.assign({ infected: true, blood: true, topWear: 0.85, bottomWear: 0.8 }, this.T)); scene.add(this.h.root);
+    initSprings(this.h); this.mats = collectMats(this.h); this.dirty = false;
+  }
+  reset(far) {
+    if (this.dirty) this.rebuild();
+    const T = this.T; this.ang = this.home; const r = Math.max(4, safeR(this.ang)) + (far ? 9 : 1.5);
+    this.pos = LURK_C.clone().addScaledVector(dirA(this.ang), r); this.pos.y = GROUND_Y; this.vel.set(0, 0, 0);
+    this.yaw = this.ang + Math.PI; this.state = 'lurk'; this.st = 0; this.ph = rnd(0, 6); this.angVel = (Math.random() < 0.5 ? -1 : 1) * rnd(0.05, 0.11);
+    this.hp = T.hp; this.bal = 1; this.balT = 0; this.cool = rnd(1, 3); this.barT = 0;
+    this.adapt = 0; this.wasLit = false; this.shielding = false; this.hesT = 0;
+    this.voiceT = rnd(4, 10); this.dead = false; this.mood = rnd(); this.flinchT = 0;
+    this.aware = 0; this.lastKnown.copy(LURK_C); this.seeT = 99; this.seen = 0; this.provoked = false; this.spotFlash = 0; this.lookT = 0; this.lookAt = null;
+    this.inbox.length = 0; this.slot = null; this.slotT = 0; this.rage = 0; this.roarT = 0; this.roarDur = 1; this.feintT = rnd(2, 4); this.feint = 0; this.circleDir = Math.random() < 0.5 ? -1 : 1;
+    this.stumDur = 0.5; this.stumPh = 0; this.fdx = 0; this.fdz = -1; this.fallA = 0; this.fallV = 0; this.landed = false; this.dieOnLand = false; this.downPose = {};
+    this.flashK = 0; this.bumpT = 0; this.investT = 0; this.searchYaw = 0; this.regroupT = 0; this.wailed = false;
+    this.arms = 2; this.brokenArm = { L: false, R: false }; this.crawler = false; this.bleed = 0; this.dripT = 0; this.headless = false;
+    this.h.cur = Object.assign({}, NEUTRAL); this.h.root.visible = true; initSprings(this.h); setFlash(this.mats, 0);
+  }
+  get standing() { return !GROUNDED.includes(this.state); }
+  fwd() { return fwdOf(this.yaw); }
+  setState(s) { this.state = s; this.st = 0; }
+  lying() { return this.state === 'down' || this.state === 'dead' || this.state === 'getup' || this.state === 'crawl' || (this.state === 'pinning' && this.crawler); }
+  chestPos() {
+    if (this.lying()) {
+      const a = this.crawler && this.state !== 'down' ? 1.45 : Math.min(1.5, this.state === 'getup' ? 1.5 * (1 - smooth(0, 1, this.st)) : this.fallA);
+      return this.pos.clone().addScaledVector(toWorld(this.fdx, this.fdz, this.yaw), 0.85 * Math.sin(a)).add(new V3(0, 1.15 * Math.cos(a) + 0.18, 0));
+    }
+    return this.pos.clone().add(new V3(0, 1.2 * this.T.height / 1.75, 0));
+  }
+  headPos() { return this.lying() ? this.chestPos().add(new V3(0, 0.45, 0)) : this.pos.clone().add(new V3(0, 1.95 * this.T.height / 1.75, 0)); }
+
+  /* ---- senses ---- */
+  perceive(dP) {
+    this.seen = 0;
+    if (P.dead || G.mode === 'title' || G.mode === 'opening' || this.state === 'down' || this.state === 'getup' || this.state === 'startle' || this.state === 'flee') return;
+    const range = 3 + 13.5 * P.vis; if (dP > range) return;
+    const to = P.pos.clone().sub(this.pos).setY(0).divideScalar(Math.max(dP, 0.001)), c = this.fwd().dot(to);
+    if (dP > 2.2 && c < -0.2) return; // wide predator vision, but nothing behind
+    _eye.set(this.pos.x, this.pos.y + (this.crawler ? 0.35 : 1.6), this.pos.z); _tg.set(P.pos.x, P.pos.y + 1.1, P.pos.z);
+    const los = sightLine(_eye, _tg); if (los <= 0) return;
+    let k = los * clamp(1.25 - dP / range, 0.12, 1); if (c < 0.45) k *= 0.55; if (this.shielding) k *= 0.6;
+    this.seen = k;
+  }
+  hear(pos, s, radius) {
+    if (this.dead || this.state === 'down' || this.state === 'getup') return;
+    const err = (1 - s) * 2.2;
+    this.lastKnown.set(pos.x + rnd(-err, err), GROUND_Y, pos.z + rnd(-err, err));
+    this.aware = Math.min(1.25, this.aware + 0.15 + s * 0.55 * (radius >= 8 ? 1.4 : 1));
+    if (radius >= 8 && s > 0.35) this.provoked = true;
+    this.lookAt = pos.clone(); this.lookT = 1.4;
+    if ((this.state === 'lurk' || this.state === 'search') && this.aware > 0.3 && (this.provoked || G.playT > 40)) { this.setState('investigate'); this.investT = 0; }
+    else if (this.state === 'investigate') this.investT = 0;
+  }
+  onSpot() {
+    this.setState('stalk'); this.spotFlash = 1.6;
+    if (G.t - SQUAD.spotT > 6) { SQUAD.spotT = G.t; roar(this, 'spot'); } else SND.clicks(this.pos, 3);
+  }
+  onSignal(m) {
+    if (m.type !== 'retreat' && !(this.standing || this.state === 'crawl')) return;
+    switch (m.type) {
+      case 'spot': this.aware = Math.max(this.aware, 1.05); this.provoked = true; this.lastKnown.copy(m.where); SND.clicks(this.pos, 2); break;
+      case 'flank': if (m.slot !== undefined) { this.slot = m.slot; this.slotT = 9; SND.clicks(this.pos, 2); } break;
+      case 'witness': if (this.standing && !this.wailed) { this.wailed = true; roar(this, 'wail'); } break;
+      case 'wail': this.rage = 7; this.aware = 1.25; this.provoked = true; this.lastKnown.copy(P.pos); SND.growl(this.pos, 0.7, 0.8); floatLabel('红了眼', this.headPos(), 'roar'); break;
+      case 'rally': this.aware = 1.25; this.provoked = true; this.regroupT = 0; this.lastKnown.copy(P.pos); SND.growl(this.pos, 0.6, 0.9); break;
+      case 'retreat':
+        if (this.T.feral) { floatLabel('（原发型不听）', this.headPos(), 'tough', 1.6); break; }
+        if (this.standing && this.state !== 'pinning' && this.state !== 'stumble') this.flee(P.pos); break;
+    }
+  }
+  leaderThink(dP) {
+    if (this !== SQUAD.leader || P.dead || P.indoor) return;
+    const hunters = infected.filter(o => !o.dead && o.standing && HUNT.includes(o.state));
+    const fallen = infected.filter(o => o.dead || o.state === 'down' || o.state === 'crawl').length;
+    if (G.t - SQUAD.retreatT > 30 && ((this.hp < this.T.hp * 0.35 && fallen >= 1) || fallen >= 2)) { SQUAD.retreatT = G.t; roar(this, 'retreat'); this.flee(P.pos); return; }
+    if (hunters.length >= 2 && dP < 10 && G.t - SQUAD.flankT > 11 && this.roarT <= 0) {
+      SQUAD.flankT = G.t; const others = hunters.filter(o => o !== this), slots = new Map(), plan = [Math.PI, Math.PI * 0.55, -Math.PI * 0.55, -Math.PI * 0.8];
+      others.sort((a, b) => b.pos.distanceTo(P.pos) - a.pos.distanceTo(P.pos)).forEach((o, i) => slots.set(o, plan[i % plan.length]));
+      this.slot = 0.35; this.slotT = 9; roar(this, 'flank', slots);
+    }
+  }
+  startle(from) { // strong light only works at first: a flinch, an arm over the eyes, a step back
+    if (this.crawler) { if (this.state === 'pinning') releasePin(this, true); return; }
+    if (this.state === 'pinning') releasePin(this, true);
+    if (this.state === 'windup' || this.state === 'lunge') releaseToken();
+    this.setState('startle'); const away = this.pos.clone().sub(from).setY(0); if (away.lengthSq() < 0.01) away.set(0, 0, 1); away.normalize();
+    this.vel.copy(away).multiplyScalar(2.2); SND.shriek(this.pos, 0.55);
+    floatLabel('惊退', this.headPos(), 'tough');
+  }
+  flee(from) {
+    if (this.state === 'pinning') releasePin(this, true);
+    if (this.state === 'windup' || this.state === 'lunge') releaseToken();
+    this.setState('flee'); const away = this.pos.clone().sub(from); away.y = 0; if (away.lengthSq() < 0.01) away.set(0, 0, 1); away.normalize();
+    const a = Math.atan2(this.pos.x - LURK_C.x, this.pos.z - LURK_C.z); const r = Math.max(5, safeR(a)) + rnd(5, 8);
+    this.fleeTo.copy(LURK_C).addScaledVector(dirA(a), r).addScaledVector(away, 2); this.regroupT = 9;
+  }
+
+  /* ---- getting hit: the body is human; it has no pain, but it has mass and balance ---- */
+  hit(dir, kind, power, blade) {
+    if (this.dead) return null;
+    const T = this.T, H = HIT[kind];
+    let imp = H.imp * power * (blade ? 0.72 : 1), dmg = H.dmg * power * (blade ? 1.45 : 1), tag = '';
+    const lying = !this.standing, wasAtk = this.state === 'windup' || this.state === 'lunge';
+    if (lying) dmg *= 1.4;
+    if (this.state === 'windup') { imp *= 1.35; tag = '打断'; }
+    if (this.state === 'lunge') { imp *= 1.7; dmg *= 1.25; tag = '迎击'; }
+    this.hp -= dmg; this.barT = 3.5; this.flashK = kind === 'heavy' ? 1 : 0.7; this.provoked = true; this.aware = 1.25; this.lastKnown.copy(P.pos); this.dirty = true;
+    if (wasAtk) releaseToken();
+    const loc = toLocal(dir, this.yaw), pw = imp / T.weight;
+    impactReact(this.h, loc.x, loc.z, clamp(pw * 1.1, 0.25, 1.6), kind);
+    if (kind !== 'kick') { paintWound(this.h.coatMat, kind === 'heavy' ? 3 : 2, kind === 'heavy' || blade); if (Math.random() < 0.4) paintWound(this.h.faceMat, 1, false, true); }
+    this.bleed = Math.min(1, this.bleed + (kind === 'kick' ? 0 : (blade ? 0.12 : 0.04) * (kind === 'heavy' ? 2 : 1)));
+    const killed = this.hp <= 0;
+    let cut = null;
+    if (blade && kind !== 'kick') cut = this.dismember(kind, killed, loc, dir, lying);
+    else if (!blade && kind === 'heavy') {
+      if (killed && !lying && Math.random() < 0.6) { const hp = this.headPos(); spawnBlood(hp, new V3(dir.x * 0.4, 0.8, dir.z * 0.4), 30, false, 1.2, 0.4); spawnMist(hp, dir, 1); springKick(this.h, 'headZ', (loc.x > 0 ? -1 : 1) * 14); SND.crunch(hp, 7, 0.7); cut = { tag: '颅骨碎裂' }; }
+      else if (!killed && Math.random() < 0.3) cut = this.breakArm(loc.x > 0 ? 'R' : 'L');
+    }
+    if (lying) {
+      this.vel.addScaledVector(dir, pw * 1.2); springKick(this.h, 'bodyY', 0.9 * clamp(pw, 0.3, 1));
+      if (killed) this.die();
+      return { tag: cut ? cut.tag : (killed ? '断气了' : '倒地重击'), cls: 'heavy', killed, cut };
+    }
+    this.vel.addScaledVector(dir, pw * 3.0);
+    if (cut && cut.fall) return { tag: cut.tag, cls: 'heavy', killed, cut };
+    if (killed) { this.startFall(loc, pw); this.dieOnLand = true; return { tag: cut ? cut.tag : (tag || '倒下'), cls: 'heavy', killed, cut }; }
+    const loss = imp / (100 * T.stab) * (this.arms < 2 ? 1.15 : 1);
+    this.bal -= loss; this.balT = 0.6;
+    if (this.bal <= 0) { this.startFall(loc, pw); return { tag: cut ? cut.tag : (tag || '击倒'), cls: 'heavy', cut }; }
+    if (loss >= 0.33 || this.bal < 0.45 || tag) { this.stumble(dir, 0.3 + loss * 0.85 + (tag ? 0.15 : 0)); return { tag: cut ? cut.tag : (tag || (loss > 0.6 ? '趔趄' : '失衡')), cls: tag || cut ? 'heavy' : '', cut }; }
+    this.flinchT = 0.15;
+    return { tag: cut ? cut.tag : '晃了一下', cls: cut ? 'heavy' : 'tough', cut };
+  }
+  dismember(kind, killed, loc, dir, lying) {
+    const heavy = kind === 'heavy';
+    if (killed && heavy && !this.h.cut.head && !lying && Math.random() < 0.6) { this.decapitate(dir); return { tag: '斩首' }; }
+    if (killed) return null;
+    const side = loc.x > 0.12 ? 'R' : loc.x < -0.12 ? 'L' : (Math.random() < 0.5 ? 'L' : 'R');
+    if (!lying && Math.random() < (heavy ? 0.4 : 0.15) && this.severArm(side, dir)) return { tag: '断臂' };
+    if (heavy && Math.random() < (lying ? 0.5 : 0.15) && (this.severLeg(side, dir) || this.severLeg(side === 'L' ? 'R' : 'L', dir))) return { tag: '断腿', fall: !lying };
+    return null;
+  }
+  severArm(side, dir) {
+    const key = 'el' + side, arm = side === 'L' ? this.h.armL : this.h.armR; if (this.h.cut[key]) return false;
+    this.h.cut[key] = true; this.arms -= this.brokenArm[side] ? 0.5 : 1; this.bleed = Math.min(1, this.bleed + 0.45);
+    const c = new V3(); arm.el.children[0].getWorldPosition(c);
+    detachGib(arm.el, dir.clone().multiplyScalar(2.4).add(new V3(rnd(-0.5, 0.5), 2.2, rnd(-0.5, 0.5))), new V3(rnd(-10, 10), rnd(-5, 5), rnd(-10, 10)), { r: 0.05, center: c });
+    addStump(arm.sh, -0.29 * this.h.s, 0.048 * this.h.s * Math.sqrt(this.T.girth), new V3(0, -1, 0));
+    const p = new V3(); arm.sh.getWorldPosition(p); spawnBlood(p, dir, 26, false, 1.2, 0.5); spawnMist(p, dir, 0.8); SND.crunch(p, 5, 0.6);
+    return true;
+  }
+  severLeg(side, dir) {
+    const key = 'kn' + side, leg = side === 'L' ? this.h.L : this.h.R; if (this.h.cut[key]) return false;
+    this.h.cut[key] = true; this.bleed = Math.min(1, this.bleed + 0.6); this.crawler = true;
+    const c = new V3(); leg.knee.children[0].getWorldPosition(c);
+    detachGib(leg.knee, dir.clone().multiplyScalar(1.6).add(new V3(rnd(-0.5, 0.5), 1.4, rnd(-0.5, 0.5))), new V3(rnd(-8, 8), rnd(-4, 4), rnd(-8, 8)), { r: 0.06, center: c });
+    addStump(leg.hip, -0.43 * this.h.s, 0.066 * this.h.s * Math.sqrt(this.T.girth), new V3(0, -1, 0));
+    spawnBlood(c, dir, 22, false, 1, 0.5); spawnMist(c, dir, 0.7); SND.crunch(c, 5, 0.6);
+    if (this.standing) { this.yaw = Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z); this.startFall({ x: 0, z: 1 }, 1.2); }
+    return true;
+  }
+  decapitate(dir) {
+    const h = this.h; h.cut.head = true; this.headless = true; this.bleed = 1;
+    const c = new V3(); h.head.children[0].getWorldPosition(c);
+    detachGib(h.head, dir.clone().multiplyScalar(2.6).add(new V3(rnd(-0.4, 0.4), 3.2, rnd(-0.4, 0.4))), new V3(rnd(-12, 12), rnd(-6, 6), rnd(-12, 12)), { r: 0.1, center: c, roll: true, bleed: 4 });
+    const st = addStump(h.chest, 0.13 * h.s, 0.05 * h.s, new V3(0, 1, 0)); st.life = 6; st.next = 0.15;
+    spawnBlood(c, new V3(0, 1, 0), 40, false, 1.6, 0.4); spawnMist(c, new V3(0, 0.6, 0), 1.2); SND.crunch(c, 7, 0.7);
+    if (P.pos.distanceTo(this.pos) < 2.4) { lensSplat(3); paintWound(P.h.coatMat, 2, true); }
+  }
+  breakArm(side) {
+    if (this.brokenArm[side] || this.h.cut['el' + side]) return null;
+    this.brokenArm[side] = true; this.arms -= 0.5; const arm = side === 'L' ? this.h.armL : this.h.armR, p = new V3(); arm.el.getWorldPosition(p);
+    SND.crunch(p, 6, 0.65); springKick(this.h, side === 'L' ? 'shLx' : 'shRx', 9);
+    return { tag: '骨折' };
+  }
+  stumble(dir, dur) {
+    if (this.state === 'windup' || this.state === 'lunge') releaseToken();
+    this.setState('stumble'); this.stumDur = dur; this.stumPh = 0; this.cool = Math.max(this.cool, 0.6);
+    SND.exhale(this.pos, this.T.voice, 0.4);
+  }
+  startFall(loc, pw) {
+    if (this.state === 'windup' || this.state === 'lunge') releaseToken();
+    const l = Math.hypot(loc.x, loc.z) || 1; this.fdx = loc.x / l; this.fdz = loc.z / l;
+    this.setState('down'); this.fallA = 0.12; this.fallV = 1.5 + clamp(pw, 0, 1.6) * 2.0; this.landed = false;
+    this.downPose = this.makeDownPose(); SND.exhale(this.pos, this.T.voice, 0.55);
+  }
+  makeDownPose() {
+    if (this.fdz > 0.4) return { shLx: -2.6 + rnd(-0.3, 0.3), shRx: -2.4 + rnd(-0.3, 0.3), shLz: rnd(0.2, 0.6), shRz: -rnd(0.2, 0.6), elL: rnd(0.3, 0.9), elR: rnd(0.3, 0.9), headX: -0.6, headY: rnd(-0.9, 0.9), knL: rnd(0.1, 0.6), knR: rnd(0.1, 0.6), hipLz: 0.12, hipRz: -0.12 };
+    return { shLz: rnd(0.7, 1.4), shRz: -rnd(0.7, 1.4), shLx: rnd(-0.7, 0.2), shRx: rnd(-0.7, 0.2), elL: rnd(0.2, 1), elR: rnd(0.2, 1), hipLz: rnd(0.05, 0.3), hipRz: -rnd(0.05, 0.3), knL: rnd(0.1, 0.8), knR: rnd(0.1, 0.8), headY: rnd(-0.8, 0.8), headX: this.fdz < -0.4 ? rnd(-0.3, 0.1) : 0, headZ: this.fdz < -0.4 ? 0 : -this.fdx * 0.4 };
+  }
+  fallHard(a) { const lift = smooth(0.7, 1.5, a) * (Math.abs(this.fdz) * 0.13 + Math.abs(this.fdx) * 0.19) * (this.T.girth > 1.2 ? 1.4 : 1); return { bodyX: this.fdz * a, bodyZ: -this.fdx * a, bodyY: lift }; }
+  onLand() {
+    const w = this.T.weight, along = toWorld(this.fdx, this.fdz, this.yaw);
+    SND.bodyFall(this.pos, w); makeNoise(this.pos, 10, 'fall');
+    for (let i = 0; i < 4; i++) spawnSplash(this.pos.clone().addScaledVector(along, 0.3 + i * 0.4), 7, 0.25, 1.4 + w / 90);
+    if (this.pos.distanceTo(P.pos) < 9) G.shake = Math.max(G.shake, 0.1 * w / 80);
+    if (this.hp < this.T.hp * 0.5) { const c = this.pos.clone().addScaledVector(along, 0.8); c.y += 0.15; spawnBlood(c, new V3(0, 1, 0), 8, true, 0.8, 0.6); }
+    if (this.dieOnLand) { this.dieOnLand = false; this.die(); return; }
+    if (this.hp < this.T.hp * 0.35 && !this.wailed && !this.headless) { this.wailed = true; roar(this, 'wail'); }
+  }
+  die() {
+    this.dead = true; this.state = 'dead'; this.barT = 0; this.inbox.length = 0; this.flashK = 0; setFlash(this.mats, 0);
+    addBloodPool(this.chestPos(), this.headless || this.arms < 2 || this.crawler ? 1.9 : 1.4);
+    let o = null, od = 18; for (const x of infected) if (x !== this && !x.dead && x.standing) { const d = x.pos.distanceTo(this.pos); if (d < od) { od = d; o = x; } }
+    if (o) o.inbox.push({ type: 'witness', at: G.t + 0.6 });
+  }
+  bleedOut(dt) {
+    if (this.bleed <= 0) return;
+    this.hp -= this.bleed * 1.6 * dt; this.dripT -= dt;
+    if (this.dripT <= 0) { this.dripT = rnd(0.08, 0.3) / (0.3 + this.bleed); const p = this.chestPos(); p.y -= this.standing ? 0.35 : 0.05; spawnBlood(p, new V3(0, -0.5, 0), 1, true, 0.2, 0.9); }
+    this.bleed = Math.max(0, this.bleed - dt * 0.012);
+    if (this.hp <= 0) { if (this.standing) { this.startFall({ x: 0, z: 1 }, 0.2); this.dieOnLand = true; } else if (this.state !== 'down') this.die(); else this.dieOnLand = true; }
+  }
+  bump(o, n, sp) { // a stumbling body carries its momentum into whoever it runs into
+    this.bumpT = 0.5; o.bumpT = 0.35;
+    const m1 = this.T.weight, m2 = o.T.weight, j = sp * m1 / (m1 + m2) * 1.15;
+    o.vel.addScaledVector(n, j); this.vel.multiplyScalar(0.45);
+    const loss = j * 0.42 * (70 / m2), loc = toLocal(n, o.yaw);
+    impactReact(o.h, loc.x, loc.z, clamp(j * 0.4, 0.2, 1.2), 'quick'); SND.thud(o.pos); SND.exhale(o.pos, o.T.voice, 0.4);
+    o.bal -= loss; o.balT = 0.5;
+    if (o.bal <= 0) { o.startFall(loc, j * 0.5); floatLabel('撞倒同伴', o.headPos(), 'heavy'); } else { o.stumble(n, 0.3 + loss * 0.7); floatLabel('撞上', o.headPos(), ''); }
+  }
+  slam() { // into a post, the rail or the porch edge
+    this.bumpT = 0.6; const sp = Math.hypot(this.vel.x, this.vel.z); this.vel.multiplyScalar(-0.25);
+    const n = this.vel.clone().setY(0); if (n.lengthSq() < 1e-4) n.copy(this.fwd()).negate(); n.normalize();
+    const loc = toLocal(n, this.yaw); impactReact(this.h, loc.x, loc.z, 0.8, 'quick'); SND.thud(this.pos); G.shake = Math.max(G.shake, 0.1);
+    if (this.state === 'stumble') { this.bal -= 0.35 + sp * 0.08; this.balT = 0.6; floatLabel('撞上柱子', this.headPos(), ''); if (this.bal <= 0) this.startFall(loc, 0.5); }
+  }
+  avoidLight(dir, dt) {
+    if (!inFlood(this.pos.clone().addScaledVector(dir, 0.8))) return dir;
+    this.hesT += dt;
+    const tang = new V3(-dir.z, 0, dir.x); if (inFlood(this.pos.clone().addScaledVector(tang, 0.8))) tang.negate();
+    return inFlood(this.pos.clone().addScaledVector(tang, 0.8)) ? new V3() : tang;
+  }
+  moveDir(dir, spd, dt, k = 6) { this.vel.x = damp(this.vel.x, dir.x * spd, k, dt); this.vel.z = damp(this.vel.z, dir.z * spd, k, dt); }
+  moveTo(target, spd, dt) { const d = target.clone().sub(this.pos); d.y = 0; const l = d.length(); if (l < 0.3) { this.moveDir(new V3(), 0, dt); return; } this.moveDir(d.divideScalar(l), Math.min(spd, l * 1.5), dt); }
+  face(target, dt, k = 8) { const a = Math.atan2(target.x - this.pos.x, target.z - this.pos.z); this.yaw += angDiff(this.yaw, a) * (1 - Math.exp(-k * dt)); }
+  gait(amt, run) {
+    const w = walkPose(this.ph, amt, run);
+    if (this.hp < this.T.hp * 0.45) { w.knR *= 0.3; w.hipRx *= 0.6; w.spZ = (w.spZ || 0) + Math.sin(this.ph) * 0.08; w.bodyY = (w.bodyY || 0) - Math.max(0, Math.sin(this.ph)) * 0.03; }
+    return w;
+  }
+  updateDead(dt) {
+    this.vel.multiplyScalar(Math.exp(-6 * dt)); this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt; this.pos.y = groundY(this.pos.x, this.pos.z);
+    springStep(this.h, dt); poseTo(this.h, this.downPose, 6, dt, this.fallHard(1.5));
+    this.h.root.position.copy(this.pos); this.h.root.rotation.y = this.yaw;
+  }
+
+  update(dt) {
+    const T = this.T, h = this.h; this.st += dt;
+    this.barT -= dt; this.voiceT -= dt; this.cool -= dt; this.flinchT -= dt; this.roarT -= dt; this.spotFlash -= dt; this.rage -= dt; this.lookT -= dt; this.bumpT -= dt; this.slotT -= dt; this.regroupT -= dt;
+    if (this.flashK > 0) { this.flashK = Math.max(0, this.flashK - dt * 8); setFlash(this.mats, this.flashK); }
+    if (this.dead) { this.updateDead(dt); return; }
+    if (this.balT > 0) this.balT -= dt; else this.bal = Math.min(1, this.bal + (this.state === 'stumble' ? 0.22 : 0.5) * dt);
+    this.bleedOut(dt); if (this.dead) { this.updateDead(dt); return; }
+    for (let i = this.inbox.length - 1; i >= 0; i--) if (G.t >= this.inbox[i].at) { const m = this.inbox.splice(i, 1)[0]; this.onSignal(m); if (this.dead) return; }
+    const toP = P.pos.clone().sub(this.pos); toP.y = 0; const dP = toP.length();
+    // strong light (floodlight, torch) startles them at first; then they shield their eyes and keep coming. The feral barely care.
+    const lit = inFlood(this.pos), torch = torchHits(this.pos), strong = lit || torch, sens = T.lightSens;
+    if (strong && this.standing) {
+      if (!this.wasLit && this.adapt < 0.5 && this.state !== 'stumble') {
+        if (sens > 0.5 && this.rage <= 0 && ['lurk', 'stalk', 'porch', 'windup', 'recover', 'pinning', 'investigate', 'search'].includes(this.state)) this.startle(torch ? P.pos : floodLight.position);
+        else if (this.state !== 'lurk') { this.flinchT = 0.15; floatLabel('硬扛强光', this.headPos(), 'heavy'); }
+      }
+      this.adapt = Math.min(1, this.adapt + dt / (1.3 * sens));
+    } else if (!strong) this.adapt = Math.max(0, this.adapt - dt / 7);
+    this.wasLit = strong; this.shielding = strong && sens > 0.5 && this.state !== 'startle' && this.standing;
+    // senses
+    this.perceive(dP);
+    if (this.seen > 0) { this.aware = Math.min(1.25, this.aware + dt * this.seen * 1.7); this.lastKnown.copy(P.pos); this.seeT = 0; if (dP < 6 && !inFlood(P.pos)) this.provoked = true; }
+    else this.seeT += dt;
+    if ((G.playT < 40 && !this.provoked && !floodOff()) || this.regroupT > 0) this.aware = Math.min(this.aware, 0.95);
+    const canHunt = G.mode === 'play' && !P.dead && !P.indoor;
+    if (this.aware >= 1 && canHunt && (this.state === 'lurk' || this.state === 'investigate' || this.state === 'search')) this.onSpot();
+    let pose = {}, hard = null; const sp = Math.hypot(this.vel.x, this.vel.z);
+    switch (this.state) {
+      case 'lurk': {
+        this.ang += this.angVel * dt; let r = safeR(this.ang);
+        if (r < 0 || Math.random() < 0.0015) { this.angVel *= -1; this.ang += this.angVel * dt * 3; r = Math.max(4, safeR(this.ang)); }
+        const tgt = LURK_C.clone().addScaledVector(dirA(this.ang), Math.max(r, 4) + 0.9 + this.mood * 1.7);
+        const watching = this.aware > 0.3 && this.seeT < 2.5;
+        this.moveTo(tgt, watching ? 0.35 : 0.8, dt);
+        if (watching) this.face(P.pos, dt, 3);
+        else if (sp > 0.15) this.yaw += angDiff(this.yaw, Math.atan2(this.vel.x, this.vel.z)) * (1 - Math.exp(-4 * dt));
+        else if (Math.sin(G.t * 0.3 + this.mood * 9) > 0.7) this.face(P.pos, dt, 2);
+        if (!watching) this.aware = Math.max(0, this.aware - dt * 0.05);
+        if (this.aware > 0.45 && (this.provoked || G.playT > 40) && canHunt && this.regroupT <= 0) { this.setState('investigate'); this.investT = 0; }
+        if (floodOff() && !P.dead) { if (P.indoor) this.setState('porch'); else if (dP < 17 && G.mode === 'play') { this.aware = Math.max(this.aware, 1.05); this.provoked = true; } }
+        if (this.voiceT < 0) { SND.growl(this.pos, 0.3, rnd(0.8, 1.4)); this.voiceT = rnd(8, 15); }
+        pose = Object.assign(this.gait(clamp(sp / 0.9, 0, 1) * 0.7), { spX: 0.42, knL: 0.35, knR: 0.35, pelY: -0.07, headX: watching ? -0.45 : -0.32, shLx: -0.35, shRx: -0.4, elL: 0.55, elR: 0.6, spZ: Math.sin(G.t * 0.9 + this.mood * 5) * 0.06 });
+        break;
+      }
+      case 'investigate': { // walk to where it saw or heard something, low and slow, head sweeping
+        this.investT += dt;
+        const to = this.lastKnown.clone().sub(this.pos).setY(0), l = to.length();
+        let dir = l > 0.7 ? to.divideScalar(l) : new V3();
+        const allowLight = T.feral || floodOff() || this.adapt > 0.8 || this.rage > 0;
+        if (!allowLight && dir.lengthSq()) dir = this.avoidLight(dir, dt);
+        this.moveDir(dir, T.speed * (this.aware > 0.7 ? 0.55 : 0.4), dt);
+        if (this.seen > 0) this.face(P.pos, dt, 4); else if (sp > 0.2) this.yaw += angDiff(this.yaw, Math.atan2(this.vel.x, this.vel.z)) * (1 - Math.exp(-5 * dt));
+        if (this.seen <= 0) this.aware = Math.max(0, this.aware - dt * 0.03);
+        if (l < 0.9 || this.investT > 8 || (!dir.lengthSq() && this.investT > 2.5)) { this.setState('search'); this.searchYaw = this.yaw; }
+        else if (P.indoor && floodOff()) this.setState('porch');
+        if (this.voiceT < 0) { SND.clicks(this.pos, 2); this.voiceT = rnd(3, 6); }
+        pose = Object.assign(this.gait(clamp(sp / 1.4, 0, 1)), { spX: 0.36, knL: 0.3, knR: 0.3, pelY: -0.06, headX: -0.15 + Math.sin(G.t * 3) * 0.08, headY: Math.sin(G.t * 1.3 + this.mood * 4) * 0.6, shLx: -0.3, shRx: -0.3, elL: 0.5, elR: 0.5 });
+        break;
+      }
+      case 'search': { // stand where the trail went cold: turn, sniff, click
+        this.moveDir(new V3(), 0, dt, 4); this.yaw = this.searchYaw + Math.sin(this.st * 1.1) * 1.3;
+        if (this.seen <= 0) this.aware = Math.max(0, this.aware - dt * 0.1);
+        if (this.st > 5.5 || this.aware < 0.12) { this.setState('lurk'); this.ang = Math.atan2(this.pos.x - LURK_C.x, this.pos.z - LURK_C.z); }
+        else if (this.aware > 0.45 && this.st > 1 && this.lastKnown.distanceTo(this.pos) > 1.5) { this.setState('investigate'); this.investT = 0; }
+        if (this.voiceT < 0) { SND.clicks(this.pos, 3); this.voiceT = rnd(2, 4); }
+        pose = { spX: 0.32, knL: 0.25, knR: 0.25, headX: -0.25 + Math.sin(this.st * 2.3) * 0.15, headY: Math.sin(this.st * 1.7) * 0.5, shLx: -0.3, shRx: -0.35, elL: 0.5, elR: 0.5, jaw: 0.2 + Math.max(0, Math.sin(this.st * 5)) * 0.3 };
+        break;
+      }
+      case 'porch': {
+        const tgt = new V3(clamp(this.pos.x, -2.8, 2.8) + Math.sin(this.home * 3) * 0.6, GROUND_Y, 6.1 + this.mood * 0.6);
+        this.moveTo(tgt, 1.3, dt); this.face(new V3(0, 0, 3), dt, 3);
+        if (!floodOff()) this.setState('lurk');
+        if (!P.indoor && dP < 12) { this.aware = 1.1; this.setState('stalk'); }
+        if (this.voiceT < 0) { SND.growl(this.pos, 0.5, rnd(1, 1.6)); this.voiceT = rnd(3, 6); }
+        pose = Object.assign(this.gait(clamp(sp / 1.3, 0, 1)), { spX: 0.25, headX: -0.2, shLx: -0.6, shRx: -0.55, elL: 0.3, elR: 0.4 });
+        break;
+      }
+      case 'stalk': {
+        if (!canHunt) { this.setState(floodOff() && P.indoor ? 'porch' : 'lurk'); this.aware = Math.min(this.aware, 0.8); break; }
+        if (this.seeT > 3.5) { this.setState('investigate'); this.investT = 0; break; } // lost sight: go to where it was last seen
+        this.leaderThink(dP); if (this.state !== 'stalk') break;
+        const pLit = inFlood(P.pos), allowLight = T.feral || floodOff() || this.adapt > 0.8 || this.hesT > T.hesitate || this.rage > 0;
+        const rageK = this.rage > 0 ? 1.18 : 1, limpK = this.hp < T.hp * 0.45 ? 0.82 : 1, myTurn = SQUAD.next === this;
+        const target = this.seen > 0 ? P.pos : this.lastKnown, toT = target.clone().sub(this.pos).setY(0), dT = toT.length();
+        let dir, spd;
+        if (myTurn && dP < 2.7 && (!pLit || allowLight)) { this.setState('windup'); SQUAD.tokenCD = 0.3; SND.growl(this.pos, 0.8, 0.6); break; }
+        if (dT > 4.4 || myTurn) { dir = dT > 0.05 ? toT.divideScalar(dT) : new V3(); spd = (dT > 5 ? T.speed : T.speed * 0.8) * (floodOff() ? 1.15 : 1); this.feint = 0; }
+        else { // hold a ring around the prey, wait for a turn, drift toward the flank slot the leader gave
+          const R = P.state === 'pinned' ? 2.3 : 2.9 + this.mood * 0.5;
+          let want = Math.atan2(this.pos.x - P.pos.x, this.pos.z - P.pos.z);
+          if (this.slot !== null && this.slotT > 0) want += clamp(angDiff(want, P.yaw + this.slot), -0.9, 0.9); else want += this.circleDir * 0.5;
+          const to = P.pos.clone().addScaledVector(dirA(want), R).sub(this.pos).setY(0);
+          if (dP < R) { const rad = toP.clone().divideScalar(-Math.max(dP, 0.001)), out = to.dot(rad); if (out > 0) to.addScaledVector(rad, -out); } // you stepped in: it holds its ground instead of backing off
+          const l = to.length(); dir = l > 0.05 ? to.divideScalar(l) : new V3(); spd = Math.min(T.speed * 0.8, l * 2.2 + 0.4);
+          this.feintT -= dt;
+          if (this.feintT <= 0 && dP < 3.9 && P.state !== 'pinned') { this.feint = 0.34; this.feintT = rnd(2.4, 4.6) / (T.feral ? 1.6 : 1); SND.growl(this.pos, 0.55, 0.45); }
+          if (this.feint > 0) { this.feint -= dt; dir = toP.clone().normalize(); spd = 3.4; }
+          if (Math.random() < dt * 0.15) this.circleDir *= -1;
+        }
+        if (!allowLight && dir.lengthSq() > 0) dir = this.avoidLight(dir, dt);
+        if (!inFlood(this.pos) && allowLight && !floodOff()) this.hesT = Math.max(0, this.hesT - dt * 0.2);
+        this.moveDir(dir, spd * rageK * limpK * (this.shielding ? 0.72 : 1), dt); this.face(P.pos, dt, 6);
+        if (dP > 19 && this.seen <= 0) this.setState('lurk');
+        if (this.voiceT < 0) { SND.growl(this.pos, 0.45, rnd(0.6, 1)); this.voiceT = rnd(4, 8); }
+        pose = Object.assign(this.gait(clamp(sp / 2.5, 0, 1), clamp((sp - 2.2) / 1.5, 0, 1)), { spX: 0.3 + clamp((sp - 2) / 2, 0, 0.2) + (this.feint > 0 ? 0.25 : 0), headX: -0.25, shLx: -0.5, shRx: -0.45, elL: 0.45, elR: 0.5, jaw: this.feint > 0 ? 0.9 : 0.15 });
+        break;
+      }
+      case 'windup': {
+        this.moveDir(new V3(), 0, dt, 10); this.face(P.pos, dt, 10);
+        const k = smooth(0, 0.5, this.st);
+        pose = { spX: -0.12 * k, shLx: -1.7 * k, shRx: -1.7 * k, shLz: 0.45 * k, shRz: -0.45 * k, elL: 0.35, elR: 0.35, headX: -0.25, jaw: k, knL: 0.3 * k, knR: 0.3 * k, pelY: -0.06 * k };
+        if (this.st > (this.shielding ? 0.78 : 0.5)) { this.setState('lunge'); this.lungeT.copy(P.pos).addScaledVector(P.vel, this.shielding ? 0.05 : 0.22); SND.shriek(this.pos, 0.5); }
+        break;
+      }
+      case 'lunge': {
+        const d = this.lungeT.clone().sub(this.pos); d.y = 0; d.normalize();
+        const ls = this.shielding ? 6.0 : 7.2; this.vel.x = d.x * ls; this.vel.z = d.z * ls; this.face(this.lungeT, dt, 12);
+        pose = { spX: 0.6, shLx: -1.5, shRx: -1.5, shLz: 0.2, shRz: -0.2, elL: 0.15, elR: 0.15, jaw: 1, hipLx: -0.7, hipRx: 0.5, knR: 0.6, headX: -0.4 };
+        if (dP < (this.shielding ? 0.7 : 0.85) && P.invuln <= 0 && P.state === 'move' && !P.dead && G.mode === 'play') {
+          if (this.arms >= 1) { startPin(this); break; }
+          shovePlayer(this); this.setState('recover'); this.cool = rnd(1.4, 2.2); releaseToken(); break; // no hands left to hold on with
+        }
+        if (this.st > 0.32) { // lunged at air: momentum carries it past
+          this.cool = rnd(1.3, 2.2) * (T.feral ? 0.6 : 1) * (this.rage > 0 ? 0.6 : 1); releaseToken();
+          this.bal -= 0.28; this.stumble(this.fwd(), 0.5); floatLabel('扑空', this.headPos(), 'tough');
+        }
+        break;
+      }
+      case 'recover': {
+        this.moveDir(new V3(), 0, dt, 5);
+        pose = { spX: 0.55 - this.st * 0.4, shLx: -0.6, shRx: -0.7, elL: 0.5, elR: 0.5, knL: 0.4, knR: 0.2, headX: -0.2 };
+        if (this.st > 0.85) this.setState('stalk');
+        break;
+      }
+      case 'stumble': { // feet scrambling to get back under a body that is falling over
+        this.vel.multiplyScalar(Math.exp(-2.4 * dt));
+        const lv = toLocal(this.vel, this.yaw), k = 1 - smooth(this.stumDur * 0.6, this.stumDur, this.st);
+        this.stumPh += dt * (7 + sp * 5);
+        pose = Object.assign(walkPose(this.stumPh, clamp(sp / 1.5, 0.35, 1) * k, 0.4 * k), {
+          spX: clamp(lv.z * 0.16, -0.5, 0.5) * k + 0.1, spZ: clamp(-lv.x * 0.16, -0.4, 0.4) * k, headX: -0.25 * k, jaw: 0.6 * k, pelY: -0.05 * k,
+          shLx: (-0.9 + Math.sin(this.st * 13) * 0.9) * k, shRx: (-0.7 + Math.sin(this.st * 13 + 2) * 0.9) * k,
+          shLz: (1.0 + Math.sin(this.st * 9) * 0.3) * k + 0.08, shRz: -(1.0 + Math.sin(this.st * 9 + 1) * 0.3) * k - 0.08, elL: 0.5, elR: 0.6
+        });
+        if (this.st > this.stumDur) {
+          if (this.bal < 0.12) this.startFall(toLocal(sp > 0.1 ? this.vel.clone().normalize() : this.fwd().negate(), this.yaw), 0.3);
+          else { this.setState('stalk'); this.cool = Math.max(this.cool, 0.35); if (Math.random() < 0.6) SND.growl(this.pos, 0.6, 0.6); }
+        }
+        break;
+      }
+      case 'down': {
+        this.vel.multiplyScalar(Math.exp(-(this.landed ? 6 : 2.2) * dt));
+        if (!this.landed) { this.fallV += 8.4 * Math.sin(this.fallA) * dt; this.fallA += this.fallV * dt; if (this.fallA >= 1.5) { this.fallA = 1.5; this.landed = true; this.fallV = -Math.min(2.2, Math.abs(this.fallV) * 0.2); this.onLand(); } }
+        else { this.fallV += 16 * dt; this.fallA = Math.min(1.5, this.fallA + this.fallV * dt); if (this.fallA >= 1.5) this.fallV = 0; }
+        const k = smooth(0.2, 1.3, this.fallA); for (const key in this.downPose) pose[key] = this.downPose[key] * k;
+        if (!this.landed) Object.assign(pose, { shLx: -1.4 + Math.sin(this.st * 20) * 0.5, shRx: -1.2 + Math.sin(this.st * 18 + 1) * 0.5, shLz: 0.9, shRz: -0.9, jaw: 0.8 });
+        hard = this.fallHard(this.fallA);
+        if (this.dead) break;
+        if (this.landed && this.st > 1.7 + T.weight / 140) { if (this.crawler) this.setState('crawl'); else { this.setState('getup'); SND.growl(this.pos, 0.5, 0.7); } }
+        break;
+      }
+      case 'getup': {
+        const k = 1 - smooth(0, 1.0, this.st), m = Math.sin((1 - k) * Math.PI);
+        hard = this.fallHard(1.5 * k); for (const key in this.downPose) pose[key] = this.downPose[key] * k;
+        Object.assign(pose, { spX: (this.fdz > 0 ? 0.9 : 0.6) * m, knL: 1.5 * m, knR: 1.3 * m, pelY: -0.38 * m, hipLx: -0.8 * m, hipRx: -0.5 * m, shLx: -0.8 * m, shRx: -0.6 * m });
+        if (this.st > 1.0) { this.setState('stalk'); this.bal = 0.75; this.cool = Math.max(this.cool, 0.4); }
+        break;
+      }
+      case 'crawl': { // a leg is gone; it drags itself on toward you anyway
+        const want = Math.atan2(P.pos.x - this.pos.x, P.pos.z - this.pos.z); this.yaw += clamp(angDiff(this.yaw, want), -0.9 * dt, 0.9 * dt);
+        this.ph += dt * 3.2; const pull = Math.max(0, Math.sin(this.ph)), f = this.fwd();
+        const spd = (canHunt ? 0.25 + 0.55 * pull : 0) * (this.seen > 0 || this.aware > 0.9 ? 1 : 0.4);
+        this.vel.x = f.x * spd; this.vel.z = f.z * spd;
+        hard = { bodyX: 1.45, bodyZ: 0, bodyY: 0.13 * (T.girth > 1.2 ? 1.4 : 1) };
+        const s = Math.sin(this.ph), c = Math.cos(this.ph);
+        pose = { shLx: -2.7 + s * 0.6, shRx: -2.7 - s * 0.6, shLz: 0.35, shRz: -0.35, elL: 0.6 + Math.max(0, c) * 0.9, elR: 0.6 + Math.max(0, -c) * 0.9, headX: -0.85, headY: Math.sin(G.t * 2) * 0.15, jaw: 0.6 + Math.sin(G.t * 7) * 0.3, spX: -0.15, hipLx: 0.1 + s * 0.15, hipRx: 0.1 - s * 0.15, knL: 0.3, knR: 0.3 };
+        const head = this.pos.clone().addScaledVector(f, 1.45);
+        if (canHunt && head.distanceTo(P.pos) < 0.75 && P.invuln <= 0 && P.state === 'move' && attackersBusy() === 0 && this.arms >= 1) { startPin(this); break; }
+        if (this.voiceT < 0) { SND.growl(this.pos, 0.55, rnd(0.8, 1.3)); this.voiceT = rnd(2.5, 5); }
+        break;
+      }
+      case 'pinning': {
+        this.vel.set(0, 0, 0);
+        const f = fwdOf(P.yaw); this.pos.copy(P.pos).addScaledVector(f, this.crawler ? 1.75 : 0.62); this.yaw = P.yaw + Math.PI;
+        if (this.crawler) { hard = { bodyX: 1.3, bodyZ: 0, bodyY: 0.2 }; pose = { shLx: -2.9, shRx: -2.8, shLz: 0.25, shRz: -0.25, elL: 0.9 + Math.sin(G.t * 17) * 0.1, elR: 0.8, headX: -0.5 + Math.sin(G.t * 11) * 0.1, jaw: 0.6 + Math.sin(G.t * 9) * 0.4 }; }
+        else pose = { spX: 0.95, shLx: -1.45, shRx: -1.4, elL: 0.9 + Math.sin(G.t * 17) * 0.1, elR: 0.85, headX: 0.25 + Math.sin(G.t * 11) * 0.08, jaw: 0.6 + Math.sin(G.t * 9) * 0.4, knL: 0.7, knR: 0.9, pelY: -0.28 };
+        if (this.voiceT < 0) { SND.growl(this.pos, 0.9, 0.7); this.voiceT = 0.8; }
+        break;
+      }
+      case 'flee': {
+        this.moveTo(this.fleeTo, T.speed * 1.4, dt);
+        if (sp > 0.2) this.yaw += angDiff(this.yaw, Math.atan2(this.vel.x, this.vel.z)) * (1 - Math.exp(-10 * dt));
+        pose = Object.assign(this.gait(1, 1), { shLx: -0.6, shRx: -0.5, headX: 0.1, spX: 0.4 });
+        if (this.st > 5 || this.pos.distanceTo(this.fleeTo) < 0.6) { this.setState('lurk'); this.ang = Math.atan2(this.pos.x - LURK_C.x, this.pos.z - LURK_C.z); this.aware = Math.min(this.aware, 0.6); }
+        break;
+      }
+      case 'startle': {
+        this.vel.multiplyScalar(Math.exp(-4 * dt));
+        const k = 1 - smooth(0.45, 0.8, this.st);
+        pose = { spX: -0.25 * k, headX: 0.35 * k, headY: 0.4 * k, shLx: -2.4 * k, elL: 2.1 * k, shLz: 0.1, shRx: -1.6 * k, elR: 1.8 * k, shRz: -0.3 * k, knL: 0.3 * k, knR: 0.2 * k, hipLx: 0.3 * k, jaw: 0.7 * k };
+        if (this.st > 0.8) this.setState(P.indoor || P.dead ? (floodOff() ? 'porch' : 'lurk') : 'stalk');
+        break;
+      }
+    }
+    if (this.dead) { this.updateDead(dt); return; }
+    if (this.standing && this.state !== 'pinning') {
+      if (this.shielding && this.state !== 'startle' && this.state !== 'stumble') Object.assign(pose, { shLx: -2.35, elL: 2.15, shLz: 0.15, shLy: 0.3, headX: (pose.headX || 0) + 0.25 });
+      if (this.flinchT > 0) Object.assign(pose, { spX: (pose.spX || 0) - 0.15, headX: -0.3 });
+      if (this.roarT > 0) { const k = Math.min(1, this.roarT * 3, (this.roarDur - this.roarT) * 6 + 0.2); Object.assign(pose, { headX: lerp(pose.headX || 0, -0.65, k), jaw: 1, chX: -0.2 * k, spX: lerp(pose.spX || 0, -0.12, k), shLz: lerp(pose.shLz || 0.08, 0.55, k), shRz: lerp(pose.shRz || -0.08, -0.55, k), elL: 0.9, elR: 0.9 }); }
+      if (this.lookT > 0 && this.lookAt) { const a = clamp(angDiff(this.yaw, Math.atan2(this.lookAt.x - this.pos.x, this.lookAt.z - this.pos.z)), -1.1, 1.1); pose.headY = (pose.headY || 0) + a * 0.8; pose.chY = (pose.chY || 0) + a * 0.3; }
+      if (this.state !== 'stumble') pose.headZ = (pose.headZ || 0) + Math.sin(G.t * 1.7 + this.mood * 7) * 0.08;
+    }
+    for (const sd of ['L', 'R']) if (this.brokenArm[sd] && !h.cut['el' + sd] && this.state !== 'down' && this.state !== 'crawl') { pose['sh' + sd + 'x'] = 0.12 + Math.sin(this.ph) * 0.3 * clamp(sp / 2, 0, 1); pose['sh' + sd + 'z'] = sd === 'L' ? 0.05 : -0.05; pose['el' + sd] = 0.05; }
+    const glow = this.state === 'windup' || this.state === 'lunge' || this.rage > 0 ? 3.2 : 0.9; for (const e of h.eyes) e.material.emissiveIntensity = damp(e.material.emissiveIntensity, glow, 10, dt);
+    // integrate, then bodies collide: with each other (momentum carries over), with posts, with the porch edge
+    if (this.state !== 'pinning') {
+      this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
+      const flying = (this.state === 'stumble' || (this.state === 'down' && !this.landed)) && sp > 1.7;
+      for (const o of infected) if (o !== this && !o.dead) {
+        const d = this.pos.clone().sub(o.pos); d.y = 0; const l = d.length();
+        if (l < 0.72 && l > 0.001) {
+          if (flying && this.bumpT <= 0 && o.bumpT <= 0 && o.standing && o.state !== 'pinning' && this.vel.dot(d) < 0) this.bump(o, d.clone().divideScalar(-l), sp);
+          if (o.standing || this.standing) this.pos.addScaledVector(d, (0.72 - l) / l * 0.5);
+        }
+      }
+      if (!P.dead && P.state !== 'pinned' && this.standing) { const d = this.pos.clone().sub(P.pos); d.y = 0; const l = d.length(); if (l < 0.6 && l > 0.001) this.pos.addScaledVector(d, (0.6 - l) / l); }
+      const minZ = this.state === 'lunge' ? 4.6 : 5.75; let wall = false;
+      if (Math.abs(this.pos.x) < 4.0 && this.pos.z < minZ && this.pos.z > -3.6) { this.pos.z = minZ; wall = true; }
+      for (const c of colliders) if ((c.tag === 'post' || c.tag === 'rail') && pushOut(this.pos, c, 0.3)) wall = true;
+      if (wall && flying && this.bumpT <= 0) this.slam();
+      const dc = this.pos.clone().sub(LURK_C); dc.y = 0; if (dc.length() > 21) this.pos.copy(LURK_C).addScaledVector(dc.normalize(), 21);
+    }
+    this.pos.y = groundY(this.pos.x, this.pos.z);
+    if (this.state !== 'crawl') this.ph += dt * Math.max(sp, 0.001) * 3.3;
+    springStep(h, dt);
+    poseTo(h, pose, this.state === 'down' ? 9 : this.state === 'stumble' ? 14 : 10, dt, hard);
+    h.root.position.copy(this.pos); h.root.rotation.y = this.yaw;
+  }
+}
+new Infected('butcher', 0.55); new Infected('student', -0.9); new Infected('office', 2.0);
+
+/* ===== P8 player: stamina & adrenaline, melee (club / axe: quick, heavy, kick), dodge, stealth, pin & struggle ===== */
+// survival instinct hits hard: high base force; stamina is generous but real, and running dry bends every motion
+const HIT = {
+  quick: { imp: 40, dmg: 24, reach: 2.05, cone: 1.05, stop: 0.075, shake: 0.22, cost: 9, dur: 0.55, strikeA: 0.34, hitA: 0.45 },
+  heavy: { imp: 85, dmg: 52, reach: 2.3, cone: 0.95, stop: 0.13, shake: 0.42, cost: 18, dur: 0.85, strikeA: 0.45, hitA: 0.56 },
+  kick: { imp: 66, dmg: 6, reach: 1.5, cone: 1.15, stop: 0.06, shake: 0.25, cost: 11, dur: 0.5, strikeA: 0.3, hitA: 0.42 }
+};
+const WEAPONS = { club: { name: '钉头球棍', speed: 1, cost: 1 }, axe: { name: '消防斧', speed: 1.12, cost: 1.2 } };
+function effMax() { return P.staMax - (P.crash > 0 ? 12 : 0); }
+function fatigue() { return smooth(0, 1, 1 - P.stamina / 32) * (1 - 0.5 * P.adr); } // 0 fresh … 1 spent: form falls apart
+function powerMul() { return (P.broken && P.weapon === 'club' ? 0.45 : 1) * (1 + 0.35 * P.adr) * (1 - 0.45 * fatigue()); }
+function spend(cost) { P.stamina = Math.max(0, P.stamina - cost * (1 - 0.3 * P.adr)); P.staDelay = 0.45; P.staMax = Math.max(55, P.staMax - cost * 0.05); if (P.stamina <= 0.5) P.winded = true; }
+function camBasis() { return { fwd: new V3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)), right: new V3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)) }; }
+function inputDir() { const { fwd, right } = camBasis(), d = new V3(); if (keys.KeyW) d.add(fwd); if (keys.KeyS) d.sub(fwd); if (keys.KeyD) d.add(right); if (keys.KeyA) d.sub(right); return d; }
+
+/* ---------------- attacks ---------------- */
+function startAttack(kind, fromCharge) {
+  if (kind === true) kind = 'heavy'; else if (kind === false) kind = 'quick';
+  if (P.atk || P.state !== 'move' || P.dead || G.mode !== 'play') return;
+  const H = HIT[kind], Wp = WEAPONS[P.weapon], f = fatigue(), dur = H.dur * (1 + 0.5 * f) * (kind === 'kick' ? 1 : Wp.speed);
+  spend(H.cost * (kind === 'kick' ? 1 : Wp.cost));
+  P.atk = { kind, t: fromCharge ? dur * (H.strikeA - 0.15) : 0, dur, strikeA: H.strikeA, hitA: H.hitA, f, target: pickTarget() };
+  if (f > 0.7 && G.spentToastT <= 0) { toast('力竭：动作变形，挥不动了', 2.2); G.spentToastT = 10; }
+}
+// soft lock: whoever is in the direction you're pushing, threats first
+function pickTarget() {
+  const inp = inputDir(), aim = inp.lengthSq() > 0.01 ? inp.normalize() : fwdOf(P.yaw);
+  let best = null, bs = 1e9;
+  for (const e of infected) {
+    if (e.dead) continue; const d = e.chestPos().sub(P.pos).setY(0), l = d.length(); if (l > 3.4) continue;
+    const dot = d.divideScalar(Math.max(l, 0.001)).dot(aim); if (dot < 0.2) continue;
+    const s = l + (1 - dot) * 2.2 - (e.state === 'windup' || e.state === 'lunge' ? 1.2 : 0) + (e.standing ? 0 : 0.6);
+    if (s < bs) { bs = s; best = e; }
+  }
+  return best;
+}
+function strike(kind) {
+  const H = HIT[kind], blade = P.weapon === 'axe' && kind !== 'kick', f = fwdOf(P.yaw), right = new V3(-Math.cos(P.yaw), 0, Math.sin(P.yaw));
+  const push = kind === 'quick' ? f.clone().multiplyScalar(0.8).addScaledVector(right, 0.6).normalize() : f.clone();
+  const cands = [];
+  for (const e of infected) {
+    if (e.dead) continue; const d = e.chestPos().sub(P.pos).setY(0), l = d.length();
+    if (l > H.reach + (e.standing ? 0 : 0.35)) continue; if (l > 0.3 && d.divideScalar(l).dot(f) < Math.cos(H.cone)) continue;
+    cands.push({ e, l });
+  }
+  cands.sort((a, b) => a.l - b.l);
+  const pm = powerMul(); let n = 0, kills = 0;
+  for (const { e } of cands.slice(0, kind === 'heavy' ? 2 : 1)) {
+    const r = e.hit(push, kind, pm, blade); if (!r) continue; n++; if (r.killed) kills++;
+    hitFX(e.chestPos(), push, kind, r, e, blade, pm);
+  }
+  makeNoise(P.pos, n ? 12 : 4, 'swing');
   if (n) {
-    G.hitStop = heavy ? 0.1 : 0.06; G.shake = Math.max(G.shake, heavy ? 0.38 : 0.2);
-    if (!P.broken) { P.durability -= heavy ? 4 : 2; if (P.durability <= 0) { P.durability = 0; P.broken = true; P.club.userData.shaft.scale.y = 0.45; P.club.userData.shaft.position.y = -0.15; P.club.children.forEach(c => { if (c.geometry && c.geometry.type === 'CylinderGeometry' && c !== P.club.userData.shaft && c.position.y < -0.4) c.visible = false; }); toast('球棍断了。剩下的半截伤害很低。', 3.5); } }
-  }
+    G.hitStop = H.stop * (0.85 + 0.3 * pm) * (kills ? 1.35 : 1); G.shake = Math.max(G.shake, H.shake * (0.8 + 0.3 * pm));
+    G.camKick.addScaledVector(push, kind === 'heavy' ? 0.16 : 0.09); G.fovPunch = kind === 'heavy' ? -3.2 : -1.6;
+    P.adr = Math.min(1, P.adr + 0.05 + kills * 0.1);
+    springKick(P.h, 'shRx', 3); springKick(P.h, 'elR', 4); springKick(P.h, 'chY', -2.5); springKick(P.h, 'spX', -1.5); // the weapon stops in a body; the arm takes it
+    if (kind !== 'kick') { stainWeapon(weaponObj(), 0.18 * n); if (P.weapon === 'club' && !P.broken) { P.durability -= kind === 'heavy' ? 4 : 2; if (P.durability <= 0) breakClub(); } }
+  } else if (kind !== 'kick' && P.atk && P.atk.f > 0.5) { springKick(P.h, 'spX', 3); P.vel.addScaledVector(f, 1.4); floatLabel('挥空', P.pos.clone().add(new V3(0, 1.9, 0)), 'tough'); }
+}
+function hitFX(p, dir, kind, r, e, blade, pm) {
+  const heavy = kind === 'heavy';
+  spawnImpact(p, heavy ? 1.3 : kind === 'kick' ? 0.8 : 0.95);
+  if (kind === 'kick') { SND.kick(p); spawnSplash(e.pos, 6, 0.2, 1); }
+  else { SND.impact(p, kind, pm, blade); spawnBlood(p, dir, Math.round((heavy ? 30 : 16) * (blade ? 1.6 : 1)), false, heavy ? 1.3 : 1, 0.35); if (heavy || blade) spawnMist(p, dir, heavy ? 1 : 0.7); }
+  SND.exhale(e.pos, e.T.voice, 0.35);
+  if (r.tag) floatLabel(r.tag, p.clone().add(new V3(0, 0.55, 0)), r.cls);
+  if (kind !== 'kick' && heavy && P.pos.distanceTo(e.pos) < 2.2) { if (Math.random() < 0.5) lensSplat(blade ? 3 : 2); if (Math.random() < 0.4) paintWound(P.h.coatMat, 1, false); }
+}
+function breakClub() {
+  P.durability = 0; P.broken = true; const sh = P.club.userData.shaft; sh.scale.y = 0.45; sh.position.y = -0.15;
+  P.club.children.forEach(c => { if (c.geometry && c.geometry.type === 'CylinderGeometry' && c !== sh && c.position.y < -0.4) c.visible = false; });
+  SND.crunch(P.pos, 4, 0.5); toast('球棍断了。剩下的半截伤害很低。按 2 换斧头。', 3.5);
+}
+function switchWeapon(w) {
+  if (P.weapon === w || P.atk || P.state !== 'move' || P.dead) return;
+  P.weapon = w; P.club.visible = w === 'club'; P.axe.visible = w === 'axe'; SND.click();
+  toast(w === 'axe' ? '消防斧：伤害高，能砍断肢体；更沉，更耗体力' : '球棍：冲击大，打得它们站不稳', 2.2);
 }
 function dodge() {
-  if (P.state !== 'move' || P.dead || G.mode !== 'play' || P.stamina < 16) return;
-  const { fwd, right } = camBasis(); const d = new V3();
-  if (keys.KeyW) d.add(fwd); if (keys.KeyS) d.sub(fwd); if (keys.KeyD) d.add(right); if (keys.KeyA) d.sub(right);
-  if (d.lengthSq() < 0.01) d.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
-  P.dodgeDir.copy(d.normalize()); P.state = 'dodge'; P.st = 0; P.invuln = 0.32; P.stamina -= 18; P.staDelay = 0.8; P.atk = null; P.charging = false;
-  SND.step(P.pos, P.indoor ? 'wood' : 'mud', 0.8);
+  if (P.state !== 'move' || P.dead || G.mode !== 'play') return;
+  const f = fatigue(), d = inputDir(); if (d.lengthSq() < 0.01) d.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
+  P.dodgeDir.copy(d.normalize()); P.state = 'dodge'; P.st = 0; P.dodgeK = 1 - 0.45 * f; P.invuln = 0.34 * (1 - 0.4 * f); spend(12); P.atk = null; P.charging = false;
+  SND.step(P.pos, P.indoor ? 'wood' : 'mud', 0.8); spawnSplash(P.pos, 6, 0.2, 1.2); makeNoise(P.pos, 5, 'dodge');
+  // reading the lunge: dodge just before it lands and time slows for a breath
+  let close = null; for (const e of infected) if (!e.dead && (e.state === 'lunge' || (e.state === 'windup' && e.st > 0.3)) && e.pos.distanceTo(P.pos) < 2.8) close = e;
+  if (close && f < 0.8) { G.slowmo = 0.45; P.invuln = 0.6; P.adr = Math.min(1, P.adr + 0.2); floatLabel('闪开了', P.pos.clone().add(new V3(0, 1.9, 0)), 'heavy'); }
 }
-function toggleTorch() {
-  if (P.battery <= 0) { toast('手电没电了'); return; }
-  P.torchOn = !P.torchOn; SND.click();
+function shovePlayer(e) { // an attacker with no hands left slams into you instead
+  const d = P.pos.clone().sub(e.pos).setY(0).normalize();
+  P.state = 'stagger'; P.st = 0; P.atk = null; P.charging = false; P.vel.copy(d).multiplyScalar(4.2); spend(14); P.invuln = 0.5;
+  const loc = toLocal(d, P.yaw); impactReact(P.h, loc.x, loc.z, 1.1, 'quick'); G.shake = Math.max(G.shake, 0.3); SND.thud(P.pos); SND.grunt();
+  floatLabel('被撞开', P.pos.clone().add(new V3(0, 1.9, 0)), 'heavy');
 }
-function camBasis() { return { fwd: new V3(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)), right: new V3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)) }; }
+function toggleTorch() { if (P.battery <= 0) { toast('手电没电了'); return; } P.torchOn = !P.torchOn; SND.click(); makeNoise(P.pos, 3, 'click'); }
+function whistle() { if (P.whistleCD > 0 || P.dead || G.mode !== 'play') return; P.whistleCD = 2.5; SND.whistle(); makeNoise(P.pos, 12, 'whistle'); floatLabel('（口哨）', P.pos.clone().add(new V3(0, 2, 0)), 'tough'); }
 
 function quickPose(a) {
   if (a < 0.34) { const k = smooth(0, 0.34, a); return { chY: 0.9 * k, spY: 0.25 * k, shRx: -1.35 * k, shRz: -0.55 * k, shRy: 0.5 * k, elR: 0.5 + 0.9 * k, hipRx: 0.2 * k }; }
@@ -1737,78 +2482,135 @@ function heavyPose(a) {
   if (a < 0.62) { const k = smooth(0.45, 0.62, a); return { shRx: -2.85 + 2.95 * k, shLx: -1.9 + 1.7 * k, elR: 1.9 - 1.75 * k, elL: 1.7 - 1.2 * k, spX: -0.28 + 0.85 * k, chY: 0.25 - 0.35 * k, hipLx: -0.55 * k, knL: 0.45 * k, knR: 0.25 * k, bodyY: -0.09 * k, headX: 0.25 * k }; }
   const k = smooth(0.62, 1, a); return { shRx: 0.1 * (1 - k) - 0.3 * k, shLx: -0.2 * (1 - k) - 0.35 * k, elR: 0.15 + 0.6 * k, elL: 0.5 + 0.45 * k, spX: 0.57 * (1 - k), hipLx: -0.55 * (1 - k), knL: 0.45 * (1 - k), knR: 0.25 * (1 - k), bodyY: -0.09 * (1 - k) };
 }
+function kickPose(a) { // chamber, drive the heel through, recover
+  if (a < 0.3) { const k = smooth(0, 0.3, a); return { hipRx: -1.15 * k, knR: 1.55 * k, spX: -0.15 * k, shLx: -0.55 * k, shLz: 0.3 * k, shRx: 0.25 * k, knL: 0.15 * k, elL: 1.0 }; }
+  if (a < 0.5) { const k = smooth(0.3, 0.5, a); return { hipRx: -1.15 - 0.35 * k, knR: 1.55 - 1.45 * k, ankR: 0.35 * k, spX: -0.15 - 0.22 * k, shLx: -0.55, shLz: 0.3, shRx: 0.25 + 0.2 * k, knL: 0.15 + 0.12 * k, elL: 1.0 }; }
+  const k = smooth(0.5, 1, a); return { hipRx: -1.5 * (1 - k), knR: 0.1 + Math.sin(k * Math.PI) * 0.6, spX: -0.37 * (1 - k), shLx: -0.55 * (1 - k), shLz: 0.3 * (1 - k), shRx: 0.45 * (1 - k), knL: 0.27 * (1 - k), elL: 1.0 };
+}
+// running dry doesn't stop you, it bends you: smaller arcs, slumped spine, bent knees
+function deform(p, f) { if (f <= 0.02) return p; const k = 1 - 0.32 * f; for (const key in p) p[key] *= k; p.spX = (p.spX || 0) + 0.2 * f; p.headX = (p.headX || 0) + 0.15 * f; p.knL = (p.knL || 0) + 0.12 * f; p.knR = (p.knR || 0) + 0.1 * f; return p; }
 
+/* ---------------- pin / struggle ---------------- */
+function startPin(e) {
+  P.state = 'pinned'; P.st = 0; P.struggle = 0; P.pinnedBy = e; P.atk = null; P.charging = false; e.setState('pinning');
+  P.yaw = Math.atan2(e.pos.x - P.pos.x, e.pos.z - P.pos.z);
+  $('qte').classList.add('on'); G.shake = 0.4; SND.thud(P.pos); SND.heartbeat(0.8); P.adr = Math.min(1, P.adr + 0.3); makeNoise(P.pos, 9, 'struggle');
+  impactReact(P.h, 0, -1, 1.2, 'quick');
+}
+function releasePin(e, scared) {
+  if (P.pinnedBy !== e) return;
+  P.state = 'move'; P.pinnedBy = null; P.invuln = 1.0; $('qte').classList.remove('on'); SQUAD.tokenCD = Math.max(SQUAD.tokenCD, 0.9);
+  const away = e.pos.clone().sub(P.pos).setY(0).normalize();
+  if (e.crawler) { e.setState('crawl'); e.pos.addScaledVector(away, 0.5); floatLabel(scared ? '被光逼退' : '踹开', e.headPos(), 'heavy'); return; }
+  e.vel.copy(away).multiplyScalar(scared ? 2.5 : 3.5);
+  if (!scared) { e.startFall(toLocal(away, e.yaw), 1.2); floatLabel('挣脱', P.pos.clone().add(new V3(0, 1.6, 0)), 'heavy'); }
+  else floatLabel('被光逼退', e.headPos(), '');
+}
+function bitten() {
+  P.dead = true; P.state = 'dead'; $('qte').classList.remove('on');
+  const e = P.pinnedBy; if (e) { if (e.crawler) e.setState('crawl'); else { e.setState('stalk'); e.cool = 3; } } P.pinnedBy = null;
+  G.shake = 0.5; SND.shriek(P.pos, 0.6); paintWound(P.h.coatMat, 3, true);
+  setTimeout(() => P.dead && showCard('深咬伤', '它咬穿了你的衣领。脖子上一阵剧痛，然后是热。\n潜伏期开始了，最多三天。\n\n这是原型：按 R 重新开始。', null, true), 900);
+}
+
+/* ---------------- per-frame ---------------- */
 function updatePlayer(dt) {
-  const h = P.h; P.st += dt; P.invuln -= dt; P.staDelay -= dt;
+  const h = P.h; P.st += dt; P.invuln -= dt; P.staDelay -= dt; P.whistleCD -= dt; P.crash -= dt; G.spentToastT -= dt;
   P.indoor = insideCabin(P.pos.x, P.pos.z);
-  const act = G.mode === 'play' && P.state !== 'pinned' && !P.dead;
-  let ix = 0, iz = 0; if (act) { if (keys.KeyW) iz += 1; if (keys.KeyS) iz -= 1; if (keys.KeyA) ix -= 1; if (keys.KeyD) ix += 1; }
-  const { fwd, right } = camBasis(); const want = fwd.multiplyScalar(iz).addScaledVector(right, ix); if (want.length() > 1) want.normalize();
-  const sprint = act && keys.ShiftLeft && want.lengthSq() > 0.01 && P.stamina > 4 && !P.atk && !P.charging && P.state === 'move' && !P.indoor;
-  let speed = P.indoor ? 1.6 : sprint ? 4.0 : 2.25; if (P.carrying) speed *= 0.85; if (P.atk || P.charging) speed *= 0.3;
-  if (P.state === 'dodge') { const k = 1 - P.st / 0.42; P.vel.copy(P.dodgeDir).multiplyScalar(6.4 * k + 0.6); if (P.st > 0.42) P.state = 'move'; }
+  const act = G.mode === 'play' && P.state !== 'pinned' && P.state !== 'stagger' && !P.dead;
+  const want = act ? inputDir() : new V3(); if (want.length() > 1) want.normalize();
+  const fd = fatigue(); if (P.winded && P.stamina > 25) P.winded = false;
+  const sprint = act && keys.ShiftLeft && want.lengthSq() > 0.01 && !P.winded && !P.atk && !P.charging && P.state === 'move' && !P.indoor;
+  if (sprint && P.crouch) P.crouch = false;
+  let speed = P.indoor ? 1.6 : sprint ? 4.0 : P.crouch ? 1.25 : 2.25; speed *= 1 - 0.18 * fd; if (P.carrying) speed *= 0.85; if (P.atk || P.charging) speed *= 0.3;
+  if (P.state === 'dodge') { const k = 1 - P.st / 0.42; P.vel.copy(P.dodgeDir).multiplyScalar((6.4 * k + 0.6) * P.dodgeK); if (P.st > 0.42) P.state = 'move'; }
+  else if (P.state === 'stagger') { P.vel.multiplyScalar(Math.exp(-5 * dt)); if (P.st > 0.45) P.state = 'move'; }
   else if (P.state === 'pinned' || P.dead) P.vel.multiplyScalar(Math.exp(-10 * dt));
   else { P.vel.x = damp(P.vel.x, want.x * speed, 10, dt); P.vel.z = damp(P.vel.z, want.z * speed, 10, dt); }
-  if (sprint) { P.stamina -= 13 * dt; P.staDelay = 0.7; }
-  if (P.staDelay <= 0) P.stamina = Math.min(100, P.stamina + 24 * dt);
+  // stamina: generous and dynamic; a short rest refills it, long fights lower the ceiling
+  const sp0 = Math.hypot(P.vel.x, P.vel.z), cap = effMax();
+  if (sprint) { P.stamina = Math.max(0, P.stamina - 7 * (1 - 0.3 * P.adr) * dt); P.staDelay = Math.max(P.staDelay, 0.5); P.staMax = Math.max(55, P.staMax - 0.3 * dt); if (P.stamina <= 0.5) P.winded = true; }
+  if (P.staDelay <= 0 && !P.atk && P.state !== 'pinned' && !P.dead) P.stamina = Math.min(cap, P.stamina + (sp0 < 0.3 ? 22 : 15) * (1 + 0.4 * P.adr) * (P.crash > 0 ? 0.7 : 1) * dt);
+  if (P.stamina > cap) P.stamina = Math.max(cap, P.stamina - 20 * dt);
+  let threat = 0;
+  for (const e of infected) {
+    if (e.dead || !(HUNT.includes(e.state) || e.state === 'crawl' || e.state === 'stumble')) continue; const d = e.pos.distanceTo(P.pos);
+    if (d < 2.8 && (e.state === 'windup' || e.state === 'lunge')) threat = Math.max(threat, 1); else if (d < 5) threat = Math.max(threat, 0.6); else if (d < 9) threat = Math.max(threat, 0.25);
+  }
+  if (P.state === 'pinned') threat = 1.4;
+  P.calmT = threat > 0.2 ? 0 : P.calmT + dt;
+  P.staMax = Math.min(100, P.staMax + (P.calmT > 3 && !sprint ? 0.7 : 0.08) * dt);
+  // adrenaline: the body answers danger, then drops you when it leaves
+  if (threat > 0.2 && !P.dead) P.adr = Math.min(1, P.adr + threat * 0.35 * dt); else if (P.calmT > 3) P.adr = Math.max(0, P.adr - 0.07 * dt);
+  P.adrPeak = Math.max(P.adrPeak, P.adr);
+  if (P.adrPeak > 0.6 && P.adr < 0.15 && !P.dead) { P.adrPeak = 0; P.crash = 14; toast('肾上腺素退了。手在抖，腿发软。', 2.8); }
   P.pos.x += P.vel.x * dt; P.pos.z += P.vel.z * dt; collide(P.pos, 0.28);
   P.pos.y = damp(P.pos.y, groundY(P.pos.x, P.pos.z), 16, dt);
   const sp = Math.hypot(P.vel.x, P.vel.z);
   if (P.state === 'move' && !P.atk && sp > 0.2) P.yaw += angDiff(P.yaw, Math.atan2(P.vel.x, P.vel.z)) * (1 - Math.exp(-12 * dt));
-  if (P.state === 'dodge') P.yaw += angDiff(P.yaw, Math.atan2(P.dodgeDir.x, P.dodgeDir.z) + (P.dodgeDir.dot(new V3(Math.sin(P.yaw), 0, Math.cos(P.yaw))) < -0.3 ? Math.PI : 0)) * 0.2;
-  // footsteps
+  if (P.state === 'dodge') P.yaw += angDiff(P.yaw, Math.atan2(P.dodgeDir.x, P.dodgeDir.z) + (P.dodgeDir.dot(fwdOf(P.yaw)) < -0.3 ? Math.PI : 0)) * 0.2;
+  // how far away they can make you out: lantern, torch, floodlight, lightning; crouching and bushes help
+  P.vis = (0.2 + (P.shutter ? 0.02 : 0.4) + (P.torchOn ? 0.45 : 0) + (inFlood(P.pos) ? 0.7 : 0) + flashLight.intensity * 0.35) * (P.crouch ? 0.6 : 1) * (bushCover(P.pos) ? 0.45 : 1) * (1 - 0.2 * G.rain) * (P.indoor ? 0.8 : 1);
+  // footsteps are noise
   const prevS = Math.sin(P.ph); P.ph += dt * sp * 3.3;
-  if (sp > 0.4 && Math.sign(Math.sin(P.ph)) !== Math.sign(prevS)) SND.step(P.pos, P.indoor ? 'wood' : (P.pos.z < 5.45 && Math.abs(P.pos.x) < 3.7 ? 'porch' : 'mud'), sprint ? 0.65 : 0.45);
-  // attack / charge
-  if (P.charging) P.chargeT += dt;
+  if (sp > 0.4 && Math.sign(Math.sin(P.ph)) !== Math.sign(prevS)) {
+    const surf = P.indoor ? 'wood' : (P.pos.z < 5.45 && Math.abs(P.pos.x) < 3.7 ? 'porch' : 'mud');
+    SND.step(P.pos, surf, P.crouch ? 0.22 : sprint ? 0.65 : 0.45);
+    makeNoise(P.pos, P.crouch ? 1.2 : sprint ? 9 : (surf === 'mud' ? 3.5 : 4.5), 'step');
+    if (sprint && surf === 'mud') spawnSplash(P.pos, 3, 0.1, 0.9);
+  }
+  // attack / charge, with a soft lock that turns you and steps you in
+  if (P.charging) { P.chargeT += dt; const t = pickTarget(); if (t) { const d = t.chestPos().sub(P.pos); P.yaw += angDiff(P.yaw, Math.atan2(d.x, d.z)) * (1 - Math.exp(-6 * dt)); } }
   if (P.atk) {
     const A = P.atk; A.t += dt; const a = A.t / A.dur;
-    if (!A.whoosh && a > A.strikeA) { A.whoosh = true; aimAssist(); SND.swing(P.pos, A.heavy); }
-    if (!A.hit && a > A.hitA) { A.hit = true; strike(A.heavy); }
+    if (A.target && !A.target.dead && a < A.hitA) {
+      const d = A.target.chestPos().sub(P.pos).setY(0), l = d.length();
+      if (l > 0.05) { P.yaw += angDiff(P.yaw, Math.atan2(d.x, d.z)) * (1 - Math.exp(-18 * dt)); const ideal = A.kind === 'kick' ? 0.95 : (A.target.standing ? 1.3 : 1.05); P.pos.addScaledVector(d.divideScalar(l), clamp(l - ideal, -0.4, A.kind === 'heavy' ? 1.3 : 0.9) * Math.min(1, dt * (a > A.strikeA - 0.16 ? 13 : 7))); collide(P.pos, 0.28); }
+    }
+    if (!A.whoosh && a > A.strikeA) { A.whoosh = true; if (A.kind !== 'kick') SND.swing(P.pos, A.kind === 'heavy'); }
+    if (!A.hit && a > A.hitA) { A.hit = true; strike(A.kind); }
     if (a >= 1) P.atk = null;
   }
   // torch battery
   if (P.torchOn) { P.battery -= 4.5 * dt; if (P.battery <= 0) { P.battery = 0; P.torchOn = false; toast('手电没电了'); } }
   P.spot.intensity = damp(P.spot.intensity, P.torchOn ? 7 : 0, 20, dt);
   P.tlens.material.emissiveIntensity = P.torchOn ? 6 : 0; P.tbeam.material.uniforms.intensity.value = P.torchOn ? 0.1 : 0;
-  // pinned
+  // pinned: mash to break it; adrenaline puts weight behind it
   if (P.state === 'pinned') {
     P.struggle = Math.max(0, P.struggle - 0.28 * dt);
     $('qteBar').style.width = (P.struggle * 100).toFixed(0) + '%';
     if (Math.floor(P.st * 1.6) !== Math.floor((P.st - dt) * 1.6)) SND.heartbeat(0.7);
-    if (P.struggle >= 1) { const e = P.pinnedBy; releasePin(e, false); P.stamina = Math.max(0, P.stamina - 20); }
+    if (P.struggle >= 1) { releasePin(P.pinnedBy, false); spend(20); }
     else if (P.st > 3.5) bitten();
   }
   // pose
   let pose = walkPose(P.ph, clamp(sp / 2.25, 0, 1), clamp((sp - 2.6) / 1.4, 0, 1));
   Object.assign(pose, { shRx: (pose.shRx || 0) * 0.55 - 0.32, elR: 0.75, shRz: -0.1, shLx: (pose.shLx || 0) * 0.4 - 0.3, elL: 1.0, shLz: 0.14 });
+  if (P.crouch) Object.assign(pose, { knL: (pose.knL || 0) + 0.75, knR: (pose.knR || 0) + 0.75, hipLx: (pose.hipLx || 0) - 0.5, hipRx: (pose.hipRx || 0) - 0.5, pelY: -0.22, spX: (pose.spX || 0) + 0.38, headX: -0.25 });
   if (P.carrying) Object.assign(pose, { shLx: -0.62, shLz: 0.42, elL: 1.85 });
-  if (P.charging && P.chargeT > 0.14 && !P.atk) { Object.assign(pose, heavyPose(0.45 * clamp((P.chargeT - 0.14) / 0.3, 0, 1))); pose.shRx += Math.sin(G.t * 40) * 0.02; }
-  if (P.atk) Object.assign(pose, P.atk.heavy ? heavyPose(P.atk.t / P.atk.dur) : quickPose(P.atk.t / P.atk.dur));
+  if (fd > 0.02 && !P.atk) { const br = Math.sin(G.t * lerp(4, 9, fd)); Object.assign(pose, { spX: (pose.spX || 0) + 0.3 * fd + br * 0.035 * fd, headX: (pose.headX || 0) + 0.25 * fd, shRx: pose.shRx * (1 - 0.6 * fd) + 0.1 * fd, elR: pose.elR * (1 - 0.5 * fd), shLx: pose.shLx * (1 - 0.4 * fd), knL: (pose.knL || 0) + 0.12 * fd, knR: (pose.knR || 0) + 0.12 * fd, chX: br * 0.04 * fd }); }
+  if (P.charging && P.chargeT > 0.14 && !P.atk) { Object.assign(pose, deform(heavyPose(0.45 * clamp((P.chargeT - 0.14) / 0.3, 0, 1)), fd)); pose.shRx += Math.sin(G.t * 40) * 0.02 * (1 + 3 * fd); }
+  if (P.atk) { const a = P.atk.t / P.atk.dur; Object.assign(pose, deform(P.atk.kind === 'heavy' ? heavyPose(a) : P.atk.kind === 'kick' ? kickPose(a) : quickPose(a), P.atk.f)); }
   if (P.state === 'dodge') { const k = Math.sin(clamp(P.st / 0.42, 0, 1) * Math.PI); Object.assign(pose, { spX: 0.6 * k, knL: 1.0 * k, knR: 1.2 * k, hipLx: -0.6 * k, hipRx: -0.2 * k, pelY: -0.3 * k, headX: 0.2 * k, shLx: -0.8 * k, shRx: -0.6 * k }); }
+  if (P.state === 'stagger') { const k = 1 - smooth(0.2, 0.45, P.st); Object.assign(pose, { spX: -0.35 * k, headX: -0.3 * k, shLx: -0.8 * k, shRx: -0.5 * k, shLz: 0.6 * k, shRz: -0.5 * k, knL: 0.3 * k, hipLx: 0.3 * k }); }
   if (P.state === 'pinned') Object.assign(pose, { bodyX: -1.05, bodyY: 0.18, shLx: -2.1, shRx: -2.0, shLz: 0.3, shRz: -0.3, elL: 0.6 + Math.sin(G.t * 19) * 0.15, elR: 0.7, hipLx: -0.9, hipRx: -0.3, knL: 1.1, knR: 0.5, headX: -0.3 + Math.sin(G.t * 13) * 0.1 });
   if (P.dead) Object.assign(pose, { bodyX: -1.5, bodyY: 0.16, shLz: 1.0, shRz: -0.9, elL: 0.4, elR: 0.6, headY: 0.7, knL: 0.3 });
+  springStep(h, dt);
   poseTo(h, pose, P.state === 'dodge' ? 20 : (P.atk ? 22 : 13), dt);
   h.root.position.copy(P.pos); h.root.rotation.y = P.yaw;
   // scarf tail
   const tail = h.o._scarf; if (tail) tail.forEach((seg, i) => { const target = clamp(sp * 0.28, 0, 1.0) * (i ? 0.35 : 1) + (P.indoor ? 0 : Math.sin(G.t * 6 + i * 1.3) * 0.12 * (0.5 + G.rain * 0.5)); seg.rotation.x = damp(seg.rotation.x, target, 10, dt); seg.rotation.z = damp(seg.rotation.z, Math.sin(G.t * 4 + i) * 0.08, 6, dt); });
-  // lantern pendulum (stays upright, swings with acceleration)
+  // lantern pendulum (stays upright, swings with acceleration); V throws a cloth over it
   const acc = P.vel.clone().sub(P.prevVel).divideScalar(Math.max(dt, 1e-3)); P.prevVel.copy(P.vel);
   const S = P.swing, lx = acc.x * Math.cos(P.yaw) - acc.z * Math.sin(P.yaw), lz = acc.x * Math.sin(P.yaw) + acc.z * Math.cos(P.yaw);
   S.vx += (-30 * Math.sin(S.ax) - 3 * S.vx - lz * 0.9) * dt; S.ax += S.vx * dt; S.vz += (-30 * Math.sin(S.az) - 3 * S.vz + lx * 0.9) * dt; S.az += S.vz * dt;
   const q = new THREE.Quaternion(); P.lantern.parent.getWorldQuaternion(q); q.invert();
   P.lantern.quaternion.copy(q).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(S.ax, P.yaw, S.az, 'YXZ')));
   const L = P.lantern.userData, fl = 1 + Math.sin(G.t * 13) * 0.05 + Math.sin(G.t * 31) * 0.04 + (Math.random() - 0.5) * 0.05;
-  L.light.intensity = 1.2 * fl; L.flame.scale.set(1, 2 * fl, 1); L.glow.material.opacity = 0.75 * fl;
+  L.light.intensity = damp(L.light.intensity, (P.shutter ? 0.06 : 1.2) * fl, 12, dt); L.flame.scale.set(1, 2 * fl, 1); L.glow.material.opacity = P.shutter ? 0.05 : 0.75 * fl;
 }
 
-function bitten() {
-  P.dead = true; P.state = 'dead'; $('qte').classList.remove('on');
-  const e = P.pinnedBy; if (e) { e.setState('stalk'); e.cool = 3; } P.pinnedBy = null;
-  G.shake = 0.5; SND.shriek(P.pos, 0.6);
-  setTimeout(() => showCard('深咬伤', '它咬穿了你的衣领。脖子上一阵剧痛，然后是热。\n潜伏期开始了，最多三天。\n\n这是原型：按 R 重新开始。', null, true), 900);
-}
-
+/* ===== P9 scene glue: mother, dialogue, camera, environment, HUD, input, reset, main loop ===== */
 /* ---------------- mother update ---------------- */
 function updateMother(dt) {
   const m = mother, h = m.h; m.t += dt;
@@ -1828,7 +2630,7 @@ function updateMother(dt) {
   if (m.handing > 0) { m.handing -= dt; Object.assign(pose, { shLx: -1.15, shLy: -0.5, elL: 0.9, shRx: -1.1, shRy: 0.5, elR: 0.8, spX: 0.18, headX: 0.25, headY: 0.1 }); if (m.handing <= 0) finishHandover(); }
   poseTo(h, pose, 3.5, dt);
   const bu = m.baby.userData; bu.hand.position.y = 0.055 + Math.sin(G.t * 2.7) * 0.008; bu.head.rotation.y = Math.sin(G.t * 0.8) * 0.15;
-  m.cooT -= dt; if (m.cooT < 0) { m.cooT = rnd(10, 18); const bp = new V3(); m.baby.getWorldPosition(bp); if (P.carrying) SND.babyCry(bp, 0.35); else if (P.pos.distanceTo(bp) < 7) SND.babyCoo(bp); }
+  m.cooT -= dt; if (m.cooT < 0) { m.cooT = rnd(10, 18); const bp = new V3(); m.baby.getWorldPosition(bp); if (P.carrying) { SND.babyCry(bp, 0.35); makeNoise(bp, 15, 'baby'); floatLabel('（孩子在哭）', bp.clone().add(new V3(0, 0.5, 0)), 'tough', 1.6); } else if (P.pos.distanceTo(bp) < 7) SND.babyCoo(bp); }
 }
 function finishHandover() {
   const b = mother.baby; P.h.spine.add(b); b.position.set(0.02, 0.27 * P.h.s, 0.19); b.rotation.set(0.1, Math.PI + 0.15, 0.3);
@@ -1883,8 +2685,9 @@ function closeCard() {
   $('card').classList.remove('on'); G.mode = 'play'; if (G.cardOnClose) G.cardOnClose();
 }
 
+
 /* ---------------- camera ---------------- */
-const cam = { yaw: 0.12, pitch: 0.86, dist: 13, fov: 32, tgt: new V3(0, 1, 6), pos: new V3(0, 14, 24), userDist: 13 };
+const cam = { yaw: 0.12, pitch: 0.86, dist: 13, fov: 32, tgt: new V3(0, 1, 6), pos: new V3(0, 14, 24), userDist: 13, combat: 0, focus: new V3(0, 0, 9) };
 function updateCamera(dt, rdt) {
   let tgt, pos, fov;
   if (G.mode === 'title') {
@@ -1896,12 +2699,15 @@ function updateCamera(dt, rdt) {
     tgt = mp.clone().add(new V3(0, -0.34, 0)).addScaledVector(s, 0.12); fov = 34;
   } else {
     if (keys.ArrowLeft) cam.yaw += rdt * 1.4; if (keys.ArrowRight) cam.yaw -= rdt * 1.4;
+    // in a fight the command view pulls in a little and leans toward the nearest threat
+    let th = null, td = 7; for (const e of infected) if (!e.dead && (HUNT.includes(e.state) || e.state === 'stumble' || e.state === 'crawl')) { const d = e.pos.distanceTo(P.pos); if (d < td) { td = d; th = e; } }
+    cam.combat = damp(cam.combat, th && G.mode === 'play' ? 1 : 0, 2.2, rdt); if (th) cam.focus.lerp(th.pos, 1 - Math.exp(-4 * rdt));
     if (G.camMode === 'close') {
       const r = new V3(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
       tgt = P.pos.clone().add(new V3(0, 1.45, 0)).addScaledVector(r, 0.42);
       const d = 3.3, p = 0.28; pos = tgt.clone().add(new V3(Math.sin(cam.yaw) * Math.cos(p) * d, Math.sin(p) * d, Math.cos(cam.yaw) * Math.cos(p) * d)); fov = 48;
     } else {
-      tgt = P.pos.clone().add(new V3(0, 0.9, 0)); const d = cam.userDist, p = cam.pitch;
+      tgt = P.pos.clone().add(new V3(0, 0.9, 0)).lerp(cam.focus.clone().setY(P.pos.y + 0.9), 0.25 * cam.combat); const d = cam.userDist * (1 - 0.15 * cam.combat), p = cam.pitch;
       pos = tgt.clone().add(new V3(Math.sin(cam.yaw) * Math.cos(p) * d, Math.sin(p) * d, Math.cos(cam.yaw) * Math.cos(p) * d)); fov = 32;
     }
     if (G.mode === 'opening') { const k = smooth(0, 7.5, G.openingT); pos.lerp(tgt.clone().add(new V3(0, 22, 18)), 1 - k); }
@@ -1910,9 +2716,9 @@ function updateCamera(dt, rdt) {
   cam.pos.x = damp(cam.pos.x, pos.x, k, rdt); cam.pos.y = damp(cam.pos.y, pos.y, k, rdt); cam.pos.z = damp(cam.pos.z, pos.z, k, rdt);
   cam.tgt.x = damp(cam.tgt.x, tgt.x, k * 1.3, rdt); cam.tgt.y = damp(cam.tgt.y, tgt.y, k * 1.3, rdt); cam.tgt.z = damp(cam.tgt.z, tgt.z, k * 1.3, rdt);
   cam.fov = damp(cam.fov, fov, 4, rdt);
-  camera.position.copy(cam.pos);
+  camera.position.copy(cam.pos).add(G.camKick); G.camKick.multiplyScalar(Math.exp(-14 * rdt));
   if (G.shake > 0.001) { camera.position.x += (Math.random() - 0.5) * G.shake * 0.35; camera.position.y += (Math.random() - 0.5) * G.shake * 0.35; G.shake = Math.max(0, G.shake - rdt * 1.6); }
-  camera.fov = cam.fov; camera.updateProjectionMatrix(); camera.lookAt(cam.tgt);
+  camera.fov = cam.fov + G.fovPunch; G.fovPunch = damp(G.fovPunch, 0, 8, rdt); camera.updateProjectionMatrix(); camera.lookAt(cam.tgt);
 }
 function updateWalls() {
   const c = camera.position, inside = (P.indoor && G.mode !== 'title') || G.mode === 'dialog' || G.mode === 'cutscene';
@@ -1923,6 +2729,7 @@ function updateWalls() {
   porchRoof.visible = !inside && !(onPorch && G.camMode === 'command');
 }
 
+
 /* ---------------- environment update ---------------- */
 const floodPosV = new V3(), floodDirV = new V3(), lanternW = new V3();
 function updateEnvironment(dt) {
@@ -1931,7 +2738,7 @@ function updateEnvironment(dt) {
   const F = G.flood; F.t += dt;
   if (F.state === 'on' && G.mode !== 'title' && G.mode !== 'opening' && t > F.next) { F.state = 'flicker'; F.t = 0; toast('泛光灯在闪……', 2.5); }
   let lvl = 1;
-  if (F.state === 'flicker') { lvl = Math.sin(F.t * 47) > 0.2 ? 0.25 + Math.random() * 0.6 : 0.05; if (F.t > 1.3) { F.state = 'off'; F.t = 0; toast('灯灭了。', 2); } }
+  if (F.state === 'flicker') { lvl = Math.sin(F.t * 47) > 0.2 ? 0.25 + Math.random() * 0.6 : 0.05; if (F.t > 1.3) { F.state = 'off'; F.t = 0; toast('灯灭了。', 2); onBlackout(); } }
   else if (F.state === 'off') { lvl = 0.0; if (F.t > 4.8) { F.state = 'restore'; F.t = 0; } }
   else if (F.state === 'restore') { lvl = Math.sin(F.t * 39) > 0 ? 0.9 : 0.1; if (F.t > 0.7) { F.state = 'on'; F.t = 0; F.next = t + rnd(38, 60); toast('灯亮了。', 1.6); } }
   floodLight.intensity = 3.2 * lvl; lensMat.emissiveIntensity = 5 * lvl + 0.2; beamMat.uniforms.intensity.value = 0.17 * lvl; beamMat.uniforms.time.value = t;
@@ -2006,41 +2813,72 @@ function updateEnvironment(dt) {
     if (m.userData.t > 1) { m.userData.t = 0; const pd = puddles[Math.floor(Math.random() * puddles.length)]; const a = rnd(0, 6.28), rr = Math.sqrt(Math.random()) * 0.8; m.position.set(pd.x + Math.cos(a) * pd.a * rr, GROUND_Y + 0.012, pd.z + Math.sin(a) * pd.b * rr); }
     const k = m.userData.t; m.scale.setScalar(0.04 + k * 0.32); m.material.opacity = (1 - k) * 0.55 * Math.min(1, G.rain * 1.5);
   }
-  // blood particles & pools
-  for (let i = 0; i < BL_N; i++) { if (blLife[i] > 0) { blLife[i] -= dt; blVel[i * 3 + 1] -= 9.8 * dt; blPos[i * 3] += blVel[i * 3] * dt; blPos[i * 3 + 1] += blVel[i * 3 + 1] * dt; blPos[i * 3 + 2] += blVel[i * 3 + 2] * dt; const gy = groundY(blPos[i * 3], blPos[i * 3 + 2]); if (blPos[i * 3 + 1] < gy + 0.01) { blPos[i * 3 + 1] = gy + 0.01; blVel[i * 3] = blVel[i * 3 + 1] = blVel[i * 3 + 2] = 0; } if (blLife[i] <= 0) blPos[i * 3 + 1] = -50; } }
-  blGeo.attributes.position.needsUpdate = true;
-  for (const m of pools) if (m.userData.grow > 0) { const s = m.scale.x + dt * 0.5; m.scale.setScalar(Math.min(s, 1.4)); if (s >= 1.4) m.userData.grow = 0; }
 }
+// when the light dies the leader calls everyone in
+function onBlackout() { const L = SQUAD.leader; if (L && !L.dead && L.standing && !P.indoor && G.mode === 'play') roar(L, 'rally'); }
 
 /* ---------------- HUD ---------------- */
 function updateHUD(dt) {
-  $('barSta').style.width = P.stamina.toFixed(0) + '%';
+  const fd = fatigue();
+  $('barSta').style.width = clamp(P.stamina, 0, 100).toFixed(0) + '%';
+  $('barFat').style.width = (100 - effMax()).toFixed(0) + '%';
+  $('barAdr').style.width = (P.adr * 100).toFixed(0) + '%';
+  const st = P.dead ? '' : P.winded ? '喘不过气' : fd > 0.72 ? '力竭 · 动作变形' : fd > 0.25 ? '疲惫' : P.crash > 0 ? '手在抖' : P.staMax < 85 ? '体力上限下降' : '';
+  if ($('staState').textContent !== st) $('staState').textContent = st;
+  $('bars').classList.toggle('spent', fd > 0.72); $('adrRow').classList.toggle('hot', P.adr > 0.55);
   $('barBat').style.width = P.battery.toFixed(0) + '%';
-  $('barDur').style.width = (P.durability / 60 * 100).toFixed(0) + '%';
-  $('durLabel').textContent = P.broken ? '球棍（断了）' : '球棍耐久';
+  const axe = P.weapon === 'axe';
+  $('barDur').style.width = (axe ? 100 : P.durability / 60 * 100).toFixed(0) + '%';
+  const wl = axe ? '消防斧' : (P.broken ? '球棍（断了）' : '钉头球棍 · 耐久'); if ($('durLabel').textContent !== wl) $('durLabel').textContent = wl;
+  const sl = (P.crouch ? '潜行' : '') + (P.shutter ? (P.crouch ? ' · ' : '') + '提灯遮住' : ''); if ($('stealth').textContent !== sl) $('stealth').textContent = sl;
   if (G.toastT > 0) { G.toastT -= dt; if (G.toastT <= 0) $('toast').classList.remove('on'); }
   // prompt
   let pr = '';
-  if (G.mode === 'play' && !P.dead) {
-    const mp = new V3(); mother.h.pelvis.getWorldPosition(mp);
-    if (P.pos.distanceTo(mp.setY(P.pos.y)) < 1.7) pr = mother.hasBaby ? 'E　靠近她' : 'E　坐到她身边';
-  }
+  if (G.mode === 'play' && !P.dead) { const mp = new V3(); mother.h.pelvis.getWorldPosition(mp); if (P.pos.distanceTo(mp.setY(P.pos.y)) < 1.7) pr = mother.hasBaby ? 'E　靠近她' : 'E　坐到她身边'; }
   const pe = $('prompt'); if (pr) { pe.textContent = pr; pe.classList.add('on'); } else pe.classList.remove('on');
-  // labels
+  // floating labels
   for (let i = labels.length - 1; i >= 0; i--) {
-    const L = labels[i]; L.t += dt; const p = project(L.pos.clone().add(new V3(0, L.t * 0.6, 0)));
-    L.el.style.transform = `translate(${p.x.toFixed(0)}px,${p.y.toFixed(0)}px) translate(-50%,-50%)`; L.el.style.opacity = Math.max(0, 1 - L.t / 1.1).toFixed(2);
-    if (L.t > 1.1) { L.el.remove(); labels.splice(i, 1); }
+    const L = labels[i]; L.t += dt; const p = project(L.pos.clone().add(new V3(0, L.t * 0.5, 0)));
+    L.el.style.transform = `translate(${p.x.toFixed(0)}px,${p.y.toFixed(0)}px) translate(-50%,-50%)`; L.el.style.opacity = (p.vis ? Math.max(0, Math.min(1, (L.dur - L.t) / 0.35)) : 0).toFixed(2);
+    if (L.t > L.dur) { L.el.remove(); labels.splice(i, 1); }
   }
+  // enemy readouts: awareness icon (？ investigating, ！ spotted / attacking), health + balance once you're fighting it
+  const W = innerWidth, H = innerHeight, play = G.mode === 'play';
   for (const e of infected) {
-    const show = e.barT > 0 && !e.dead && G.mode === 'play';
-    e.bar.style.opacity = show ? '1' : '0';
-    if (show) { const p = project(e.pos.clone().add(new V3(0, 2.05 * e.T.height / 1.75, 0))); e.bar.style.transform = `translate(${p.x.toFixed(0)}px,${p.y.toFixed(0)}px) translate(-50%,-50%)`; e.barFill.style.width = (clamp(e.poise / e.T.poise, 0, 1) * 100).toFixed(0) + '%'; }
+    const dP = e.pos.distanceTo(P.pos), hunting = HUNT.includes(e.state) || e.state === 'stumble' || e.state === 'crawl';
+    let icon = '', alert = false;
+    if (!e.dead && play) {
+      if (e.state === 'windup' || e.state === 'lunge' || e.spotFlash > 0) { icon = '！'; alert = true; }
+      else if (e.state === 'investigate' || e.state === 'search' || ((e.state === 'lurk' || e.state === 'porch') && e.aware > 0.3)) icon = '？';
+    }
+    const bars = !e.dead && play && (e.barT > 0 || (hunting && dP < 6));
+    const show = icon || bars;
+    e.bar.style.opacity = show ? '1' : '0'; e.bar.classList.toggle('iconOnly', !bars);
+    if (show) {
+      const p = project(e.headPos().add(new V3(0, 0.15, 0)));
+      e.bar.style.transform = `translate(${p.x.toFixed(0)}px,${p.y.toFixed(0)}px) translate(-50%,-100%)`;
+      if (e.icon.textContent !== icon) e.icon.textContent = icon; e.icon.classList.toggle('alert', alert); e.icon.style.opacity = icon === '？' ? (0.45 + 0.55 * clamp(e.aware, 0, 1)).toFixed(2) : '1';
+      e.barHp.style.width = (clamp(e.hp / e.T.hp, 0, 1) * 100).toFixed(0) + '%'; e.barBal.style.width = (clamp(e.bal, 0, 1) * 100).toFixed(0) + '%';
+      const nm = e.T.name + (e === SQUAD.leader && infected.filter(o => !o.dead).length > 1 ? ' · 头领' : ''); if (e.shownName !== nm) { e.shownName = nm; e.nameEl.textContent = nm; }
+    }
+    // off-screen danger: an arrow on the screen edge toward anything closing in on you
+    const danger = !e.dead && play && (e.state === 'windup' || e.state === 'lunge' || (hunting && dP < 4.5));
+    let arrowOn = false;
+    if (danger) {
+      const v = e.pos.clone().add(new V3(0, 1.1, 0)).project(camera); let x = v.x, y = v.y; if (v.z > 1) { x = -x; y = -y; }
+      if (v.z > 1 || Math.abs(x) > 0.92 || Math.abs(y) > 0.88) {
+        const a = Math.atan2(y, x), m = Math.max(Math.abs(Math.cos(a)) / 0.9, Math.abs(Math.sin(a)) / 0.84), ex = Math.cos(a) / m, ey = Math.sin(a) / m;
+        e.arrow.style.transform = `translate(${((ex * 0.5 + 0.5) * W).toFixed(0)}px,${((-ey * 0.5 + 0.5) * H).toFixed(0)}px) translate(-50%,-50%) rotate(${(-a).toFixed(3)}rad)`;
+        e.arrow.classList.toggle('hot', e.state === 'windup' || e.state === 'lunge'); arrowOn = true;
+      }
+    }
+    e.arrow.style.opacity = arrowOn ? '1' : '0';
   }
-  gradePass.uniforms.hurt.value = damp(gradePass.uniforms.hurt.value, P.state === 'pinned' ? 0.6 + Math.sin(G.t * 8) * 0.15 : (P.dead ? 0.8 : 0), 6, dt);
-  gradePass.uniforms.desat.value = damp(gradePass.uniforms.desat.value, P.dead ? 0.9 : (G.mode === 'dialog' ? 0.25 : 0), 3, dt);
+  const pulse = P.adr > 0.3 ? Math.max(0, Math.sin(G.t * (6 + P.adr * 6))) * 0.08 * P.adr : 0;
+  gradePass.uniforms.hurt.value = damp(gradePass.uniforms.hurt.value, P.state === 'pinned' ? 0.6 + Math.sin(G.t * 8) * 0.15 : (P.dead ? 0.8 : (P.state === 'stagger' ? 0.35 : 0)), 6, dt);
+  gradePass.uniforms.desat.value = damp(gradePass.uniforms.desat.value, P.dead ? 0.9 : (G.mode === 'dialog' ? 0.25 : fd * 0.3), 3, dt);
   gradePass.uniforms.bars.value = damp(gradePass.uniforms.bars.value, (G.mode === 'dialog' || G.mode === 'cutscene') ? 1 : 0, 4, dt);
-  gradePass.uniforms.vig.value = damp(gradePass.uniforms.vig.value, G.mode === 'dialog' ? 0.85 : 0.55, 3, dt);
+  gradePass.uniforms.vig.value = damp(gradePass.uniforms.vig.value, G.mode === 'dialog' ? 0.85 : 0.55 + 0.15 * P.adr + pulse, 3, dt);
 }
 
 /* ---------------- audio sync ---------------- */
@@ -2053,9 +2891,12 @@ function updateAudioMix(dt) {
   if (G.mode === 'title') hum = 0;
   SND.humGain = hum; SND.humDegrade = mother.lang;
   let tens = 0;
-  for (const e of infected) { if (e.dead) continue; const de = e.pos.distanceTo(P.pos); if (['stalk', 'windup', 'lunge', 'pinning'].includes(e.state)) tens = Math.max(tens, de < 12 ? 1 : 0.5); else if (de < 8 && !P.indoor) tens = Math.max(tens, 0.35); }
+  for (const e of infected) { if (e.dead) continue; const de = e.pos.distanceTo(P.pos); if (HUNT.includes(e.state) || e.state === 'crawl') tens = Math.max(tens, de < 12 ? 1 : 0.5); else if (e.state === 'investigate' || e.state === 'search') tens = Math.max(tens, 0.55); else if (de < 8 && !P.indoor) tens = Math.max(tens, 0.35); }
   if (floodOff() && G.mode === 'play') tens = Math.max(tens, 0.7);
   G.tension = damp(G.tension, G.mode === 'play' ? tens : 0, 1.5, dt); SND.tension = G.tension;
+  const play = G.mode === 'play' && !P.dead;
+  SND.exertion = play ? Math.max(fatigue(), clamp((60 - P.stamina) / 60, 0, 1) * 0.6, P.state === 'pinned' ? 0.9 : 0) : 0;
+  SND.adr = play ? P.adr : 0;
   SND.update(dt);
 }
 
@@ -2080,10 +2921,16 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyH') $('help').classList.toggle('off');
   if (e.code === 'KeyL' && G.flood.state === 'on') { G.flood.next = G.t; }
   if (G.mode !== 'play') return;
-  if (e.code === 'Space') { if (P.state === 'pinned') { P.struggle += 0.15; SND.grunt(); P.stamina = Math.max(0, P.stamina - 2); } else dodge(); }
+  if (e.code === 'Space') { if (P.state === 'pinned') { const pe = P.pinnedBy; P.struggle += 0.12 * (1 + 0.8 * P.adr) * (P.stamina > 4 ? 1 : 0.7) * (pe && pe.arms < 2 ? 1.4 : 1); SND.grunt(); P.stamina = Math.max(0, P.stamina - 2); springKick(P.h, 'spZ', rnd(-3, 3)); } else dodge(); }
   if (e.code === 'KeyF') toggleTorch();
-  if (e.code === 'KeyJ') startAttack(false);
-  if (e.code === 'KeyK') startAttack(true);
+  if (e.code === 'KeyJ') startAttack('quick');
+  if (e.code === 'KeyK') startAttack('heavy');
+  if (e.code === 'KeyQ') startAttack('kick');
+  if (e.code === 'KeyC') { P.crouch = !P.crouch; toast(P.crouch ? '潜行：脚步几乎无声，更难被看见' : '站起来', 1.4); }
+  if (e.code === 'KeyV') { P.shutter = !P.shutter; SND.click(); toast(P.shutter ? '遮住提灯：它们更难看见你，你也看不清' : '打开提灯', 1.6); }
+  if (e.code === 'KeyX') whistle();
+  if (e.code === 'Digit1') switchWeapon('club');
+  if (e.code === 'Digit2') switchWeapon('axe');
   if (e.code === 'KeyE') {
     const mp = new V3(); mother.h.pelvis.getWorldPosition(mp);
     if (P.pos.distanceTo(mp.setY(P.pos.y)) < 1.7 && !P.dead) startDialog(mother.hasBaby ? 'start' : 'after');
@@ -2091,7 +2938,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 canvas.addEventListener('mousedown', e => {
-  if (e.button === 2) { cam.drag = { x: e.clientX }; return; }
+  if (e.button === 2) { cam.drag = { x: e.clientX, x0: e.clientX, t: performance.now() }; return; }
   if (e.button !== 0) return;
   if (G.mode === 'card') { closeCard(); return; }
   if (G.mode === 'dialog') { advanceDialog(); return; }
@@ -2099,9 +2946,9 @@ canvas.addEventListener('mousedown', e => {
   if (G.mode === 'play' && !P.atk && P.state === 'move') { P.charging = true; P.chargeT = 0; }
 });
 addEventListener('mouseup', e => {
-  if (e.button === 2) { cam.drag = null; return; }
+  if (e.button === 2) { const d = cam.drag; cam.drag = null; if (d && Math.abs(e.clientX - d.x0) < 5 && performance.now() - d.t < 260 && G.mode === 'play') startAttack('kick'); return; } // a right-click tap kicks
   if (e.button !== 0 || !P.charging) return;
-  const heavy = P.chargeT >= 0.42; P.charging = false; startAttack(heavy, heavy);
+  const heavy = P.chargeT >= 0.42; P.charging = false; startAttack(heavy ? 'heavy' : 'quick', heavy);
 });
 addEventListener('mousemove', e => { if (cam.drag) { cam.yaw -= (e.clientX - cam.drag.x) * 0.006; cam.drag.x = e.clientX; } });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -2121,16 +2968,29 @@ function setFX(on) {
   toast(on ? '画质：高（泛光、阴影全开）' : '画质：省电（关闭泛光和部分阴影）', 1.8);
 }
 function resetGame() {
-  $('card').classList.remove('on'); $('qte').classList.remove('on'); $('dlg').classList.remove('on'); D = null;
-  Object.assign(P, { state: 'move', st: 0, stamina: 100, battery: 100, torchOn: false, durability: 60, broken: false, atk: null, charging: false, invuln: 1, struggle: 0, pinnedBy: null, dead: false, yaw: Math.PI });
-  P.pos.set(0.2, GROUND_Y, 10.6); P.vel.set(0, 0, 0); P.h.cur = Object.assign({}, NEUTRAL);
-  const sh = P.club.userData.shaft; sh.scale.y = 1; sh.position.y = -0.33; P.club.children.forEach(c => c.visible = true);
+  $('card').classList.remove('on'); $('qte').classList.remove('on'); $('dlg').classList.remove('on'); D = null; $('splat').innerHTML = '';
+  Object.assign(P, { state: 'move', st: 0, stamina: 100, staMax: 100, winded: false, adr: 0, adrPeak: 0, crash: 0, battery: 100, torchOn: false, durability: 60, broken: false, atk: null, charging: false, invuln: 1, struggle: 0, pinnedBy: null, dead: false, yaw: Math.PI, crouch: false, shutter: false, calmT: 0 });
+  P.pos.set(0.2, GROUND_Y, 10.6); P.vel.set(0, 0, 0); P.h.cur = Object.assign({}, NEUTRAL); initSprings(P.h);
+  const sh = P.club.userData.shaft; sh.scale.y = 1; sh.position.y = -0.33; P.club.children.forEach(c => { c.visible = true; });
+  P.weapon = 'club'; P.club.visible = true; P.axe.visible = false;
   if (!mother.hasBaby) { const b = mother.baby; mother.h.chest.add(b); b.position.set(0.02, -0.2, 0.15); b.rotation.set(0.1, Math.PI + 0.2, 0.18); mother.hasBaby = true; P.carrying = false; P.h.armL.hand.add(P.lantern); P.lantern.position.set(0, -0.05, 0); }
   mother.lang = mother.langT = 0.15; G.babyTaken = false;
+  clearGore();
+  while (infected.length > 3) { const e = infected.pop(); scene.remove(e.h.root); disposeTree(e.h.root); e.bar.remove(); e.arrow.remove(); }
   for (const e of infected) e.reset();
-  pools.forEach(m => scene.remove(m)); pools.length = 0;
-  G.flood.state = 'on'; G.flood.next = G.t + 40; G.playT = 0; G.mode = 'play'; setObj('屋里有人在哼歌。');
+  // repaint the player's coat: rebuild the texture by swapping in a fresh one
+  if (P.h.coatMat.map) P.h.coatMat.map.dispose(); P.h.coatMat.map = toTex(clothCanvas('#4a4434', 0.55, false, 3 + 7)); P.h.coatMat.needsUpdate = true;
+  Object.assign(SQUAD, { leader: null, next: null, tokenCD: 0, flankT: -99, retreatT: -99, spotT: -99 });
+  labels.forEach(L => L.el.remove()); labels.length = 0;
+  G.flood.state = 'on'; G.flood.next = G.t + 40; G.playT = 0; G.mode = 'play'; G.wave = 1; G.waveT = -1; G.hitStop = 0; G.slowmo = 0; setObj('屋里有人在哼歌。');
   toast('重新开始', 1.2);
+}
+function spawnWave() { // they answer each other from far off, then come
+  G.wave++; const base = rnd(0, 6.28);
+  for (let i = infected.length - 1; i >= 0 && infected.filter(o => o.dead).length > 6; i--) if (infected[i].dead) { const e = infected[i]; scene.remove(e.h.root); disposeTree(e.h.root); e.bar.remove(); e.arrow.remove(); infected.splice(i, 1); }
+  ['butcher', 'student', 'office'].forEach((t, i) => { const e = new Infected(t, base + i * 2.1); e.reset(true); e.provoked = true; e.aware = 0.7; e.lastKnown.copy(P.pos); e.setState('investigate'); });
+  SND.roar(LURK_C.clone().addScaledVector(dirA(base), 24), 'rally', 0.9);
+  toast('远处的嘶吼一声接一声地应和着。它们又来了。', 3.5); setObj('第 ' + G.wave + ' 波。它们听见了刚才的动静。');
 }
 
 /* ---------------- opening & start ---------------- */
@@ -2151,7 +3011,7 @@ function frame(now) {
   composer.render();
 }
 function tick(rdt) {
-  let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; dt = rdt * 0.05; }
+  let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; dt = rdt * 0.05; } else if (G.slowmo > 0) { G.slowmo -= rdt; dt = rdt * 0.3; }
   G.t += rdt;
   if (G.mode === 'opening') {
     G.openingT += rdt;
@@ -2161,18 +3021,24 @@ function tick(rdt) {
   if (G.mode === 'play') G.playT += rdt;
   if (D && !D.done) { D.typed += rdt * 22; $('dlgText').textContent = D.text.slice(0, Math.floor(D.typed)); if (D.typed >= D.text.length) { D.done = true; mother.talking = false; } }
   updatePlayer(dt);
+  squadThink(dt);
   for (const e of infected) e.update(dt);
+  updateFX(dt);
   updateMother(dt);
   updateEnvironment(dt);
   updateCamera(dt, rdt);
   updateWalls();
   updateHUD(rdt);
   updateAudioMix(rdt);
+  if (G.mode === 'play' && !P.dead) {
+    if (G.waveT < 0 && infected.every(e => e.dead)) { G.waveT = 22; toast('雨里安静了……暂时。', 3); setObj('院子里没有站着的东西了。'); }
+    if (G.waveT > 0) { G.waveT -= dt; if (G.waveT <= 0) { G.waveT = -1; spawnWave(); } }
+  }
   document.body.classList.toggle('cine', G.mode === 'dialog' || G.mode === 'cutscene' || G.mode === 'card');
   gradePass.uniforms.time.value = G.t;
 }
 requestAnimationFrame(frame);
-window.__dbg = { G, P, cam, mother, infected, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, toggleTorch, startPin, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };
+window.__dbg = { G, P, cam, mother, infected, SQUAD, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, dodge, switchWeapon, toggleTorch, startPin, roar, makeNoise, spawnWave, fatigue, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };
 
 })();
 </script>
