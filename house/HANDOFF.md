@@ -33,7 +33,7 @@
 | S1 软装风格选型（5 个方案 + 方案 5 的 6 种沙发色） | 完成，用户选：方案 5 + 墨绿沙发 |
 | S2 全屋按方案 5 重新布置 + 补齐卫生间/衣帽间等（`rich.py`） | 完成 |
 | S3 全部房间效果图（25 个房间）`renders/rooms/*.jpg` + 总览 `sheet_rooms1~4.jpg` | 已出图，**等用户逐个确认**；我自检发现的问题见 §7 |
-| 小眠羊 5 只玩偶建模（`lamb.py`）并放到卧室 2 床上 | 模型完成；高清特写 `int_lambs` 交接时正在渲染（可能没渲完，重渲见 §4） |
+| 小眠羊 5 只玩偶建模（`lamb.py`）并放到卧室 2 床上 | 模型完成；高清特写已出：`renders/rooms/int_lambs.jpg` |
 | S4 浏览器可探索 3D 场景 | **未开始**（等 S3 确认） |
 
 还没做的房间：洗衣房、车库内部（S2 计划里有，未建）。
@@ -72,7 +72,7 @@ NOISE=0.02 python build_final.py --views front,lake --samples 128
 - 环境变量：`RENDER_OUT`（输出目录）、`NOISE`（自适应采样阈值，默认 0.015）、`STYLE`（软装方案，默认 `moody`）、`SOFA=velvet:#1e2b45`（覆盖沙发面料）、`DUSK_EXPOSURE`、`INSIDE_EXPOSURE`、`INSIDE_RL`、`SUN_E`、`ROOM_W`。
 - 所有视角：外景在 `build_massing.py` 的 `VIEWS`（front、lake、pool、lawn、garden、aerial），其余在 `build_final.py` 的 `EXTRA_VIEWS`（front_close、heli、dock、int_*）。灯光模式在 `build_final.py` 的 `LIGHT`：`dusk` 黄昏、`day` 白天、`inside` 白天 HDRI + 室内补光（第三个数是曝光）。
 - `CLOSEUPS = {"int_lambs"}`：这些镜头渲染时会隐藏前后院植物和远景树林，否则毛发 + 植被会爆内存（OOM）。
-- 交接时：`int_lambs` 高清版可能没渲完。重渲：`RENDER_OUT=$(pwd)/../renders/rooms NOISE=0.02 python build_final.py --views int_lambs --samples 96`。
+- 重渲小眠羊特写：`RENDER_OUT=$(pwd)/../renders/rooms NOISE=0.02 python build_final.py --views int_lambs --samples 96`。
 
 ---
 
