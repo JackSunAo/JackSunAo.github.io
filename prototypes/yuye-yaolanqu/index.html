@@ -72,6 +72,9 @@ kbd { font-family: var(--sans); font-size: 11px; letter-spacing: 0.04em; display
 #help { position: absolute; right: clamp(16px, 2.4vw, 32px); top: calc(env(safe-area-inset-top, 0px) + clamp(14px, 2.4vh, 28px)); display: grid; gap: 6px; font-size: 12px; color: #b9b1a2;
   background: rgba(9, 11, 15, 0.55); padding: 12px 14px; border: 1px solid rgba(255, 255, 255, 0.06); transition: opacity 0.3s; }
 #help.off { opacity: 0; }
+#perf { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 3px 10px; border-radius: 4px; background: rgba(5, 7, 10, 0.62); color: #9fb0a0; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+#perf.on { opacity: 1; }
+#perf.low { color: #e07a5f; }
 #help .row { display: flex; align-items: center; }
 #help .ttl { font-size: 10.5px; letter-spacing: 0.3em; color: var(--dim); margin-bottom: 2px; }
 #labels { position: absolute; inset: 0; overflow: hidden; }
@@ -208,6 +211,7 @@ body.cmd::after { content: ''; position: fixed; inset: 0; pointer-events: none; 
     <div class="bar"><span class="lab" id="labBat">强光手电</span><i><b id="barBat"></b></i></div>
     <div class="bar"><span class="lab" id="durLabel">钉头球棍 · 耐久</span><i><b id="barDur"></b></i></div>
   </div>
+  <div id="perf" aria-live="off"></div>
   <div id="prompt"></div>
   <div id="toast"></div>
   <div id="help">
@@ -227,7 +231,8 @@ body.cmd::after { content: ''; position: fixed; inset: 0; pointer-events: none; 
     <div class="row"><kbd>Tab</kbd>切换镜头</div>
     <div class="row"><kbd>←→</kbd>/右键拖动 转镜头　滚轮缩放</div>
     <div class="row"><kbd>L</kbd>让泛光灯熄灭　<kbd>T</kbd>天气</div>
-    <div class="row"><kbd>G</kbd>画质　<kbd>M</kbd>静音　<kbd>R</kbd>重来</div>
+    <div class="row"><kbd>G</kbd>画质（自动 · 极高…最低）　<kbd>`</kbd>帧数</div>
+    <div class="row"><kbd>M</kbd>静音　<kbd>R</kbd>重来</div>
   </div>
   <div id="squad" aria-label="你的人"></div>
   <div id="cmdbar"><div id="cmdtitle">指挥</div><div class="btns"><button type="button" data-o="hold"><kbd>Y</kbd>守住</button><button type="button" data-o="fallback"><kbd>U</kbd>后撤</button><button type="button" data-o="plug"><kbd>I</kbd>堵缺口</button><button type="button" data-o="sally"><kbd>O</kbd>出击</button><button type="button" data-o="focus"><kbd>P</kbd>打头领</button><button type="button" data-p="1"><kbd>N</kbd>附身</button></div><small>点守军选人（Shift 多选 · 1–3 · 4 全体）　点蓝圈或地面把人派过去　N 附身选中的人　Z 退出</small></div>
@@ -287,12 +292,17 @@ function rng(seed) { let s = seed >>> 0; return () => (s = (s * 1664525 + 101390
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); // the quality system (p8c) sets the real value
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.NoToneMapping; // done in the grade pass
+
+// shadows fade out over the last stretch of a shadow map instead of stopping at a hard line: someone walking out past the
+// moon's shadow loses it gradually (a spotlight's cone is already dark there, so only the moon's square edge changes)
+THREE.ShaderChunk.shadowmap_pars_fragment = THREE.ShaderChunk.shadowmap_pars_fragment.replace(/(float getShadow\([\s\S]*?)(\n\s*return shadow;)/,
+  '$1\n\t\tvec2 shEdge = abs( shadowCoord.xy - 0.5 ) * 2.0;\n\t\tshadow = mix( shadow, 1.0, smoothstep( 0.82, 0.98, max( shEdge.x, shEdge.y ) ) );$2');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x05080d);
@@ -331,9 +341,10 @@ const GradeShader = {
     }`
 };
 let composer, bloomPass, gradePass;
-function makeComposer() {
+function makeComposer(samples = 4) {
+  if (composer) { composer.renderTarget1.dispose(); composer.renderTarget2.dispose(); if (bloomPass) bloomPass.dispose(); }
   const w = innerWidth, h = innerHeight, pr = renderer.getPixelRatio();
-  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples: 4 });
+  const rt = new THREE.WebGLRenderTarget(w * pr, h * pr, { type: THREE.HalfFloatType, samples });
   composer = new THREE.EffectComposer(renderer, rt);
   composer.setPixelRatio(pr);
   composer.addPass(new THREE.RenderPass(scene, camera));
@@ -341,7 +352,7 @@ function makeComposer() {
   composer.addPass(bloomPass);
   gradePass = new THREE.ShaderPass(GradeShader);
   composer.addPass(gradePass);
-  composer.setSize(w, h);
+  composer.setSize(w, h); gradePass.uniforms.res.value.set(w, h);
 }
 makeComposer();
 addEventListener('resize', () => {
@@ -452,6 +463,12 @@ function clothCanvas(hex, wear = 0.3, blood = false, seed = 5) {
   }
   return c;
 }
+// a canvas is painted once per pattern; every later caller gets a copy (a few microseconds instead of thousands of brush strokes)
+function memoCanvas(fn) {
+  const cache = new Map();
+  return (...args) => { const k = JSON.stringify(args); let c = cache.get(k); if (!c) cache.set(k, c = fn(...args)); const out = mkCanvas(c.width, c.height); out.getContext('2d').drawImage(c, 0, 0); return out; };
+}
+skinCanvas = memoCanvas(skinCanvas); clothCanvas = memoCanvas(clothCanvas);
 function softDisc(size = 128, stops = [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]) {
   const c = mkCanvas(size, size), g = c.getContext('2d'), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
   stops.forEach(s => gr.addColorStop(s[0], s[1])); g.fillStyle = gr; g.fillRect(0, 0, size, size);
@@ -1038,6 +1055,8 @@ function faceCanvas(o) {
   return c;
 }
 
+hairCanvas = memoCanvas(hairCanvas); faceCanvas = memoCanvas(faceCanvas);
+
 function makeHuman(o) {
   o = Object.assign({
     height: 1.75, girth: 1, female: false, skin: '#c99a78', top: '#4b5a52', topWear: 0.3, bottom: '#33302c', bottomWear: 0.3,
@@ -1109,12 +1128,12 @@ function makeHuman(o) {
   jawM.scale.set(o.female ? 0.9 : 1.04, 0.8, 0.95);
   [-1, 1].forEach(sx => { const e = add(head, new THREE.Mesh(new THREE.SphereGeometry(0.022 * s, 8, 6), skinMat), sx * 0.093 * s, 0.105 * s, -0.005); e.scale.set(0.5, 1, 0.8); });
   const eyes = [];
-  if (o.infected) [-1, 1].forEach(sx => eyes.push(add(head, new THREE.Mesh(new THREE.SphereGeometry(0.006 * s, 6, 4), new THREE.MeshStandardMaterial({ color: 0xe8e2c8, emissive: 0x8a8460, emissiveIntensity: 0.9 })), sx * 0.034 * s, 0.117 * s, 0.098 * s)));
+  if (o.infected) { const em = new THREE.MeshStandardMaterial({ color: 0xe8e2c8, emissive: 0x8a8460, emissiveIntensity: 0.9 }); [-1, 1].forEach(sx => eyes.push(add(head, new THREE.Mesh(new THREE.SphereGeometry(0.006 * s, 6, 4), em), sx * 0.034 * s, 0.117 * s, 0.098 * s))); } // both eyes glow together: one material
   const nose = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.012 * s, 0.04 * s, 8), faceMat), 0, 0.1 * s, 0.103 * s);
   nose.rotation.x = Math.PI / 2 - 0.35;
   const mouth = add(head, new THREE.Mesh(new THREE.SphereGeometry(0.017 * s, 10, 6), M(o.infected ? '#1a0b0a' : '#4a2a26', 0.7)), 0, 0.066 * s, 0.09 * s);
   mouth.scale.set(1.25, 0.12, 0.35);
-  if (o.infected) for (let i = 0; i < 4; i++) add(head, new THREE.Mesh(new THREE.BoxGeometry(0.007 * s, 0.009 * s, 0.006 * s), M('#d8cfb4', 0.4)), (-0.012 + i * 0.008) * s, 0.071 * s, 0.093 * s);
+  if (o.infected) { const tm = M('#d8cfb4', 0.4); for (let i = 0; i < 4; i++) add(head, new THREE.Mesh(new THREE.BoxGeometry(0.007 * s, 0.009 * s, 0.006 * s), tm), (-0.012 + i * 0.008) * s, 0.071 * s, 0.093 * s); }
   // hair styles
   const cap = (scl = 1.06, theta = 0.56) => {
     const h = add(head, new THREE.Mesh(new THREE.SphereGeometry(0.105 * s * scl, 20, 14, 0, Math.PI * 2, 0, Math.PI * theta), hairMat), 0, 0.115 * s, -0.008);
@@ -1169,8 +1188,129 @@ function makeHuman(o) {
   }
   const h = { root, body, pelvis, pelvisY0, spine, chest, head, neck, L, R, armL, armR, mouth, eyes, s, o, cur: Object.assign({}, NEUTRAL), skinMat, topMat, botMat, coatMat, faceMat, cut: {}, loose: {}, drop: { L: 0, R: 0 }, sprK: null };
   root.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
-  applyPose(h);
+  // a few millimetres of ear, nose and teeth throw no shadow worth drawing
+  root.traverse(m => { if (!m.isMesh) return; const gm = m.geometry; if (!gm.boundingSphere) gm.computeBoundingSphere(); if (gm.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) < 0.045) m.castShadow = false; });
+  root.userData.human = true;
+  applyPose(h); skinHuman(h);
   return h;
+}
+
+/* ---------- the body drawn the way games draw characters ----------
+   Every part stays in the rig as an invisible bone (layer 31), so poses, springs, a crushed skull, a dropping jaw and a
+   severed arm still move exactly what they moved before. A skinned copy draws them: all of a body's textures packed into
+   one atlas, each part's colour and roughness carried in its vertices, so the whole body is one draw (plus the glowing
+   eyes); and one more copy, shown only while shadows are drawn, throws the whole body's shadow in one */
+const SKIN_LAYER = 31, _skM = new THREE.Matrix4(), _skN = new THREE.Matrix3(), _skV = new V3(), _skZero = new THREE.Matrix4().makeScale(0, 0, 0);
+const SKIN_BOUNDS = new THREE.Sphere(new V3(0, 0.9, 0), 2.1); // generous: arms out, lying flat
+const SKIN_SHADOW_MAT = new THREE.MeshBasicMaterial(); // one-sided; a two-sided part is baked in twice, once each way round
+const ATLAS_PAD = 4;
+function skinKey(m) { // identical plain materials draw together; anything textured, glowing or odd keeps its own
+  if (m.type !== 'MeshStandardMaterial' || m.map || m.emissive.getHex() !== 0 || m.transparent) return m.uuid;
+  return [m.color.getHex(), m.roughness, m.metalness, m.side, m.flatShading].join('|');
+}
+// what can share the body's one material: lit, not glowing, not see-through, not metal, its texture (if any) a painted canvas
+function atlasable(m) { return m.type === 'MeshStandardMaterial' && m.emissive.getHex() === 0 && !m.transparent && m.metalness === 0 && !m.bumpMap && !m.normalMap && !m.flatShading && m.side !== THREE.BackSide && (!m.map || !!(m.map.image && m.map.image.getContext)); }
+// spheres and capsules nudge u half a segment past the edge at their poles, where every vertex meets anyway: clamped, nothing moves
+function uvInside(g) { const U = g.attributes.uv; if (!U) return false; for (let j = 0; j < U.count; j++) { const u = U.getX(j), v = U.getY(j); if (u < -0.13 || u > 1.13 || v < -0.13 || v > 1.13) return false; } return true; }
+function bodyAtlas(images) {
+  const W = 1024, P = ATLAS_PAD, rects = new Map(), white = { width: 8, height: 8 }, list = [...images].sort((a, b) => b.height - a.height); list.push(white);
+  let x = 0, y = 0, row = 0;
+  for (const im of list) { const w = im.width + 2 * P, h = im.height + 2 * P; if (x + w > W) { x = 0; y += row; row = 0; } rects.set(im, { x: x + P, y: y + P, w: im.width, h: im.height }); x += w; row = Math.max(row, h); }
+  let H = 64; while (H < y + row) H *= 2;
+  const c = mkCanvas(W, H), A = { c, g: c.getContext('2d'), W, H, rects, white: rects.get(white), tex: null };
+  for (const im of images) atlasDraw(A, im, rects.get(im));
+  const wr = A.white; A.g.fillStyle = '#fff'; A.g.fillRect(wr.x - P, wr.y - P, wr.w + 2 * P, wr.h + 2 * P);
+  A.tex = toTex(c, true, false); return A;
+}
+function atlasDraw(A, im, r) { // the image, with its edge pixels smeared into the padding so filtering never reaches a neighbour
+  const g = A.g, P = ATLAS_PAD, iw = im.width, ih = im.height, { x, y, w, h } = r;
+  g.drawImage(im, x, y, w, h);
+  g.drawImage(im, 0, 0, 1, ih, x - P, y, P, h); g.drawImage(im, iw - 1, 0, 1, ih, x + w, y, P, h); g.drawImage(im, 0, 0, iw, 1, x, y - P, w, P); g.drawImage(im, 0, ih - 1, iw, 1, x, y + h, w, P);
+  g.drawImage(im, 0, 0, 1, 1, x - P, y - P, P, P); g.drawImage(im, iw - 1, 0, 1, 1, x + w, y - P, P, P); g.drawImage(im, 0, ih - 1, 1, 1, x - P, y + h, P, P); g.drawImage(im, iw - 1, ih - 1, 1, 1, x + w, y + h, P, P);
+}
+// a wound painted on a part's own texture (p6) is copied into its body's atlas
+function atlasRefresh(mat) { const a = mat && mat.userData.atlas; if (!a || !mat.map || !mat.map.image) return; atlasDraw(a.A, mat.map.image, a.rect); a.A.tex.needsUpdate = true; }
+// roughness read from the vertices instead of the material
+const BODY_ROUGH = sh => {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float rough;\nvarying float vRough;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvRough = rough;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vRough;').replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRough;');
+};
+// items: { i: part index, rev: a second, inside-out copy for a two-sided part, rect: atlas rectangle (or the white patch), col, rough }
+function bakeSkinned(parts, items, rootInv, opt) {
+  let nv = 0, ni = 0; for (const it of items) { const g = parts[it.i].geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const main = opt.main, A = opt.A, pos = new Float32Array(nv * 3), nor = main ? new Float32Array(nv * 3) : null, uvs = main ? new Float32Array(nv * 2) : null;
+  const col = A ? new Float32Array(nv * 3) : null, rgh = A ? new Float32Array(nv) : null, si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4), ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let v = 0, k = 0;
+  for (const it of items) {
+    const m = parts[it.i], g = m.geometry, Pa = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, I = g.index, s = it.rev ? -1 : 1;
+    _skM.multiplyMatrices(rootInv, m.matrixWorld); _skN.getNormalMatrix(_skM); const flip = (_skM.determinant() < 0) !== !!it.rev;
+    for (let j = 0; j < Pa.count; j++) {
+      const o = v + j; _skV.fromBufferAttribute(Pa, j).applyMatrix4(_skM); pos[o * 3] = _skV.x; pos[o * 3 + 1] = _skV.y; pos[o * 3 + 2] = _skV.z;
+      if (main) { _skV.fromBufferAttribute(N, j).applyMatrix3(_skN).normalize().multiplyScalar(s); nor[o * 3] = _skV.x; nor[o * 3 + 1] = _skV.y; nor[o * 3 + 2] = _skV.z;
+        let u = U ? U.getX(j) : 0, w = U ? U.getY(j) : 0;
+        if (A) { const r = it.rect; if (r === A.white) { u = 0.5; w = 0.5; } u = clamp(u, 0, 1); w = clamp(w, 0, 1); u = (r.x + u * r.w) / A.W; w = 1 - (r.y + (1 - w) * r.h) / A.H; col[o * 3] = it.col.r; col[o * 3 + 1] = it.col.g; col[o * 3 + 2] = it.col.b; rgh[o] = it.rough; }
+        uvs[o * 2] = u; uvs[o * 2 + 1] = w; }
+      si[o * 4] = it.i; sw[o * 4] = 1;
+    }
+    const n = I ? I.count : Pa.count;
+    for (let j = 0; j < n; j += 3) { const a = (I ? I.getX(j) : j) + v, b = (I ? I.getX(j + 1) : j + 1) + v, c = (I ? I.getX(j + 2) : j + 2) + v; ix[k++] = a; ix[k++] = flip ? c : b; ix[k++] = flip ? b : c; }
+    v += Pa.count;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  if (main) { geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2)); }
+  if (A) { geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.setAttribute('rough', new THREE.BufferAttribute(rgh, 1)); }
+  geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); geo.setIndex(new THREE.BufferAttribute(ix, 1));
+  geo.boundingSphere = SKIN_BOUNDS.clone(); return geo;
+}
+function skinHuman(h) {
+  const root = h.root; root.updateMatrixWorld(true);
+  const rootInv = root.matrixWorld.clone().invert(), parts = []; root.traverse(o => { if (o.isMesh) parts.push(o); });
+  const skel = new THREE.Skeleton(parts, parts.map(m => m.matrixWorld.clone().invert()));
+  // a part is drawn while it and every group above it are visible, and until it is torn off (then it is drawn as itself)
+  const chains = parts.map(m => { const c = []; for (let o = m; o && o !== root; o = o.parent) c.push(o); return c; });
+  skel.update = function () {
+    const out = this.boneMatrices, inv = this.boneInverses;
+    for (let i = 0; i < parts.length; i++) {
+      const m = parts[i]; let on = !m.userData.skinOff; if (on) for (const o of chains[i]) if (!o.visible) { on = false; break; }
+      (on ? _skM.multiplyMatrices(m.matrixWorld, inv[i]) : _skZero).toArray(out, i * 16);
+    }
+    if (this.boneTexture) this.boneTexture.needsUpdate = true;
+  };
+  const bind = (geo, mat) => { const sm = new THREE.SkinnedMesh(geo, mat); root.add(sm); sm.bind(skel, root.matrixWorld); return sm; };
+  h.skinned = [];
+  // the body's one material: every part that can share it, textures packed into one atlas
+  const inAtlas = [], rest = [];
+  parts.forEach((m, i) => (atlasable(m.material) && (!m.material.map || uvInside(m.geometry)) ? inAtlas : rest).push(i));
+  if (new Set(inAtlas.map(i => parts[i].material)).size > 1) {
+    const images = new Set(); for (const i of inAtlas) if (parts[i].material.map) images.add(parts[i].material.map.image);
+    const A = bodyAtlas(images), items = [];
+    for (const i of inAtlas) {
+      const mt = parts[i].material, rect = mt.map ? A.rects.get(mt.map.image) : A.white; if (mt.map) mt.userData.atlas = { A, rect };
+      const it = { i, rect, col: mt.color, rough: mt.roughness }; items.push(it); if (mt.side === THREE.DoubleSide) items.push(Object.assign({}, it, { rev: true }));
+    }
+    const bm = new THREE.MeshStandardMaterial({ map: A.tex, vertexColors: true, roughness: 1, metalness: 0 }); bm.onBeforeCompile = BODY_ROUGH; bm.customProgramCacheKey = () => 'body-atlas';
+    const sm = bind(bakeSkinned(parts, items, rootInv, { main: true, A }), bm); sm.receiveShadow = true; h.skinned.push(sm); h.atlas = A; h.bodyMat = bm;
+  } else rest.push(...inAtlas);
+  // the rest (the eyes that glow, reflective tape), one draw per look
+  const groups = new Map(); for (const i of rest) { const m = parts[i], key = skinKey(m.material); let g = groups.get(key); if (!g) groups.set(key, g = { mat: m.material, items: [] }); g.items.push({ i }); }
+  for (const { mat, items } of groups.values()) { const sm = bind(bakeSkinned(parts, items, rootInv, { main: true }), mat); sm.receiveShadow = true; h.skinned.push(sm); }
+  // the shadow: one-sided parts once, two-sided parts once each way round
+  const cast = []; parts.forEach((m, i) => { if (!m.castShadow) return; const sd = m.material.side; if (sd !== THREE.BackSide) cast.push({ i }); if (sd !== THREE.FrontSide) cast.push({ i, rev: true }); });
+  const sh = bind(bakeSkinned(parts, cast, rootInv, {}), SKIN_SHADOW_MAT); sh.castShadow = true; sh.visible = false; h.shadows = [sh];
+  for (const m of parts) { m.layers.set(SKIN_LAYER); m.userData.skinned = true; }
+  root.traverse(o => { o.userData.rigNode = true; }); // whatever is added to the rig later (weapons, lantern, baby, stumps) is gear
+  h.skel = skel; h.parts = parts;
+}
+// a part torn off the body (an arm, a leg, the head) leaves the skinned copy and is drawn as itself again
+function unskin(part) {
+  const merged = [];
+  part.traverse(o => {
+    if (o.userData.skinned && !o.userData.skinOff) { o.userData.skinOff = true; o.layers.set(0); }
+    if (o.userData.batched) { o.layers.set(0); o.userData.batched = false; } // drawn through a batch until now: on its own from here
+    if (o.userData.batchMesh) merged.push(o);
+  });
+  for (const m of merged) if (m.parent) m.parent.remove(m); // the batches it was in stay behind with what didn't fly off
+  part.traverse(o => { if (o.userData.rb) { o.userData.rb.sig = -1; o.userData.rb.meshes = []; o.userData.rb.shadows = []; } });
 }
 
 /* physical layer: damped springs added on top of the animated pose (hit reactions, recoil, bumps) */
@@ -1244,7 +1384,7 @@ function makeClub() {
   const wd = new THREE.MeshStandardMaterial({ map: toTex(woodCanvas('#7a5a3a', 24, 128, 128, 44, 0.5)), roughness: 0.75 });
   const shaft = mesh(new THREE.CylinderGeometry(0.035, 0.022, 0.82, 10), wd, 0, -0.33, 0); g.add(shaft);
   const grip = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.16, 8), new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 1 }), 0, 0.02, 0); g.add(grip);
-  for (let i = 0; i < 6; i++) { const n = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 4), matIron, 0, -0.52 - i * 0.04, 0); n.rotation.z = Math.PI / 2; n.rotation.y = i * 1.1; g.add(n); }
+  for (let i = 0; i < 6; i++) { const n = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 4), matIron, 0, -0.52 - i * 0.04, 0, false); n.rotation.z = Math.PI / 2; n.rotation.y = i * 1.1; g.add(n); }
   g.userData = { shaft, tip: new V3(0, -0.74, 0), stain: [wd] };
   return g;
 }
@@ -1664,7 +1804,7 @@ const P = {};
   const spotT = new THREE.Object3D(); spotT.position.set(0, -0.9, 5); torch.add(spotT); spot.target = spotT;
   const tbGeo = new THREE.ConeGeometry(Math.tan(0.32) * 6.5, 6.5, 24, 1, true); tbGeo.translate(0, -3.25, 0); tbGeo.rotateX(-Math.PI / 2);
   const tbMat = beamMat.clone(); tbMat.uniforms.color.value = new THREE.Color(0xa8bedc); tbMat.uniforms.intensity.value = 0;
-  const tbeam = new THREE.Mesh(tbGeo, tbMat); tbeam.rotation.x = Math.atan2(0.9, 5); torch.add(tbeam);
+  const tbeam = new THREE.Mesh(tbGeo, tbMat); tbeam.rotation.x = Math.atan2(0.9, 5); tbeam.visible = false; torch.add(tbeam); // drawn only while the torch is on
   Object.assign(P, {
     h, club, axe, knife, weapon: 'club', lantern, torch, spot, tlens, tbeam, pos: new V3(0.2, GROUND_Y, 10.6), vel: new V3(), yaw: Math.PI, ph: 0, state: 'move', st: 0,
     stamina: 100, staMax: 100, staDelay: 0, winded: false, adr: 0, adrPeak: 0, crash: 0, battery: 100, torchOn: false, durability: 60, broken: false,
@@ -1827,7 +1967,7 @@ function paintWound(mat, n, big, front) {
     g.strokeStyle = 'rgba(58,5,5,.6)'; g.lineCap = 'round';
     for (let k = 0; k < (big ? 4 : 2); k++) { const dx = x + rnd(-r, r) * 0.6; g.lineWidth = rnd(0.8, 2.2) * W / 128; g.beginPath(); g.moveTo(dx, y); g.lineTo(dx + rnd(-1.5, 1.5), y + rnd(0.06, 0.22) * H); g.stroke(); }
   }
-  tex.needsUpdate = true;
+  tex.needsUpdate = true; atlasRefresh(mat);
 }
 // a blade wound on cloth: a dark slash, a wet halo, blood running down from it
 function paintCut(mat, heavy) {
@@ -1838,7 +1978,7 @@ function paintCut(mat, heavy) {
   g.globalAlpha = 1; g.strokeStyle = 'rgba(30,2,2,.95)'; g.lineWidth = (heavy ? 2.6 : 1.8) * W / 128; g.beginPath(); g.moveTo(-len / 2, 0); g.lineTo(len / 2, rnd(-1.5, 1.5)); g.stroke();
   g.restore(); g.strokeStyle = 'rgba(60,5,5,.7)'; g.lineCap = 'round';
   for (let i = 0; i < (heavy ? 7 : 4); i++) { const t = rnd(-0.5, 0.5), dx = x + Math.cos(a) * len * t, dy = y + Math.sin(a) * len * t; g.lineWidth = rnd(1, 2.6) * W / 128; g.beginPath(); g.moveTo(dx, dy); g.lineTo(dx + rnd(-1, 1), dy + rnd(0.1, 0.35) * H); g.stroke(); }
-  tex.needsUpdate = true;
+  tex.needsUpdate = true; atlasRefresh(mat);
 }
 function stainWeapon(w, k) { for (const m of w.userData.stain) { if (!m.userData.base) m.userData.base = m.color.clone(); m.userData.blood = Math.min(1, (m.userData.blood || 0) + k); m.color.copy(m.userData.base).lerp(new THREE.Color(0x3a0606), m.userData.blood * 0.75); } }
 function rinseWeapons(dt) { for (const w of [P.club, P.axe]) for (const m of w.userData.stain) if (m.userData.blood > 0) { m.userData.blood = Math.max(0, m.userData.blood - dt * 0.006 * G.rain); m.color.copy(m.userData.base).lerp(new THREE.Color(0x3a0606), m.userData.blood * 0.75); } }
@@ -1854,7 +1994,7 @@ function addStump(parent, y, r, dirLocal, owner) {
   const st = { obj: s, t: 0, life: owner ? 999 : rnd(5, 8), next: 0, dir: dirLocal || new V3(0, -1, 0), owner }; stumps.push(st); return st;
 }
 function detachGib(part, vel, spin, opts = {}) {
-  part.updateWorldMatrix(true, true); let obj = part;
+  unskin(part); part.updateWorldMatrix(true, true); let obj = part;
   if (opts.center) { obj = new THREE.Group(); obj.position.copy(opts.center); scene.add(obj); obj.updateWorldMatrix(true, false); obj.attach(part); } // tumble about its own middle
   else scene.attach(part);
   const g = { obj, vel: vel.clone(), w: spin.clone(), r: opts.r || 0.06, rest: false, t: 0, bleed: opts.dry ? 0 : (opts.bleed ?? 2.5), roll: !!opts.roll, landed: false, dry: !!opts.dry, thud: opts.thud || 'thud' };
@@ -1902,7 +2042,7 @@ function clearGore() {
   for (const w of [P.club, P.axe]) for (const m of w.userData.stain) if (m.userData.base) { m.userData.blood = 0; m.color.copy(m.userData.base); }
 }
 
-function disposeTree(root) { root.traverse(m => { if (!m.isMesh) return; m.geometry.dispose(); const mt = m.material; if (mt === meatMat || mt === boneMat || mt === decalMat) return; if (mt.map) mt.map.dispose(); mt.dispose(); }); }
+function disposeTree(root) { root.traverse(m => { if (!m.isMesh) return; m.geometry.dispose(); if (m.isSkinnedMesh && m.skeleton && m.skeleton.boneTexture) m.skeleton.dispose(); const mt = m.material; if (mt === meatMat || mt === boneMat || mt === decalMat) return; if (mt.map) mt.map.dispose(); mt.dispose(); }); }
 /* hit flash on a body's materials (eyes keep their own glow) */
 function collectMats(h) { const s = new Set(); h.root.traverse(m => { if (m.isMesh && m.material && m.material.emissive && m.material.emissive.getHex() === 0) s.add(m.material); }); return [...s]; }
 function setFlash(mats, k) { for (const m of mats) m.emissive.setRGB(k * 0.2, k * 0.13, k * 0.1); }
@@ -2111,7 +2251,7 @@ function setDoorCut(cut) {
 const boardMat = new THREE.MeshStandardMaterial({ map: toTex(woodCanvas('#6a5038', 16, 256, 64, 41, 0.55)), roughness: 0.88 });
 function makeBoard(w, slotY) {
   const b = mesh(boxGeo(w.len, 0.15, 0.028, 0.9), boardMat, 0, 0, 0);
-  [-1, 1].forEach(k => b.add(mesh(new THREE.SphereGeometry(0.008, 5, 4), matIron, k * (w.len / 2 - 0.06), 0, w.inward ? -0.016 : 0.016)));
+  [-1, 1].forEach(k => b.add(mesh(new THREE.SphereGeometry(0.008, 5, 4), matIron, k * (w.len / 2 - 0.06), 0, w.inward ? -0.016 : 0.016, false)));
   if (w.axis === 'z') b.rotation.y = Math.PI / 2; b.rotation.z = rnd(-0.05, 0.05);
   b.position.copy(w.boardPos).setY(slotY); scene.add(b); return { m: b, hp: 1, wob: 0, wobV: 0, rz: b.rotation.z };
 }
@@ -2355,7 +2495,7 @@ function sightLine(a, b) {
 const _eye = new V3(), _tg = new V3();
 
 class Infected {
-  constructor(type, ang) {
+  constructor(type, ang, pooled) {
     const T = this.T = INF[type]; this.type = type;
     this.vel = new V3(); this.lastKnown = new V3(); this.lungeT = new V3(); this.fleeTo = new V3(); this.inbox = [];
     this.h = null; this.dirty = true; this.home = ang;
@@ -2369,7 +2509,7 @@ class Infected {
     this.bar = bar; this.statEl = bar.querySelector('.estat'); this.barBlood = bar.querySelector('.blood b'); this.barBal = bar.querySelector('.bal b'); this.icon = bar.querySelector('.eicon');
     this.doll = {}; ['head', 'torso', 'armL', 'armR', 'legL', 'legR'].forEach(k => { this.doll[k] = bar.querySelector('.d-' + k); });
     const ar = document.createElement('div'); ar.className = 'threat'; $('threats').appendChild(ar); this.arrow = ar;
-    this.reset(); infected.push(this);
+    this.reset(); if (pooled) this.h.root.visible = false; else infected.push(this); // a pooled one waits off stage until a wave calls it
   }
   rebuild() {
     if (this.h) { scene.remove(this.h.root); disposeTree(this.h.root); }
@@ -4468,7 +4608,7 @@ function updatePlayer(dt) {
   // torch battery
   if (P.torchOn) { P.battery -= 4.5 * dt; if (P.battery <= 0) { P.battery = 0; P.torchOn = false; toast('手电没电了'); } }
   P.spot.intensity = damp(P.spot.intensity, P.torchOn ? 7 : 0, 20, dt);
-  P.tlens.material.emissiveIntensity = P.torchOn ? 6 : 0; P.tbeam.material.uniforms.intensity.value = P.torchOn ? 0.1 : 0;
+  P.tlens.material.emissiveIntensity = P.torchOn ? 6 : 0; P.tbeam.material.uniforms.intensity.value = P.torchOn ? 0.1 : 0; P.tbeam.visible = P.torchOn;
   // pinned: mash to break it; adrenaline puts weight behind it
   if (P.state === 'pinned') {
     P.struggle = Math.max(0, P.struggle - 0.28 * dt);
@@ -4514,6 +4654,530 @@ function updatePlayer(dt) {
   P.lantern.quaternion.copy(q).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(S.ax, P.yaw, S.az, 'YXZ')));
   const L = P.lantern.userData, fl = 1 + Math.sin(G.t * 13) * 0.05 + Math.sin(G.t * 31) * 0.04 + (Math.random() - 0.5) * 0.05;
   L.light.intensity = damp(L.light.intensity, (P.shutter ? 0.06 : 1.2) * fl, 12, dt); L.flame.scale.set(1, 2 * fl, 1); L.glow.material.opacity = P.shutter ? 0.05 : 0.75 * fl;
+}
+
+/* ===== P8c performance: 60 frames a second on your own machine, without the picture getting any worse =====
+   The way games do it: what never moves is drawn in a handful of calls and its shadows are drawn once; every frame only
+   what moves is drawn into the shadow maps; characters are skinned meshes (p3); the quality level fits the machine and
+   is picked before the fight, not in the middle of it */
+renderer.info.autoReset = false;       // counted per frame, across the shadow passes and the post passes
+renderer.shadowMap.autoUpdate = false; // three's own shadow step is replaced below
+
+/* ---------------- what never moves ---------------- */
+const VIS_ROOTS = new Set([roofG]); wallSets.forEach(w => { VIS_ROOTS.add(w.full); VIS_ROOTS.add(w.cut); });
+const CUT_ROOTS = new Set(wallSets.map(w => w.cut)); // the low walls of the cutaway stand inside the full ones: the full wall throws their shadow
+const DYNAMIC = new Set([door.pivot, barMesh, rock, mobile, porchRoof, drip, ripple, glass, flame, flame2, trail, beam, moonBeam, clouds,
+  ...sheets, ...ripplePool, ...streaks, ...decals, ...sRings.map(s => s.m), ...fogLayers, ...winLeft.boards.map(b => b.m), ...defenders.map(d => d.ring), ...Object.values(postRings).map(r => r.m)]);
+const STATIC = [], STATIC_NODES = new Set();
+(function findStatic() {
+  const walk = (o, vr) => {
+    if (DYNAMIC.has(o) || o.userData.human) return;
+    if (VIS_ROOTS.has(o)) vr = o;
+    if (o.isMesh) { STATIC.push({ m: o, vr, cast: o.castShadow }); for (let a = o; a && a !== scene; a = a.parent) STATIC_NODES.add(a); } // the mesh and the groups holding it, nothing else
+    for (const k of o.children) walk(k, vr);
+  };
+  scene.updateMatrixWorld(true); walk(scene, scene);
+})();
+
+// many meshes → one geometry, in the space given by `inv`
+const _bm = new THREE.Matrix4(), _bn = new THREE.Matrix3(), _bv = new V3(), IDENT = new THREE.Matrix4();
+// sides (shadow batches only): 'front' once, 'double' once each way round, 'back' inside out; one-sided depth then draws them all as three would
+function mergeMeshes(list, inv, withNormal, withUV, sides) {
+  if (sides) { const l2 = []; for (const m of list) { const sd = sides(m); if (sd !== 'back') l2.push(m); if (sd !== 'front') l2.push({ rev: m }); } list = l2; }
+  let nv = 0, ni = 0; for (const it of list) { const g = (it.rev || it).geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = withNormal ? new Float32Array(nv * 3) : null, uv = withUV ? new Float32Array(nv * 2) : null, ix = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let v = 0, k = 0;
+  for (const it of list) {
+    const m = it.rev || it, g = m.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv, I = g.index;
+    _bm.multiplyMatrices(inv, m.matrixWorld); _bn.getNormalMatrix(_bm); const flip = (_bm.determinant() < 0) !== !!it.rev;
+    for (let j = 0; j < P.count; j++) {
+      const o = v + j; _bv.fromBufferAttribute(P, j).applyMatrix4(_bm); pos[o * 3] = _bv.x; pos[o * 3 + 1] = _bv.y; pos[o * 3 + 2] = _bv.z;
+      if (nor) { if (N) _bv.fromBufferAttribute(N, j).applyMatrix3(_bn).normalize(); else _bv.set(0, 1, 0); nor[o * 3] = _bv.x; nor[o * 3 + 1] = _bv.y; nor[o * 3 + 2] = _bv.z; }
+      if (uv && U) { uv[o * 2] = U.getX(j); uv[o * 2 + 1] = U.getY(j); }
+    }
+    const n = I ? I.count : P.count;
+    for (let j = 0; j < n; j += 3) { const a = (I ? I.getX(j) : j) + v, b = (I ? I.getX(j + 1) : j + 1) + v, c = (I ? I.getX(j + 2) : j + 2) + v; ix[k++] = a; ix[k++] = flip ? c : b; ix[k++] = flip ? b : c; }
+    v += P.count;
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  if (nor) geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); if (uv) geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(ix, 1)); geo.computeBoundingSphere(); return geo;
+}
+const cellOf = (c, size) => insideCabin(c.x, c.z) ? 'in' : Math.floor(c.x / size) + ',' + Math.floor(c.z / size);
+const _cc = new V3();
+function worldCenter(m) { const g = m.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); return _cc.copy(g.boundingSphere.center).applyMatrix4(m.matrixWorld); }
+
+// the picture: everything static and opaque, one draw per look per part of the yard
+const BATCHES = [], HIDDEN = [];
+(function batchStatic() {
+  // the same look under another name draws together; plain colours that differ only in colour draw together too, the colour moving into the vertices
+  const plain = m => m.type === 'MeshStandardMaterial' && !m.map && !m.bumpMap && m.emissive.getHex() === 0 && !m.transparent && !m.vertexColors;
+  const key = m => plain(m) ? ['tint', m.roughness, m.metalness, m.side, m.flatShading, m.fog].join('|') : m.uuid;
+  const groups = new Map();
+  for (const S of STATIC) {
+    const m = S.m, mat = m.material;
+    if (Array.isArray(mat) || m.children.length || !m.visible || m.renderOrder) continue;
+    if (mat.colorWrite === false) { m.visible = false; HIDDEN.push(m); continue; } // a stand-in that only throws shadow: its shadow is in the static batch
+    const cell = mat.transparent ? cellOf(worldCenter(m), 3) : S.vr === scene ? cellOf(worldCenter(m), 10) : 'all'; // see-through things stay where they sort
+    const k = S.vr.id + '/' + key(mat) + '/' + m.receiveShadow + '/' + cell;
+    let G = groups.get(k); if (!G) groups.set(k, G = { vr: S.vr, mat, recv: m.receiveShadow, list: [], tint: plain(mat) }); G.list.push(m);
+  }
+  for (const G of groups.values()) {
+    if (G.list.length < 2) continue;
+    const allUV = G.list.every(m => m.geometry.attributes.uv); if (!allUV && (G.mat.map || G.mat.bumpMap)) continue;
+    const colours = new Set(G.list.map(m => m.material.color.getHex()));
+    let mat = G.mat, geo = mergeMeshes(G.list, G.vr.matrixWorld.clone().invert(), true, allUV);
+    if (G.tint && colours.size > 1) { // white × the vertex colour = the colour it had
+      mat = G.mat.clone(); mat.color.set(0xffffff); mat.vertexColors = true;
+      const col = new Float32Array(geo.attributes.position.count * 3); let v = 0;
+      for (const m of G.list) { const c = m.material.color, n = m.geometry.attributes.position.count; for (let j = 0; j < n; j++, v++) { col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b; } }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    }
+    const b = new THREE.Mesh(geo, mat);
+    b.receiveShadow = G.recv; b.matrixAutoUpdate = false; b.userData.batch = G.list.length; G.vr.add(b); b.updateMatrixWorld(true);
+    for (const m of G.list) { m.visible = false; HIDDEN.push(m); }
+    BATCHES.push(b);
+  }
+})();
+
+// the shadows: everything static that throws one, whatever it looks like, in a few depth-only batches kept out of the scene
+const SHADOW_STATIC = new THREE.Scene(); SHADOW_STATIC.matrixWorldAutoUpdate = false;
+const _sideMats = {};
+function depthStandIn(side, shadowSide) { const k = side + '/' + shadowSide; return _sideMats[k] || (_sideMats[k] = new THREE.MeshBasicMaterial({ side, shadowSide })); }
+(function batchStaticShadows() {
+  const groups = new Map();
+  for (const S of STATIC) {
+    const m = S.m; if (!m.castShadow) continue; m.castShadow = false;
+    let cut = false; for (let o = m; o; o = o.parent) if (CUT_ROOTS.has(o)) { cut = true; break; } if (cut) continue;
+    const mt = Array.isArray(m.material) ? m.material[0] : m.material, odd = mt.shadowSide !== null; // a material with its own shadow side keeps it
+    const k = cellOf(worldCenter(m), 6) + (odd ? '/' + mt.side + '/' + mt.shadowSide : '');
+    let G = groups.get(k); if (!G) groups.set(k, G = { odd, side: mt.side, shadowSide: mt.shadowSide, list: [] }); G.list.push(m);
+  }
+  const sideOf = m => { const sd = (Array.isArray(m.material) ? m.material[0] : m.material).side; return sd === THREE.DoubleSide ? 'double' : sd === THREE.BackSide ? 'back' : 'front'; };
+  for (const G of groups.values()) {
+    const b = G.odd ? new THREE.Mesh(mergeMeshes(G.list, IDENT, false, false), depthStandIn(G.side, G.shadowSide)) : new THREE.Mesh(mergeMeshes(G.list, IDENT, false, false, sideOf), depthStandIn(THREE.FrontSide, null));
+    b.castShadow = true; b.matrixAutoUpdate = false; SHADOW_STATIC.add(b);
+  }
+  SHADOW_STATIC.updateMatrixWorld(true);
+})();
+// nothing static needs its matrix worked out again every frame
+for (const o of STATIC_NODES) o.matrixAutoUpdate = false;
+// and what is drawn through a batch leaves the scene graph altogether: three walks a third of the nodes it used to, every frame
+const DETACHED = [];
+(function detachDrawnElsewhere() {
+  const hid = new Set(HIDDEN);
+  const empty = o => (o.isMesh ? hid.has(o) : !o.isLight && !o.isSprite && !o.isPoints && !o.isLine && STATIC_NODES.has(o) && !VIS_ROOTS.has(o)) && o.children.every(empty);
+  const walk = o => { for (const k of o.children.slice()) { if (empty(k)) { DETACHED.push({ o: k, p: o }); o.remove(k); } else walk(k); } };
+  walk(scene);
+})();
+// a check for the bench: has anything that was taken for static moved, shown itself or changed since?
+const STATIC_SNAP = [...STATIC_NODES].map(o => ({ o, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() }));
+function checkStatic() {
+  const bad = [];
+  for (const S of STATIC_SNAP) { const o = S.o; if (!o.position.equals(S.p) || !o.quaternion.equals(S.q) || !o.scale.equals(S.s)) bad.push('moved: ' + (o.name || o.type) + ' @' + o.getWorldPosition(new V3()).toArray().map(x => x.toFixed(2)).join(',')); }
+  for (const m of HIDDEN) if (m.visible && !PERF.ref) bad.push('shown: ' + m.geometry.type + ' @' + m.getWorldPosition(new V3()).toArray().map(x => x.toFixed(2)).join(','));
+  return bad;
+}
+
+/* ---------------- what moves, in as few draws as it can ---------------- */
+// a rigid group (the door leaf, the rocking chair, the mobile) throws one merged shadow; rebuilt only when its parts change
+const PROXIES = [];
+function shadowProxy(group, members, sig) { const X = { group, members, sig, key: null, list: [], meshes: [] }; PROXIES.push(X); return X; }
+function proxyBegin(X) {
+  const k = X.sig();
+  if (k !== X.key) { // rebuild: one merged mesh per face rule (one-sided, two-sided), in the group's own space
+    X.key = k; for (const m of X.meshes) { X.group.remove(m); m.geometry.dispose(); } X.meshes = [];
+    X.list = X.members().filter(m => m.castShadow && !m.userData.proxy && m.geometry.attributes.position);
+    const by = new Map(), inv = X.group.matrixWorld.clone().invert();
+    for (const m of X.list) { const mt = depthStandIn(m.material.side, m.material.shadowSide); if (!by.has(mt)) by.set(mt, []); by.get(mt).push(m); }
+    for (const [mt, list] of by) { const pm = new THREE.Mesh(mergeMeshes(list, inv, false, false), mt); pm.castShadow = true; pm.visible = false; pm.matrixAutoUpdate = false; pm.userData.proxy = true; X.group.add(pm); pm.updateMatrixWorld(true); X.meshes.push(pm); }
+  }
+  for (const m of X.list) m.castShadow = false; for (const m of X.meshes) m.visible = true;
+}
+function proxyEnd(X) { for (const m of X.list) m.castShadow = true; for (const m of X.meshes) m.visible = false; }
+{
+  const broken = new Set();
+  shadowProxy(door.leaf, () => { broken.clear(); for (const col of door.segs) for (const s of col) if (s.broken) broken.add(s.m);
+      const out = []; door.leaf.traverse(o => { if (!o.isMesh || o.userData.proxy || o.userData.batchMesh) return; for (let a = o; a && a !== door.leaf; a = a.parent) if (broken.has(a)) return; out.push(o); }); return out; },
+    () => { let k = door.leaf.children.length; for (const col of door.segs) for (const s of col) k = k * 3 + (s.broken ? 1 : 0) + s.m.children.length * 7; return k; }); // a hole in the door lets the light through
+  shadowProxy(rock, () => rock.children.filter(m => m.isMesh), () => 1);
+  shadowProxy(mobile, () => mobile.children.filter(m => m.isMesh), () => 1);
+}
+function rigs() { const a = [P.h, mother.h]; for (const d of defenders) a.push(d.h); for (const e of infected) if (e.h) a.push(e.h); return a; }
+
+/* ---------------- small things that move together: one draw per look, rebuilt only when they change ---------------- */
+// the members stay where the game keeps them (it still moves, hides and breaks them); they are just not drawn themselves
+const BLAYER = SKIN_LAYER;
+function chainVisible(m, root) { for (let o = m; o && o !== root; o = o.parent) if (!o.visible) return false; return true; }
+function trsHash(h, m, root) { // the member's place inside the root, folded into 32 bits
+  for (let o = m; o && o !== root; o = o.parent) {
+    const p = o.position, q = o.quaternion, c = o.scale;
+    for (const v of [p.x, p.y, p.z, q.x, q.y, q.z, q.w, c.x, c.y, c.z]) h = Math.imul(h ^ Math.round(v * 8192), 16777619) >>> 0;
+  }
+  return h;
+}
+class RigidBatch {
+  constructor(root, opts = {}) { this.root = root; this.opts = opts; this.sig = -1; this.meshes = []; this.shadows = []; this.solo = []; }
+  members() { const out = [], skip = this.opts.skip; this.root.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.userData.rigNode && !o.userData.proxy && !o.userData.batchMesh && !o.userData.vol && !(skip && skip(o))) out.push(o); }); return out; }
+  update() {
+    const list = this.members(); let h = 2166136261 ^ list.length;
+    for (const m of list) {
+      const t = trsHash(2166136261, m, this.root), vis = chainVisible(m, this.root);
+      if (m.userData.trs !== undefined && m.userData.trs !== t) { m.userData.moved = (m.userData.moved || 0) + 1; if (m.userData.moved > 2) { m.userData.vol = true; this.sig = -1; } } else m.userData.moved = 0;
+      m.userData.trs = t; h = Math.imul(h ^ t ^ (vis ? 1 : 2) ^ m.id, 16777619) >>> 0;
+    }
+    if (h !== this.sig) { this.sig = h; this.rebuild(list.filter(m => !m.userData.vol)); }
+  }
+  rebuild(list) {
+    for (const m of this.meshes.concat(this.shadows)) { if (m.parent) m.parent.remove(m); m.geometry.dispose(); }
+    for (const m of list.concat(this.solo)) if (m.userData.batched) { m.layers.set(0); m.userData.batched = false; }
+    this.meshes = []; this.shadows = []; this.solo = [];
+    const inv = this.root.matrixWorld.clone().invert(), byMat = new Map(), byFace = new Map();
+    for (const m of list) {
+      if (!chainVisible(m, this.root)) continue;
+      const mt = m.material; if (Array.isArray(mt)) continue;
+      if (!byMat.has(mt)) byMat.set(mt, []); byMat.get(mt).push(m);
+      if (m.castShadow && this.opts.shadow !== false) { const sm = depthStandIn(mt.side, mt.shadowSide); if (!byFace.has(sm)) byFace.set(sm, []); byFace.get(sm).push(m); }
+    }
+    for (const [mt, ms] of byMat) {
+      if (ms.length < 2) { this.solo.push(...ms); continue; }
+      const uv = ms.every(m => m.geometry.attributes.uv); if (!uv && (mt.map || mt.bumpMap)) { this.solo.push(...ms); continue; }
+      const b = new THREE.Mesh(mergeMeshes(ms, inv, true, uv), mt); b.receiveShadow = ms[0].receiveShadow; b.renderOrder = ms[0].renderOrder; b.matrixAutoUpdate = false; b.userData.batchMesh = true;
+      this.root.add(b); b.updateMatrixWorld(true); this.meshes.push(b);
+      for (const m of ms) { m.layers.set(BLAYER); m.userData.batched = true; }
+    }
+    if (this.opts.shadow !== false) for (const [sm, ms] of byFace) {
+      const b = new THREE.Mesh(mergeMeshes(ms, inv, false, false), sm); b.castShadow = true; b.visible = false; b.matrixAutoUpdate = false; b.userData.batchMesh = b.userData.proxy = true;
+      this.root.add(b); b.updateMatrixWorld(true); this.shadows.push(b);
+    }
+  }
+  // during the shadow passes: the merged shadows stand in for every member that throws one
+  begin() { for (const b of this.shadows) b.visible = true; for (const m of this.solo) if (m.castShadow) { m.userData.cast0 = true; m.castShadow = false; } }
+  end() { for (const b of this.shadows) b.visible = false; for (const m of this.solo) if (m.userData.cast0) { m.castShadow = true; m.userData.cast0 = false; } }
+}
+// what each body carries (weapons, the lantern, the torch, the baby, a shawl, a stump) is found by looking for what isn't part of the rig
+function gearOf(h) {
+  if (h.gear && PERF.frame - h.gearT < 30) return h.gear;
+  const roots = new Set();
+  h.root.traverse(o => { if (o.userData.rigNode || o.isSkinnedMesh || o.userData.batchMesh || o.isLight || o.isSprite) return; if (o.parent && o.parent.userData.rigNode) roots.add(o.isMesh ? o.parent : o); });
+  h.gear = [...roots].map(r => r.userData.rb || (r.userData.rb = new RigidBatch(r, r.userData.rigNode ? { skip: o => o.parent !== r } : {}))); h.gearT = PERF.frame; return h.gear;
+}
+// the door: its planks, battens, straps, cuts and splinters, drawn per look; its shadow is the door proxy's (holes count, the cutaway doesn't)
+const DOOR_RB = new RigidBatch(door.leaf, { shadow: false });
+// the rocking chair and the mobile (their shadows are proxies already), and each board nailed over a window
+const MOVERS = [new RigidBatch(rock, { shadow: false, skip: o => { for (let a = o; a && a !== rock; a = a.parent) if (a.userData.human) return true; return false; } }), new RigidBatch(mobile, { shadow: false })];
+function boardBatches() { const out = []; for (const w of [winBack, winLeft]) for (const b of w.boards) out.push(b.m.userData.rb || (b.m.userData.rb = new RigidBatch(b.m))); return out; }
+
+/* things that move every frame (blood on the ground, rain on the glass, ripples in the puddles): one geometry, rewritten each frame */
+class DynBatch {
+  constructor(parent, members, mat, alpha) {
+    this.parent = parent; this.members = members; this.alpha = alpha; let nv = 0, ni = 0;
+    for (const m of members) { const g = m.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; }
+    const geo = new THREE.BufferGeometry(), ix = new Uint16Array(ni);
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(nv * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(nv * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(nv * 2), 2));
+    if (alpha) geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nv * 4).fill(1), 4).setUsage(THREE.DynamicDrawUsage));
+    let v = 0, k = 0; this.offs = [];
+    for (const m of members) { const g = m.geometry, P = g.attributes.position, U = g.attributes.uv, I = g.index; this.offs.push(v);
+      for (let j = 0; j < P.count; j++) { if (U) { geo.attributes.uv.array[(v + j) * 2] = U.getX(j); geo.attributes.uv.array[(v + j) * 2 + 1] = U.getY(j); } }
+      const n = I ? I.count : P.count; for (let j = 0; j < n; j++) ix[k++] = (I ? I.getX(j) : j) + v; v += P.count;
+      m.layers.set(BLAYER); m.userData.batched = true; }
+    geo.setIndex(new THREE.BufferAttribute(ix, 1));
+    this.mesh = new THREE.Mesh(geo, mat); this.mesh.frustumCulled = false; this.mesh.receiveShadow = members[0].receiveShadow; this.mesh.renderOrder = members[0].renderOrder; this.mesh.userData.batchMesh = true; this.mesh.matrixAutoUpdate = false;
+    parent.add(this.mesh);
+  }
+  update() {
+    const g = this.mesh.geometry, pos = g.attributes.position.array, nor = g.attributes.normal.array, col = this.alpha ? g.attributes.color.array : null;
+    _bm.copy(this.parent.matrixWorld).invert(); const inv = _bm.clone(); let any = false;
+    this.members.forEach((m, i) => {
+      const P = m.geometry.attributes.position, N = m.geometry.attributes.normal, o = this.offs[i], on = chainVisible(m, this.parent);
+      if (!on) { for (let j = 0; j < P.count; j++) { pos[(o + j) * 3] = pos[(o + j) * 3 + 1] = pos[(o + j) * 3 + 2] = 0; } return; }
+      any = true; _dynM.multiplyMatrices(inv, m.matrixWorld); _bn.getNormalMatrix(_dynM);
+      for (let j = 0; j < P.count; j++) {
+        const q = (o + j) * 3; _bv.fromBufferAttribute(P, j).applyMatrix4(_dynM); pos[q] = _bv.x; pos[q + 1] = _bv.y; pos[q + 2] = _bv.z;
+        _bv.fromBufferAttribute(N, j).applyMatrix3(_bn).normalize(); nor[q] = _bv.x; nor[q + 1] = _bv.y; nor[q + 2] = _bv.z;
+        if (col) col[(o + j) * 4 + 3] = this.alpha(m);
+      }
+    });
+    this.mesh.visible = any; g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true; if (col) g.attributes.color.needsUpdate = true;
+  }
+}
+const _dynM = new THREE.Matrix4();
+const DYN = [new DynBatch(scene, decals, decalMat), new DynBatch(win, streaks, streakMat)];
+{ const rm = ripplePool[0].material.clone(); rm.vertexColors = true; rm.opacity = 1; DYN.push(new DynBatch(scene, ripplePool, rm, m => m.material.opacity)); }
+DYN[0].mesh.renderOrder = DYN[2].mesh.renderOrder = 1; // blood and ripples lie on top of the puddles, whichever is nearer the camera
+
+/* ---------------- shadows: drawn once for what never moves, every frame for what does ---------------- */
+// a light that never moves keeps its static shadow in a cache; each frame the cache is copied in and only what moves is drawn on top
+const SHADOWS = [
+  { key: 'moon', light: moonLight, fixed: true },
+  { key: 'flood', light: floodLight, fixed: true, when: () => floodLight.intensity > 0.02 },
+  { key: 'candle', light: candleLight, fixed: true },
+  { key: 'lantern', light: P.lantern.userData.light, when: () => P.lantern.userData.light.intensity > 0.1 },
+  { key: 'torch', light: P.spot, when: () => P.spot.intensity > 0.05 }
+];
+SHADOWS.forEach((S, i) => { S.every = 1; S.phase = i & 1; S.cache = null; S.cacheOK = false; S.light.userData.key = S.key; });
+const CAN_CACHE = renderer.capabilities.isWebGL2, CLEAR = renderer.clear, NO_CLEAR = () => {};
+function blitFrom(S) { // stands in for the shadow map's clear: the static shadow, copied in
+  const gl = renderer.getContext(), st = renderer.state, props = renderer.properties;
+  return () => { const src = S.cache, dst = renderer.getRenderTarget(); st.bindFramebuffer(gl.READ_FRAMEBUFFER, props.get(src).__webglFramebuffer); gl.blitFramebuffer(0, 0, src.width, src.height, 0, 0, dst.width, dst.height, gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT, gl.NEAREST); st.bindFramebuffer(gl.READ_FRAMEBUFFER, null); };
+}
+SHADOWS.forEach(S => { S.blit = blitFrom(S); });
+const SM = renderer.shadowMap, SM_RENDER = SM.render;
+function shadowPass(S, root, clear) {
+  if (window.__I) window.__I.pass = 'sh-' + S.key; // the bench counts draws per light
+  renderer.clear = clear || CLEAR; SM.needsUpdate = true; SM_RENDER.call(SM, [S.light], root, camera); renderer.clear = CLEAR;
+  if (window.__I) window.__I.pass = 'main';
+}
+function refreshCache(S) {
+  const sh = S.light.shadow; if (!sh.map) shadowPass(S, SHADOW_STATIC);
+  if (!S.cache || S.cache.width !== sh.map.width || S.cache.height !== sh.map.height) { if (S.cache) S.cache.dispose(); S.cache = new THREE.WebGLRenderTarget(sh.map.width, sh.map.height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }); }
+  const live = sh.map; sh.map = S.cache; shadowPass(S, SHADOW_STATIC); sh.map = live; S.cacheOK = true;
+}
+// what moves and throws a shadow, gathered once a frame: every shadow pass walks this short list, not the whole scene graph
+const CAST = [], CAST_ROOT = { visible: true, layers: camera.layers, isMesh: false, isLine: false, isPoints: false, children: CAST }, NO_KIDS = { value: [] };
+function gatherCasters(o) {
+  if (!o.visible) return;
+  if (o.isMesh && o.castShadow && o.layers.test(camera.layers)) CAST.push(o.userData.shp || (o.userData.shp = Object.create(o, { children: NO_KIDS }))); // its children are gathered on their own
+  const ch = o.children; for (let i = 0; i < ch.length; i++) gatherCasters(ch[i]);
+}
+function renderShadows() {
+  const hs = rigs(), fr = renderer.info.render.frame;
+  DOOR_RB.update(); for (const M of MOVERS) M.update(); for (const D of DYN) D.update();
+  const gear = []; for (const h of hs) for (const rb of gearOf(h)) { rb.update(); rb.begin(); gear.push(rb); }
+  for (const rb of boardBatches()) { rb.update(); rb.begin(); gear.push(rb); }
+  for (const h of hs) { h.skel.update(); h.skel.frame = fr; for (const m of h.shadows) m.visible = true; } // posed from the parts as they are now, whatever three last saw
+  for (const X of PROXIES) proxyBegin(X);
+  CAST.length = 0; gatherCasters(scene);
+  for (const S of SHADOWS) {
+    if (S.when && !S.when()) { S.skipped = true; continue; }
+    if (S.every > 1 && (PERF.frame + S.phase) % S.every && !S.skipped) continue;
+    S.skipped = false;
+    if (S.fixed && CAN_CACHE) { if (!S.cacheOK) refreshCache(S); shadowPass(S, CAST_ROOT, S.blit); }
+    else { shadowPass(S, SHADOW_STATIC); shadowPass(S, CAST_ROOT, NO_CLEAR); }
+  }
+  for (const h of hs) for (const m of h.shadows) m.visible = false;
+  for (const X of PROXIES) proxyEnd(X);
+  for (const rb of gear) rb.end();
+}
+
+// three calls this inside its render, after the scene has been walked (skeletons posed) and before anything is drawn
+SM.render = function (lights, sc, cam) { if (PERF.ref) return SM_RENDER.call(SM, lights, sc, cam); if (sc !== scene) return; if (PREWARM) prewarmShadows(); renderShadows(); };
+
+/* ---------------- nothing is compiled, uploaded or allocated in the middle of a fight ---------------- */
+// the driver compiles every program side by side instead of the page waiting on each one in turn
+renderer.debug.checkShaderErrors = false;
+let PREWARM = null;
+(function prewarm() {
+  const texs = new Set(); // every texture to the GPU now, not the first time it comes into view
+  scene.traverse(o => { if (!o.material) return; for (const m of Array.isArray(o.material) ? o.material : [o.material]) for (const k of ['map', 'bumpMap', 'alphaMap', 'emissiveMap']) if (m[k]) texs.add(m[k]); });
+  for (const t of texs) renderer.initTexture(t);
+  renderer.compile(scene, camera); // every program the picture needs
+  // the shadow programs: each kind of light × one-sided, two-sided, inside-out × rigid, skinned; drawn inside the first frame
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(new Uint16Array(12), 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(new Float32Array(12), 4));
+  const root = new THREE.Group(), bone = new THREE.Bone(); root.add(bone);
+  for (const side of [THREE.FrontSide, THREE.DoubleSide, THREE.BackSide]) {
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side })), sm = new THREE.SkinnedMesh(g, m.material);
+    for (const x of [m, sm]) { x.castShadow = true; x.frustumCulled = false; root.add(x); } sm.bind(new THREE.Skeleton([bone]));
+  }
+  root.updateMatrixWorld(true); PREWARM = root;
+})();
+function prewarmShadows() { for (const S of SHADOWS) shadowPass(S, PREWARM); SHADOWS.forEach(S => { S.cacheOK = false; }); PREWARM = null; } // every shadow map allocated too (the torch's first switch-on stays smooth)
+
+// the next wave is built ahead of time, one body every few frames while there is time to spare, off stage
+const POOL = [];
+function nextWave() { const n = Math.min(10, 4 + 2 * G.wave), types = ['butcher', 'student', 'office', 'fireman'], need = {}; for (let i = 0; i < n; i++) need[types[i % 4]] = (need[types[i % 4]] || 0) + 1; return need; }
+function feedPool() {
+  const need = nextWave(); for (const e of POOL) need[e.type]--;
+  const type = Object.keys(need).find(t => need[t] > 0); if (!type) return false;
+  const e = new Infected(type, 0, true); POOL.push(e);
+  renderer.initTexture(e.h.atlas ? e.h.atlas.tex : e.h.skinMat.map); e.h.skel.computeBoneTexture(); renderer.initTexture(e.h.skel.boneTexture);
+  return true;
+}
+function takePooled(type, ang) { const i = POOL.findIndex(e => e.type === type); if (i < 0) return null; const e = POOL.splice(i, 1)[0]; e.home = ang; e.h.root.visible = true; infected.push(e); return e; }
+function perfIdle(busy) { // busy: this frame's work, in seconds
+  if (G.mode !== 'play' || PERF.frame % 4) return;
+  if (busy < 0.008 || (G.waveT > 0 && busy < 0.012)) feedPool();
+}
+
+/* ---------------- the plain way, for checking that the fast way looks the same ---------------- */
+const PERF = { level: 2, auto: true, fps: 60, ms: 16.7, busy: 0, acc: 0, n: 0, busyAcc: 0, lowT: 0, calmT: 0, missN: 0, misses: [], capLv: 4, settle: 3, show: false,
+  frame: 0, calls: 0, tris: 0, samples: 4, hz: 60, probe: [], probeN: 0, ref: false, skip: 0, lastDraw: 0 };
+function setReference(on) {
+  PERF.ref = on; for (const d of DETACHED) { if (on) d.p.add(d.o); else d.p.remove(d.o); }
+  for (const b of BATCHES) b.visible = !on; for (const m of HIDDEN) m.visible = on;
+  for (const S of STATIC) S.m.castShadow = on ? S.cast : false;
+  for (const h of rigs()) { for (const p of h.parts) if (!p.userData.skinOff) p.layers.set(on ? 0 : SKIN_LAYER); for (const s of h.skinned) s.visible = !on; }
+  scene.traverse(o => { if (o.userData.batched) o.layers.set(on ? 0 : BLAYER); if (o.userData.batchMesh && !o.userData.proxy) o.visible = !on; });
+  for (const D of DYN) D.mesh.visible = !on;
+  SM.autoUpdate = on;
+  if (!on) SHADOWS.forEach(S => { S.cacheOK = false; });
+}
+
+/* ---------------- quality levels ---------------- */
+// shadows are cheap now; what a slower machine pays for is pixels: resolution, multisampling, bloom
+// fsr: on a high-density screen, draw at the level's resolution and scale up to the screen's own pixels (EASU + RCAS) instead of letting the browser stretch it
+const QUALITY = [
+  { name: '最低', pr: 0.75, samples: 0, bloom: false, fsr: false, moon: [1024, 2], flood: [512, 2], candle: [256, 2], lantern: [256, 1], torch: [256, 1], rain: 0.4, cloth: 3 },
+  { name: '低', pr: 1.0, samples: 0, bloom: true, fsr: false, moon: [1024, 1], flood: [512, 1], candle: [256, 1], lantern: [256, 1], torch: [512, 1], rain: 0.7, cloth: 2 },
+  { name: '中', pr: 1.25, samples: 4, bloom: true, fsr: true, moon: [2048, 1], flood: [1024, 1], candle: [256, 1], lantern: [512, 1], torch: [512, 1], rain: 1, cloth: 1 },
+  { name: '高', pr: 1.5, samples: 4, bloom: true, fsr: true, moon: [2048, 1], flood: [1024, 1], candle: [512, 1], lantern: [512, 1], torch: [512, 1], rain: 1, cloth: 1 },
+  { name: '极高', pr: 2, samples: 4, bloom: true, fsr: true, moon: [2048, 1], flood: [1024, 1], candle: [512, 1], lantern: [512, 1], torch: [512, 1], rain: 1, cloth: 1 }
+];
+let QUAL = QUALITY[2];
+
+/* ---------------- FSR 1.0-style upscaling: what a browser has in place of DLSS or MetalFX ---------------- */
+// AMD's FidelityFX Super Resolution 1.0, the two passes: EASU scales up along the edges it finds (12 taps, a lanczos-like
+// lobe stretched along each edge, clamped to the 4 nearest texels so it never rings), RCAS sharpens what scaling softened
+const FS_VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const EASU = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null }, inSize: { value: new THREE.Vector2(1, 1) } }, vertexShader: FS_VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 inSize; varying vec2 vUv;
+    vec3 T(vec2 p) { return texture2D(tDiffuse, (p + 0.5) / inSize).rgb; }
+    float L(vec3 c) { return c.g + 0.5 * (c.r + c.b); }
+    void setF(inout vec2 dir, inout float len, float w, float lA, float lB, float lC, float lD, float lE) {
+      float lenX = max(abs(lD - lC), abs(lC - lB)), dirX = lD - lB; dir.x += dirX * w;
+      lenX = clamp(abs(dirX) / max(lenX, 1e-5), 0.0, 1.0); len += lenX * lenX * w;
+      float lenY = max(abs(lE - lC), abs(lC - lA)), dirY = lE - lA; dir.y += dirY * w;
+      lenY = clamp(abs(dirY) / max(lenY, 1e-5), 0.0, 1.0); len += lenY * lenY * w;
+    }
+    void tap(inout vec3 aC, inout float aW, vec2 off, vec2 dir, vec2 len, float lob, float clp, vec3 c) {
+      vec2 v = vec2(dot(off, dir), dot(off, vec2(-dir.y, dir.x))) * len;
+      float d2 = min(dot(v, v), clp), wB = 0.4 * d2 - 1.0, wA = lob * d2 - 1.0;
+      wB *= wB; wA *= wA; wB = 1.5625 * wB - 0.5625; float w = wB * wA; aC += c * w; aW += w;
+    }
+    void main() {
+      vec2 pp = vUv * inSize - 0.5, fp = floor(pp); pp -= fp;
+      vec3 bC = T(fp + vec2(0.0, -1.0)), cC = T(fp + vec2(1.0, -1.0));
+      vec3 eC = T(fp + vec2(-1.0, 0.0)), fC = T(fp), gC = T(fp + vec2(1.0, 0.0)), hC = T(fp + vec2(2.0, 0.0));
+      vec3 iC = T(fp + vec2(-1.0, 1.0)), jC = T(fp + vec2(0.0, 1.0)), kC = T(fp + vec2(1.0, 1.0)), lC = T(fp + vec2(2.0, 1.0));
+      vec3 nC = T(fp + vec2(0.0, 2.0)), oC = T(fp + vec2(1.0, 2.0));
+      float bL = L(bC), cL = L(cC), eL = L(eC), fL = L(fC), gL = L(gC), hL = L(hC), iL = L(iC), jL = L(jC), kL = L(kC), lL = L(lC), nL = L(nC), oL = L(oC);
+      vec2 dir = vec2(0.0); float len = 0.0;
+      setF(dir, len, (1.0 - pp.x) * (1.0 - pp.y), bL, eL, fL, gL, jL);
+      setF(dir, len, pp.x * (1.0 - pp.y), cL, fL, gL, hL, kL);
+      setF(dir, len, (1.0 - pp.x) * pp.y, fL, iL, jL, kL, nL);
+      setF(dir, len, pp.x * pp.y, gL, jL, kL, lL, oL);
+      float dirR = dot(dir, dir); bool zro = dirR < 1.0 / 32768.0;
+      dir = zro ? vec2(1.0, 0.0) : dir * inversesqrt(dirR);
+      len = len * 0.5; len *= len;
+      float stretch = dot(dir, dir) / max(abs(dir.x), abs(dir.y));
+      vec2 len2 = vec2(1.0 + (stretch - 1.0) * len, 1.0 - 0.5 * len);
+      float lob = 0.5 - 0.29 * len, clp = 1.0 / lob;
+      vec3 mn = min(min(fC, gC), min(jC, kC)), mx = max(max(fC, gC), max(jC, kC)), aC = vec3(0.0); float aW = 0.0;
+      tap(aC, aW, vec2(0.0, -1.0) - pp, dir, len2, lob, clp, bC); tap(aC, aW, vec2(1.0, -1.0) - pp, dir, len2, lob, clp, cC);
+      tap(aC, aW, vec2(-1.0, 1.0) - pp, dir, len2, lob, clp, iC); tap(aC, aW, vec2(0.0, 1.0) - pp, dir, len2, lob, clp, jC);
+      tap(aC, aW, vec2(0.0, 0.0) - pp, dir, len2, lob, clp, fC); tap(aC, aW, vec2(-1.0, 0.0) - pp, dir, len2, lob, clp, eC);
+      tap(aC, aW, vec2(1.0, 1.0) - pp, dir, len2, lob, clp, kC); tap(aC, aW, vec2(2.0, 1.0) - pp, dir, len2, lob, clp, lC);
+      tap(aC, aW, vec2(2.0, 0.0) - pp, dir, len2, lob, clp, hC); tap(aC, aW, vec2(1.0, 0.0) - pp, dir, len2, lob, clp, gC);
+      tap(aC, aW, vec2(1.0, 2.0) - pp, dir, len2, lob, clp, oC); tap(aC, aW, vec2(0.0, 2.0) - pp, dir, len2, lob, clp, nC);
+      gl_FragColor = vec4(min(mx, max(mn, aC / aW)), 1.0);
+    }`
+});
+const RCAS = new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null }, texel: { value: new THREE.Vector2(1, 1) }, sharp: { value: 0.8 }, grain: { value: 0.02 }, time: { value: 0 } }, vertexShader: FS_VERT, depthTest: false, depthWrite: false,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 texel; uniform float sharp, grain, time; varying vec2 vUv;
+    void main() {
+      vec3 b = texture2D(tDiffuse, vUv - vec2(0.0, texel.y)).rgb, d = texture2D(tDiffuse, vUv - vec2(texel.x, 0.0)).rgb, e = texture2D(tDiffuse, vUv).rgb;
+      vec3 f = texture2D(tDiffuse, vUv + vec2(texel.x, 0.0)).rgb, h = texture2D(tDiffuse, vUv + vec2(0.0, texel.y)).rgb;
+      vec3 mn4 = min(min(b, d), min(f, h)), mx4 = max(max(b, d), max(f, h));
+      vec3 lobeRGB = max(-mn4 / (4.0 * mx4 + 1e-5), (1.0 - mx4) / (4.0 * mn4 - 4.0 - 1e-5));
+      float lobe = max(-0.1875, min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * sharp;
+      vec3 c = (lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0);
+      // the film grain, at the screen's own pixels, added where the grade added it: in linear light, just before gamma
+      float g = fract(sin(dot(gl_FragCoord.xy + fract(time) * 37.0, vec2(12.9898, 78.233))) * 43758.5453);
+      vec3 lin = pow(max(c, 0.0), vec3(2.2)) + (g - 0.5) * grain;
+      gl_FragColor = vec4(pow(max(lin, 0.0), vec3(1.0 / 2.2)), 1.0);
+    }`
+});
+const FSR = { on: false, rt: null, qE: new THREE.FullScreenQuad(EASU), qR: new THREE.FullScreenQuad(RCAS), inPR: 1, outPR: 1 };
+// the frame: the scene and its post at the level's resolution, then (on a dense screen) up to the screen's own
+function drawFrame() {
+  composer.render();
+  if (!FSR.on) return;
+  EASU.uniforms.tDiffuse.value = composer.readBuffer.texture; renderer.setRenderTarget(FSR.rt); FSR.qE.render(renderer);
+  RCAS.uniforms.tDiffuse.value = FSR.rt.texture; RCAS.uniforms.time.value = G.t; renderer.setRenderTarget(null); FSR.qR.render(renderer);
+}
+function setQuality(lv, quiet) {
+  lv = clamp(Math.round(lv), 0, QUALITY.length - 1); const Q = QUALITY[lv]; PERF.level = lv; QUAL = Q;
+  const w = innerWidth, h = innerHeight, dpr = window.devicePixelRatio || 1;
+  const outPR = Math.min(dpr, 2, Math.sqrt(5.2e6 / (w * h))), inPR = Math.min(Q.pr, dpr), fsr = Q.fsr && inPR < outPR - 0.05; // the screen's own pixels, up to about 5 megapixels
+  FSR.on = fsr; FSR.inPR = inPR; FSR.outPR = fsr ? outPR : inPR;
+  renderer.setPixelRatio(FSR.outPR); renderer.setSize(w, h, false);
+  if (Q.samples !== PERF.samples || !composer) { PERF.samples = Q.samples; makeComposer(Q.samples); }
+  composer.setPixelRatio(inPR); composer.setSize(w, h); composer.renderToScreen = !fsr;
+  gradePass.uniforms.grain.value = fsr ? 0 : 0.02; RCAS.uniforms.grain.value = 0.02; // grain moves after the scaling, so it stays fine
+  if (fsr) {
+    const ow = Math.round(w * outPR), oh = Math.round(h * outPR);
+    if (!FSR.rt) FSR.rt = new THREE.WebGLRenderTarget(ow, oh, { depthBuffer: false }); else FSR.rt.setSize(ow, oh);
+    EASU.uniforms.inSize.value.set(Math.round(w * inPR), Math.round(h * inPR)); RCAS.uniforms.texel.value.set(1 / ow, 1 / oh);
+  }
+  bloomPass.enabled = Q.bloom;
+  for (const S of SHADOWS) {
+    const cfg = Q[S.key]; if (!cfg) continue; S.every = cfg[1]; const sh = S.light.shadow;
+    if (sh.mapSize.x !== cfg[0]) { sh.mapSize.set(cfg[0], cfg[0]); if (sh.map) { sh.map.dispose(); sh.map = null; } S.cacheOK = false; S.skipped = true; }
+  }
+  try { localStorage.setItem('yuye.quality', JSON.stringify({ auto: PERF.auto, level: lv })); } catch (e) { /* private window: just don't remember */ }
+  if (!quiet) toast('画质：' + Q.name + (PERF.auto ? '（自动）' : '（手动）'), 1.8);
+}
+function cycleQuality() { // G: 自动 → 极高 → 高 → 中 → 低 → 最低 → 自动
+  if (PERF.auto) { PERF.auto = false; setQuality(4); }
+  else if (PERF.level > 0) setQuality(PERF.level - 1);
+  else { PERF.auto = true; PERF.lowT = PERF.calmT = 0; PERF.capLv = 4; PERF.misses.length = 0; PERF.settle = 3; setQuality(2); }
+}
+addEventListener('resize', () => setQuality(PERF.level, true)); // the window changed: every size above follows
+(function loadQuality() {
+  try { const v = JSON.parse(localStorage.getItem('yuye.quality') || 'null'); if (v && typeof v.level === 'number') { PERF.auto = v.auto !== false; PERF.level = clamp(v.level, 0, QUALITY.length - 1); } } catch (e) { /* no storage: start in the middle */ }
+  setQuality(PERF.level, true);
+})();
+
+/* ---------------- frame pacing and the governor ---------------- */
+// the first frames only measure how fast the screen refreshes (60, 120, or 30 in low-power mode), with nothing drawn
+function perfProbe(raw) {
+  if (PERF.probeN >= 36) return false;
+  if (PERF.probeN > 4) PERF.probe.push(raw); PERF.probeN++;
+  if (PERF.probeN === 36) { const a = PERF.probe.slice().sort((x, y) => x - y), hz = 1 / (a[a.length >> 1] || 1 / 60); PERF.hz = hz > 100 ? 120 : hz > 75 ? 90 : hz > 50 ? 60 : hz > 36 ? 45 : 30; }
+  return true;
+}
+// a 120 Hz screen gets every other refresh: an even 60, half the heat, and no stutter from frames that only sometimes fit
+function perfSkip(now) {
+  if (PERF.hz < 110) return false;
+  if (now - PERF.lastDraw < 1000 / 60 - 4) return true;
+  PERF.lastDraw = now; return false;
+}
+// held to an even 60, not an average: a frame that misses the screen's refresh counts. Four of those within two seconds (or a
+// second and a half under 48) and it steps down one level, and that level stays off for the session, so it never seesaws;
+// twelve seconds without a single miss and it steps up one, as far as 高 (极高 is there to pick by hand, with G)
+function perfFrame(raw, busy) {
+  PERF.frame++;
+  if (raw > 0.25) return; // a stall from outside the game (a tab switch, the machine waking): not counted
+  const target = Math.min(PERF.hz, 60);
+  PERF.acc += raw; PERF.n++; PERF.busyAcc += busy; if (raw > 1.5 / target) PERF.missN++;
+  if (PERF.acc < 0.5) return;
+  PERF.fps = PERF.n / PERF.acc; PERF.ms = 1000 * PERF.acc / PERF.n; PERF.busy = 1000 * PERF.busyAcc / PERF.n;
+  const miss = PERF.missN; PERF.misses.push(miss); if (PERF.misses.length > 4) PERF.misses.shift();
+  PERF.acc = 0; PERF.n = 0; PERF.busyAcc = 0; PERF.missN = 0;
+  if (!PERF.auto || document.hidden) return;
+  if ((PERF.settle -= 0.5) > 0) return;
+  PERF.lowT = PERF.fps < target * 0.8 ? PERF.lowT + 0.5 : 0;
+  const missed2s = PERF.misses.reduce((a, b) => a + b, 0);
+  if ((missed2s >= 4 && PERF.fps < target * 0.97) || PERF.lowT >= 1.5) {
+    if (PERF.level > 0) { PERF.capLv = PERF.level - 1; setQuality(PERF.level - 1, true); }
+    PERF.settle = 3; PERF.misses.length = 0; PERF.calmT = 0; PERF.lowT = 0; return;
+  }
+  PERF.calmT = miss === 0 && PERF.fps >= target * 0.97 ? PERF.calmT + 0.5 : 0;
+  if (PERF.calmT >= 12 && PERF.level < Math.min(PERF.capLv, 3)) { setQuality(PERF.level + 1, true); PERF.settle = 3; PERF.calmT = 0; PERF.misses.length = 0; }
+}
+function updatePerfHUD() {
+  const el = $('perf'); el.classList.toggle('on', PERF.show); if (!PERF.show || PERF.frame % 10) return;
+  const c = renderer.domElement, low = PERF.fps < Math.min(PERF.hz, 60) * 0.8;
+  const res = FSR.on ? Math.round(innerWidth * FSR.inPR) + '×' + Math.round(innerHeight * FSR.inPR) + ' → FSR ' + c.width + '×' + c.height : c.width + '×' + c.height;
+  el.textContent = PERF.fps.toFixed(0) + ' 帧/秒 · ' + PERF.ms.toFixed(1) + ' 毫秒（计算 ' + PERF.busy.toFixed(1) + '）· 画质 ' + QUAL.name + (PERF.auto ? '（自动）' : '（手动）') + ' · 绘制 ' + PERF.calls + ' 次 · ' + (PERF.tris / 1000).toFixed(0) + 'k 三角形 · ' + res + (PERF.hz > 100 ? ' · 120Hz 屏，锁 60' : PERF.hz < 55 ? ' · 屏幕/系统限 ' + PERF.hz + ' 帧' : '');
+  el.classList.toggle('low', low);
 }
 
 /* ===== P9 scene glue: mother, dialogue, camera, environment, HUD, input, reset, main loop ===== */
@@ -4653,7 +5317,7 @@ function updateEnvironment(dt) {
   if (F.state === 'flicker') { lvl = Math.sin(F.t * 47) > 0.2 ? 0.25 + Math.random() * 0.6 : 0.05; if (F.t > 1.3) { F.state = 'off'; F.t = 0; toast('灯灭了。', 2); onBlackout(); } }
   else if (F.state === 'off') { lvl = 0.0; if (F.t > 4.8) { F.state = 'restore'; F.t = 0; } }
   else if (F.state === 'restore') { lvl = Math.sin(F.t * 39) > 0 ? 0.9 : 0.1; if (F.t > 0.7) { F.state = 'on'; F.t = 0; F.next = t + rnd(38, 60); toast('灯亮了。', 1.6); } }
-  floodLight.intensity = 3.2 * lvl; lensMat.emissiveIntensity = 5 * lvl + 0.2; beamMat.uniforms.intensity.value = 0.17 * lvl; beamMat.uniforms.time.value = t;
+  floodLight.intensity = 3.2 * lvl; lensMat.emissiveIntensity = 5 * lvl + 0.2; beamMat.uniforms.intensity.value = 0.17 * lvl; beamMat.uniforms.time.value = t; beam.visible = lvl > 0;
   if (SND.ready) SND.buzz.gain.setTargetAtTime(F.state === 'on' ? 0.012 : (F.state === 'off' ? 0 : 0.05 * Math.random()), SND.ctx.currentTime, 0.03);
   // lightning
   const Lg = G.lightning;
@@ -4681,7 +5345,7 @@ function updateEnvironment(dt) {
   }
   dustGeo.attributes.position.needsUpdate = true;
   // sheets in the wind
-  for (const m of sheets) {
+  if (PERF.frame % QUAL.cloth === 0) for (const m of sheets) {
     const pa = m.geometry.attributes.position, b = m.userData.base, ph = m.userData.ph;
     for (let i = 0; i < pa.count; i++) {
       const x = b[i * 3], y = b[i * 3 + 1], depth = -y;
@@ -4694,7 +5358,7 @@ function updateEnvironment(dt) {
   fogLayers.forEach((m, i) => { m.material.map.offset.x = t * 0.004 * (i + 1); m.material.map.offset.y = t * 0.002; });
   cloudTex.offset.x = t * 0.003;
   // rain
-  const active = Math.floor(RAIN_N * G.rain); rainGeo.setDrawRange(0, active * 2);
+  const active = Math.floor(RAIN_N * G.rain * QUAL.rain); rainGeo.setDrawRange(0, active * 2);
   rainCenter.lerp(new V3(cam.tgt.x, 0, cam.tgt.z), 0.05);
   floodPosV.copy(floodLight.position); floodDirV.copy(floodTarget.position).sub(floodPosV).normalize();
   const cosF = Math.cos(FLOOD_ANGLE), fOn = floodLevel(); P.lantern.userData.body.getWorldPosition(lanternW);
@@ -4855,7 +5519,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyR') { resetGame(); return; }
   if (e.code === 'Tab') { G.camMode = G.camMode === 'command' ? 'close' : 'command'; toast(G.camMode === 'close' ? '近景镜头' : '指挥镜头', 1.2); }
   if (e.code === 'KeyT') { G.rain = G.rain > 0.9 ? 0.4 : G.rain > 0.1 ? 0 : 1; $('wx').textContent = G.rain > 0.9 ? '暴雨' : G.rain > 0.1 ? '小雨' : '雨停了'; toast('天气：' + $('wx').textContent, 1.5); }
-  if (e.code === 'KeyG') setFX(!G.fx);
+  if (e.code === 'KeyG') cycleQuality();
+  if (e.code === 'Backquote') { PERF.show = !PERF.show; toast(PERF.show ? '帧数显示：开（再按 ` 关）' : '帧数显示：关', 1.4); }
   if (e.code === 'KeyM') { G.muted = !G.muted; SND.setMuted(G.muted); toast(G.muted ? '已静音' : '声音已打开', 1.2); }
   if (e.code === 'KeyH') $('help').classList.toggle('off');
   if (e.code === 'KeyL' && G.flood.state === 'on') { G.flood.next = G.t; }
@@ -4923,13 +5588,7 @@ canvas.addEventListener('wheel', e => {
 $('card').addEventListener('click', closeCard);
 $('dlg').addEventListener('click', () => advanceDialog());
 
-function setFX(on) {
-  G.fx = on; bloomPass.enabled = on;
-  renderer.setPixelRatio(on ? Math.min(window.devicePixelRatio || 1, 1.5) : 1); composer.setPixelRatio(renderer.getPixelRatio());
-  renderer.setSize(innerWidth, innerHeight, false); composer.setSize(innerWidth, innerHeight);
-  candleLight.castShadow = on; P.lantern.userData.light.castShadow = on;
-  toast(on ? '画质：高（泛光、阴影全开）' : '画质：省电（关闭泛光和部分阴影）', 1.8);
-}
+function setFX(on) { G.fx = on; PERF.auto = false; setQuality(on ? 3 : 1); } // kept for old saves and tests: high or low, by hand
 function resetGame() {
   $('card').classList.remove('on'); $('qte').classList.remove('on'); $('dlg').classList.remove('on'); D = null; $('splat').innerHTML = '';
   $('clinch').classList.remove('on'); P.knife.visible = false;
@@ -4945,7 +5604,7 @@ function resetGame() {
   while (infected.length > 4) { const e = infected.pop(); scene.remove(e.h.root); disposeTree(e.h.root); e.bar.remove(); e.arrow.remove(); }
   for (const e of infected) e.reset();
   // repaint the player's coat: rebuild the texture by swapping in a fresh one
-  if (P.h.coatMat.map) P.h.coatMat.map.dispose(); P.h.coatMat.map = toTex(clothCanvas('#4a4434', 0.55, false, 3 + 7)); P.h.coatMat.needsUpdate = true;
+  if (P.h.coatMat.map) P.h.coatMat.map.dispose(); P.h.coatMat.map = toTex(clothCanvas('#4a4434', 0.55, false, 3 + 7)); P.h.coatMat.needsUpdate = true; atlasRefresh(P.h.coatMat);
   Object.assign(SQUAD, { leader: null, tokenCD: 0, flankT: -99, retreatT: -99, spotT: -99 }); SQUAD.turn.clear();
   labels.forEach(L => L.el.remove()); labels.length = 0;
   G.flood.state = 'on'; G.flood.next = G.t + 40; G.playT = 0; G.mode = 'play'; G.wave = 1; G.waveT = -1; G.hitStop = 0; G.slowmo = 0; setObj('屋里有人在哼歌。');
@@ -4955,7 +5614,7 @@ function spawnWave() { // they answer each other from far off, then come
   G.wave++; const base = rnd(0, 6.28);
   for (let i = infected.length - 1; i >= 0 && infected.filter(o => o.dead).length > 4; i--) if (infected[i].dead) { const e = infected[i]; scene.remove(e.h.root); disposeTree(e.h.root); e.bar.remove(); e.arrow.remove(); infected.splice(i, 1); }
   const types = ['butcher', 'student', 'office', 'fireman'], n = Math.min(10, 4 + 2 * (G.wave - 1)); // every wave brings more of them
-  for (let i = 0; i < n; i++) { const e = new Infected(types[i % 4], base + i * (6.28 / n)); e.reset(true); e.provoked = true; e.aware = 0.7; e.lastKnown.copy(P.pos); e.setState('investigate'); }
+  for (let i = 0; i < n; i++) { const a = base + i * (6.28 / n), e = takePooled(types[i % 4], a) || new Infected(types[i % 4], a); e.reset(true); e.provoked = true; e.aware = 0.7; e.lastKnown.copy(P.pos); e.setState('investigate'); }
   SND.roar(LURK_C.clone().addScaledVector(dirA(base), 24), 'rally', 0.9);
   toast('远处的嘶吼一声接一声地应和着。它们又来了。', 3.5); setObj('第 ' + G.wave + ' 波。它们听见了刚才的动静。');
 }
@@ -4977,9 +5636,15 @@ $('startBtn').addEventListener('click', startGame);
 let last = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
-  const rdt = Math.min(0.05, (now - last) / 1000); last = now;
-  tick(rdt);
-  composer.render();
+  const raw = (now - last) / 1000;
+  if (perfProbe(raw)) { last = now; return; } // the first half second: how fast does this screen refresh?
+  if (perfSkip(now)) return;                  // a 120 Hz screen: every other refresh
+  last = now;
+  const t0 = performance.now(); renderer.info.reset();
+  tick(Math.min(0.05, raw));
+  drawFrame(); // shadows are drawn inside, by p8c; on a dense screen the frame is scaled up last (FSR)
+  PERF.calls = renderer.info.render.calls; PERF.tris = renderer.info.render.triangles;
+  const busy = (performance.now() - t0) / 1000; perfFrame(raw, busy); updatePerfHUD(); perfIdle(busy);
 }
 function tick(rdt) {
   let dt = rdt; if (G.hitStop > 0) { G.hitStop -= rdt; dt = rdt * 0.05; } else if (G.slowmo > 0) { G.slowmo -= rdt; dt = rdt * 0.3; }
@@ -5014,7 +5679,8 @@ function tick(rdt) {
   gradePass.uniforms.time.value = G.t;
 }
 requestAnimationFrame(frame);
-window.__dbg = { CTRL, possess, possessNext, ctrlKey, aiPlayer, defenders, CMD, POSTS, setCommand, orderDefenders, assignPost, cmdSelect, cmdClick, entryPressure, doorBraced, PREY, G, P, cam, mother, infected, SQUAD, stompTarget, takedownTarget, clinchAct, grabPlayer, ENTRIES, door, winBack, winLeft, SIEGE, doorChop, doorRam, smashGlass, hitBoard, interact, toggleBar, setBar, planSiege, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, dodge, switchWeapon, toggleTorch, startPin, roar, makeNoise, spawnWave, fatigue, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };
+window.__dbg = { perfFrame, perfSkip, composerRender: () => drawFrame(), POOL, feedPool, takePooled, makeHumanForTest: o => makeHuman(o), clothCanvas, faceCanvas, skinCanvas, DOOR_RB, cats: { decalMat, poolTex, gougeMat, crackMat, puddleMat, streakMat, ringTex, doorLeaf: door.leaf, doorPivot: door.pivot, barMesh, glowTex }, PERF, QUALITY, SHADOWS, BATCHES, PROXIES, SHADOW_STATIC, setQuality, setReference, checkStatic, renderShadows, rigs,
+  renderFrame: dt => { const t0 = performance.now(); tick(dt); const t1 = performance.now(); drawFrame(); return { tick: t1 - t0, render: performance.now() - t1 }; }, drawFrame, FSR, CTRL, possess, possessNext, ctrlKey, aiPlayer, defenders, CMD, POSTS, setCommand, orderDefenders, assignPost, cmdSelect, cmdClick, entryPressure, doorBraced, PREY, G, P, cam, mother, infected, SQUAD, stompTarget, takedownTarget, clinchAct, grabPlayer, ENTRIES, door, winBack, winLeft, SIEGE, doorChop, doorRam, smashGlass, hitBoard, interact, toggleBar, setBar, planSiege, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, dodge, switchWeapon, toggleTorch, startPin, roar, makeNoise, spawnWave, fatigue, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };
 
 })();
 </script>
