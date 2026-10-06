@@ -5003,7 +5003,7 @@ function perfIdle(busy) { // busy: this frame's work, in seconds
 }
 
 /* ---------------- the plain way, for checking that the fast way looks the same ---------------- */
-const PERF = { level: 2, auto: true, fps: 60, ms: 16.7, busy: 0, acc: 0, n: 0, busyAcc: 0, lowT: 0, calmT: 0, missN: 0, misses: [], capLv: 4, settle: 3, show: false,
+const PERF = { level: 2, auto: true, fps: 60, ms: 16.7, busy: 0, acc: 0, n: 0, busyAcc: 0, lowT: 0, calmT: 0, missN: 0, misses: [], stallN: 0, capLv: 4, settle: 3, show: false,
   frame: 0, calls: 0, tris: 0, samples: 4, hz: 60, probe: [], probeN: 0, ref: false, skip: 0, lastDraw: 0 };
 function setReference(on) {
   PERF.ref = on; for (const d of DETACHED) { if (on) d.p.add(d.o); else d.p.remove(d.o); }
@@ -5154,7 +5154,9 @@ function perfSkip(now) {
 // twelve seconds without a single miss and it steps up one, as far as 高 (极高 is there to pick by hand, with G)
 function perfFrame(raw, busy) {
   PERF.frame++;
-  if (raw > 0.25) return; // a stall from outside the game (a tab switch, the machine waking): not counted
+  // one long frame is a stall from outside the game (a tab switch, the machine waking) and isn't counted; three in a row is
+  // just how fast this machine is, and is
+  if (raw > 0.25) { if (++PERF.stallN < 3) return; } else PERF.stallN = 0;
   const target = Math.min(PERF.hz, 60);
   PERF.acc += raw; PERF.n++; PERF.busyAcc += busy; if (raw > 1.5 / target) PERF.missN++;
   if (PERF.acc < 0.5) return;
