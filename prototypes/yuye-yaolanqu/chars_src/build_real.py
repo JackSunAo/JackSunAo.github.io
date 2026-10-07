@@ -20,6 +20,11 @@ OUTFITS = {
 }
 
 
+# id colours for the low-poly bake: far apart so blending at the seams can be undone by taking the nearest
+ID_COL = [np.array(c, np.float32) / 255 for c in ((255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255), (255, 128, 0), (128, 0, 255),
+                                                   (0, 128, 255), (255, 0, 128), (128, 255, 0), (0, 255, 128), (128, 128, 128), (255, 255, 255), (64, 0, 0), (0, 64, 0))]
+
+
 def hexc(h):
     h = h.lstrip('#'); return np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], np.float32) / 255.0
 
@@ -93,7 +98,9 @@ def build(cid, rig, out, style):
     os.makedirs(out, exist_ok=True)
     tag = f'{cid}_{style}'
 
+    raw = {}; masks = {}
     def texsave(arr, name, size_note=''):
+        raw[name] = arr
         if style == 'paint':
             if name == 'skin':  # skin painted smooth: soft planes of colour, warm in the shadows, no blotches
                 rgb = arr[..., :3]
@@ -182,10 +189,29 @@ def build(cid, rig, out, style):
             ls = ndimage.median_filter(lum[..., 0], 31)[..., None]          # print and logos out, the folds' shading kept
             lum = np.where(np.abs(lum - ls) > 0.1, ls, lum); m = lum[msk].mean()
             tx = np.where(msk[..., None], np.clip(lum / m * hexc(recol['top']) * 1.05, 0, 1), tx)
+            masks[name] = msk
         t = {'map': texsave(tx, name)}
         if 'normalmapTexture' in mt and os.path.exists(mt['normalmapTexture']):
             fn = f'{tag}_{name}_n.webp'; save(load(mt['normalmapTexture'], size), f'{out}/{fn}', 92); t['nrm'] = fn
         add(name, P, TV, TT, UV, W, t, 'cloth')
+    if style == 'real':  # the dressed high model, for baking down to one low mesh and one texture (bake_lp.py)
+        hi = {'joints': G, 's': rig['s'], 'mh_v': B['V'], 'mh_f': B['F'], 'mh_w': mh.game_weights(B, G)}
+        names = []
+        for i, p in enumerate(parts):
+            d = p['d']; key = p['tex']['map'].replace(f'{tag}_', '').replace('.webp', '')
+            img = raw[key]
+            if p['alpha']:  # behind the strands, the strands' own colour (so a bake that hits a gap still gets hair)
+                a = img[..., 3] > 0.5
+                if a.any(): img = img.copy(); img[~a, :3] = img[a, :3].mean(0)
+            fn = f'{out}/{tag}_hi_{p["name"]}.png'; save(img[..., :3] if img.shape[-1] == 4 else img, fn)
+            # which piece of which garment each texel is (two ids for a two-piece outfit: top and bottom)
+            ids = np.zeros(img.shape[:2] + (3,), np.float32); ids[:] = ID_COL[2 * i + 1]
+            if p['name'] in masks: ids[masks[p['name']]] = ID_COL[2 * i]
+            save(ids, f'{out}/{tag}_hi_{p["name"]}_id.png')
+            if img.shape[-1] == 4: save(img, f'{out}/{tag}_hi_{p["name"]}_a.png')
+            hi.update({f'P{i}': d['P'], 'F%d' % i: d['I'].reshape(-1, 3), f'U{i}': d['U']})
+            names.append([p['name'], p['kind'], p['alpha'], 2 * i, 2 * i + 1, p['name'] in masks])
+        np.savez(f'{out}/{tag}_hi.npz', names=np.array(json.dumps(names)), n=len(parts), **{k: (np.array(json.dumps(v)) if k == 'joints' else v) for k, v in hi.items()})
     export(parts, out, tag, G, style)
 
 

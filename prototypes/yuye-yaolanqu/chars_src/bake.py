@@ -72,13 +72,22 @@ def drop_islands(ob, keep_min):
     bm.to_mesh(ob.data); bm.free()
 
 
-def make_low(his, quads, cage):
+def make_low(his, quads, cage, keep=None):
+    """keep: (centre, radius) of a region (the face) that keeps more of its triangles"""
     t0 = time.time()
     low = cage; low.name = 'low'
     drop_islands(low, 600)  # voids trapped between layers come out as little inner shells: nobody sees them
     me = low.data; log('cage', len(me.polygons), 'genus', (2 - (len(me.vertices) - len(me.edges) + len(me.polygons))) // 2, f'{time.time() - t0:.1f}s')
     apply_mod(low, 'TRIANGULATE')
-    apply_mod(low, 'DECIMATE', ratio=quads * 2 / len(low.data.polygons), use_collapse_triangulate=True)
+    if keep is not None:
+        c, r = Vector(keep[0]), keep[1]
+        vg = low.vertex_groups.new(name='keep')
+        for v in low.data.vertices:
+            vg.add([v.index], 1.0 if (v.co - c).length > r else 0.12, 'REPLACE')   # low weight: collapsed last
+        apply_mod(low, 'DECIMATE', ratio=quads * 2 / len(low.data.polygons), use_collapse_triangulate=True, vertex_group='keep', vertex_group_factor=1.0)
+        if 'keep' in low.vertex_groups: low.vertex_groups.remove(low.vertex_groups['keep'])
+    else:
+        apply_mod(low, 'DECIMATE', ratio=quads * 2 / len(low.data.polygons), use_collapse_triangulate=True)
     log('decimated', len(low.data.polygons), f'{time.time() - t0:.1f}s')
     # fit it back onto the sculpt: union of the high pieces as the target
     tg = []
@@ -88,6 +97,11 @@ def make_low(his, quads, cage):
     sw = low.modifiers.new('sw', 'SHRINKWRAP'); sw.target = tgt; sw.wrap_method = 'NEAREST_SURFACEPOINT'
     select_only(low)
     for m in list(low.modifiers): bpy.ops.object.modifier_apply(modifier=m.name)
+    # snapping to the nearest point can fold a triangle onto the wrong surface (a lip, an ear, a strand): relax and snap again, gently
+    for _ in range(2):
+        apply_mod(low, 'SMOOTH', factor=0.5, iterations=3)
+        sw = low.modifiers.new('sw', 'SHRINKWRAP'); sw.target = tgt; sw.wrap_method = 'NEAREST_SURFACEPOINT'
+        select_only(low); bpy.ops.object.modifier_apply(modifier=sw.name)
     low.data.shade_smooth()
     return low
 

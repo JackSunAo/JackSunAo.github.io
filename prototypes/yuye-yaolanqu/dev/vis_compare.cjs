@@ -32,7 +32,7 @@ const { chromium } = require('playwright'); const path = require('path'); const 
     { // the game's view: a few metres up and back, in the night light
       const S = scenes[1]; r.setViewport(0, 0, W, 300); r.setScissor(0, 0, W, 300); r.setClearColor(S.background); r.clear();
       hs.forEach((h, i) => { S.add(h.root); h.root.position.set((i - (n - 1) / 2) * 1.2, 0, 0); h.root.rotation.y = 0.3; h.root.updateMatrixWorld(true); h.skel.update(); });
-      cam.aspect = W / 300; cam.fov = 30; cam.updateProjectionMatrix(); cam.position.set(0, 4.5, 9); cam.lookAt(0, 0.8, 0);
+      cam.aspect = W / 300; cam.fov = 26; cam.updateProjectionMatrix(); cam.position.set(0, 2.6, 6.2); cam.lookAt(0, 0.9, 0);
       r.setViewport(0, 0, W, 300); r.render(S, cam); hs.forEach(h => S.remove(h.root));
     }
     r.setScissorTest(false); r.autoClear = true; return r.domElement.toDataURL('image/png');
