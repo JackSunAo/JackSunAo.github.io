@@ -1,0 +1,272 @@
+<title>雨夜摇篮曲</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;900&display=swap">
+<style>
+/* Layout: full-bleed WebGL scene; narrative type sits low-left like film subtitles, HUD hugs the corners */
+:root {
+  color-scheme: dark;
+  --bg: #06080b; --ink: #ebe3d4; --dim: #8f897e; --faint: #4a463f;
+  --ember: #e39a4c; --moon: #93b2d8; --blood: #b4483c; --panel: rgba(9, 11, 15, 0.74);
+  --serif: "Noto Serif SC", "Songti SC", "STSong", "Source Han Serif SC", serif;
+  --sans: -apple-system, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--sans); }
+#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; background: var(--bg); cursor: crosshair; }
+.layer { position: fixed; inset: 0; pointer-events: none; }
+kbd { font-family: var(--sans); font-size: 11px; letter-spacing: 0.04em; display: inline-block; min-width: 1.6em; padding: 2px 6px; margin-right: 8px; text-align: center;
+  border: 1px solid rgba(235, 227, 212, 0.28); border-bottom-width: 2px; border-radius: 4px; color: var(--ink); background: rgba(255, 255, 255, 0.04); }
+
+/* title */
+#title { pointer-events: auto; display: flex; align-items: flex-end; padding: 0 clamp(16px, 6vw, 96px) clamp(28px, 9vh, 96px);
+  background: linear-gradient(90deg, rgba(6, 8, 11, 0.92) 0%, rgba(6, 8, 11, 0.55) 45%, rgba(6, 8, 11, 0) 75%), linear-gradient(0deg, rgba(6, 8, 11, 0.85), rgba(6, 8, 11, 0) 45%);
+  transition: opacity 1.6s ease; }
+#title.gone { opacity: 0; pointer-events: none; }
+.tcard { max-width: 34rem; display: grid; gap: 18px; }
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: 0.32em; color: var(--dim); }
+#title h1 { margin: 0; font-family: var(--serif); font-weight: 900; font-size: clamp(48px, 8vw, 104px); line-height: 1; letter-spacing: 0.06em; text-wrap: balance;
+  text-shadow: 0 0 40px rgba(227, 154, 76, 0.18); }
+.lede { margin: 0; font-family: var(--serif); font-size: clamp(15px, 1.3vw, 18px); line-height: 1.85; color: #cfc6b6; max-width: 30em; }
+#startBtn { justify-self: start; font: 600 16px var(--serif); letter-spacing: 0.3em; padding: 14px 30px 14px 34px; color: var(--ink); background: rgba(227, 154, 76, 0.12);
+  border: 1px solid var(--ember); border-radius: 2px; cursor: pointer; transition: background 0.3s, box-shadow 0.3s; }
+#startBtn:hover, #startBtn:focus-visible { background: rgba(227, 154, 76, 0.26); box-shadow: 0 0 30px rgba(227, 154, 76, 0.25); outline: none; }
+.hint { margin: 0; font-size: 12px; color: var(--dim); letter-spacing: 0.06em; }
+.keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; margin: 6px 0 0; padding: 0; font-size: 12.5px; color: #bdb5a6; }
+.keys div { display: flex; align-items: center; min-width: 0; }
+.touchnote { display: none; color: var(--ember); font-size: 13px; }
+@media (pointer: coarse) { .touchnote { display: block; } }
+
+/* opening */
+#opening { display: grid; place-content: center; gap: 22px; padding: 0 16px; background: #000; opacity: 0; transition: opacity 1.2s; text-align: center; }
+#opening.on { opacity: 1; animation: openFade 9.2s forwards; }
+#opening p { margin: 0; font-family: var(--serif); font-size: clamp(18px, 2.4vw, 30px); letter-spacing: 0.18em; line-height: 1.7; opacity: 0; }
+#opening.on p:nth-child(1) { animation: line 1.6s 0.6s forwards; }
+#opening.on p:nth-child(2) { animation: line 1.6s 2.7s forwards; }
+#opening.on p:nth-child(3) { animation: line 1.6s 4.9s forwards; color: #e7c9a6; }
+@keyframes line { from { opacity: 0; transform: translateY(6px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes openFade { 0%, 82% { background: #000; } 100% { background: rgba(0, 0, 0, 0); opacity: 0; } }
+
+/* hud */
+#hud { opacity: 0; transition: opacity 1.5s 0.4s; }
+#hud.on { opacity: 1; }
+#topleft { position: absolute; left: clamp(16px, 2.4vw, 32px); top: calc(env(safe-area-inset-top, 0px) + clamp(14px, 2.4vh, 28px)); max-width: min(60vw, 30rem); }
+.loc { font-size: 11px; letter-spacing: 0.28em; color: var(--dim); }
+#camp { margin-top: 10px; font-size: 12px; line-height: 1.75; letter-spacing: 0.06em; color: #b9b1a2; white-space: pre-line; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); }
+#obj { margin-top: 8px; font-family: var(--serif); font-size: clamp(15px, 1.25vw, 18px); color: var(--ink); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8); min-height: 1.4em; }
+#bars { position: absolute; left: clamp(16px, 2.4vw, 32px); bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(16px, 3vh, 30px)); display: grid; gap: 9px; width: min(220px, 42vw); }
+.bar { display: grid; gap: 4px; font-size: 11px; letter-spacing: 0.14em; color: var(--dim); }
+.bar i { display: block; height: 3px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+.bar b { display: block; height: 100%; width: 100%; transition: width 0.15s linear; }
+#barSta { background: var(--ink); } #barBat { background: var(--moon); } #barDur { background: var(--ember); }
+#prompt { position: absolute; left: 50%; bottom: 18vh; transform: translateX(-50%); font-family: var(--serif); font-size: 17px; letter-spacing: 0.2em; padding: 8px 18px;
+  background: var(--panel); border-left: 2px solid var(--ember); opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+#prompt.on { opacity: 1; }
+#toast { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 9vh); transform: translateX(-50%); font-family: var(--serif); font-size: 16px; letter-spacing: 0.2em;
+  color: var(--ink); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9); opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+#toast.on { opacity: 1; }
+#help { position: absolute; right: clamp(16px, 2.4vw, 32px); top: calc(env(safe-area-inset-top, 0px) + clamp(14px, 2.4vh, 28px)); display: grid; gap: 6px; font-size: 12px; color: #b9b1a2;
+  background: rgba(9, 11, 15, 0.55); padding: 12px 14px; border: 1px solid rgba(255, 255, 255, 0.06); transition: opacity 0.3s; }
+#help.off { opacity: 0; }
+#perf { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%); max-width: calc(100vw - 32px); padding: 3px 10px; border-radius: 4px; background: rgba(5, 7, 10, 0.62); color: #9fb0a0; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+#perf.on { opacity: 1; }
+#perf.low { color: #e07a5f; }
+#help .row { display: flex; align-items: center; }
+#help .ttl { font-size: 10.5px; letter-spacing: 0.3em; color: var(--dim); margin-bottom: 2px; }
+#labels { position: absolute; inset: 0; overflow: hidden; }
+.flabel { position: absolute; left: 0; top: 0; font: 900 15px var(--serif); letter-spacing: 0.12em; color: var(--ink); text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 0 2px #000; white-space: nowrap; will-change: transform; }
+.flabel.heavy { color: #f0b36b; font-size: 18px; } .flabel.tough { color: #9fb6d4; }
+.flabel.roar { color: #f08a70; font-size: 14px; font-weight: 600; letter-spacing: 0.1em; }
+.ebar { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 3px; opacity: 0; transition: opacity 0.3s; }
+.ebar .eicon { font: 900 20px var(--serif); line-height: 1; color: #e7cf9a; text-shadow: 0 0 8px #000, 0 0 2px #000; min-height: 20px; }
+.ebar .eicon.alert { color: #e8553f; }
+.ebar .ename { font-size: 10px; letter-spacing: 0.2em; color: #c9c0b0; text-shadow: 0 0 4px #000; }
+.ebar i { display: block; width: 64px; height: 3px; background: rgba(0, 0, 0, 0.55); outline: 1px solid rgba(255, 255, 255, 0.1); }
+.ebar i.bal { height: 2px; }
+.ebar b { display: block; height: 100%; background: #d8cfb9; transition: width 0.12s linear; }
+.ebar i.blood b { background: var(--blood); }
+.ebar .erow { display: flex; align-items: center; gap: 6px; }
+.ebar .ecol { display: grid; gap: 3px; justify-items: start; }
+.ebar.iconOnly .erow { display: none; }
+.doll { display: block; overflow: visible; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.9)); }
+.doll circle, .doll rect { fill: #cfc6b4; stroke: rgba(0, 0, 0, 0.65); stroke-width: 0.8; transition: fill 0.2s; }
+.doll .hurt { fill: #e3a65a; } .doll .broken { fill: #e0573c; } .doll .bleed { fill: #b4483c; }
+.doll .gone { fill: rgba(0, 0, 0, 0); stroke: #e0573c; stroke-dasharray: 2 1.5; }
+.doll .nojaw { stroke: #e0573c; stroke-width: 1.8; }
+.doll .art { animation: artPulse 0.45s infinite alternate; }
+@keyframes artPulse { from { fill: #e0573c; } to { fill: #6a0f0a; } }
+.ebar .estat { font-size: 10px; letter-spacing: 0.14em; color: #f08a70; min-height: 0; text-shadow: 0 0 4px #000; }
+.ebar .estat:empty { display: none; }
+.ebar i.blood { position: relative; }
+.ebar i.blood::after { content: ''; position: absolute; left: 20%; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, 0.55); }
+#clinch { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); display: grid; gap: 8px; justify-items: center; text-align: center; opacity: 0; transition: opacity 0.15s;
+  font: 600 18px var(--serif); letter-spacing: 0.16em; color: #f3e2c8; text-shadow: 0 0 12px rgba(0, 0, 0, 0.9); }
+#clinch.on { opacity: 1; }
+#clinch small { font: 13px var(--sans); letter-spacing: 0.06em; color: #d9c9b0; }
+#clinch .track { width: min(280px, 70vw); height: 5px; background: rgba(0, 0, 0, 0.6); outline: 1px solid rgba(255, 255, 255, 0.2); }
+#clinchBar { height: 100%; width: 0; background: var(--ember); }
+#clinchTime { height: 100%; width: 100%; background: rgba(214, 120, 90, 0.7); }
+#threats { position: absolute; inset: 0; overflow: hidden; }
+.threat { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: 18px solid rgba(214, 120, 90, 0.75); border-top: 10px solid transparent; border-bottom: 10px solid transparent;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.9)); opacity: 0; transition: opacity 0.15s; }
+.threat.hot { border-left-color: #ff4a32; }
+#splat { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+#splat i { position: absolute; display: block; border-radius: 50% 46% 52% 44%; background: radial-gradient(circle at 45% 40%, rgba(110, 8, 8, 0.85), rgba(70, 4, 4, 0.7) 45%, rgba(50, 2, 2, 0) 72%);
+  opacity: 0.95; transition: opacity 2.2s ease-in, transform 2.4s ease-in; }
+#splat i.run { opacity: 0; transform: translateY(26px) scaleY(1.25); }
+.bar .lab { display: flex; justify-content: space-between; gap: 8px; }
+.bar .lab em { font-style: normal; color: var(--ember); letter-spacing: 0.08em; white-space: nowrap; }
+.bar i { position: relative; }
+#barFat { position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: repeating-linear-gradient(45deg, rgba(180, 72, 60, 0.6) 0 2px, rgba(0, 0, 0, 0) 2px 4px); }
+#barAdr { background: var(--blood); }
+#adrRow.hot b { box-shadow: 0 0 8px rgba(214, 70, 50, 0.8); }
+#bars.spent #barSta { background: var(--blood); animation: staPulse 0.6s infinite alternate; }
+@keyframes staPulse { from { opacity: 1; } to { opacity: 0.45; } }
+#stealth { font-size: 11px; letter-spacing: 0.2em; color: var(--moon); min-height: 1em; }
+#qte { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); display: grid; gap: 10px; justify-items: center; text-align: center; opacity: 0; transition: opacity 0.2s;
+  font: 600 18px var(--serif); letter-spacing: 0.16em; color: #f3d8cf; text-shadow: 0 0 12px rgba(0, 0, 0, 0.9); }
+#qte.on { opacity: 1; animation: pulse 0.5s infinite alternate; }
+#qte small { font: 13px var(--sans); letter-spacing: 0.06em; color: #d9c2bb; }
+#qte .track { width: min(280px, 70vw); height: 5px; background: rgba(0, 0, 0, 0.6); outline: 1px solid rgba(255, 255, 255, 0.2); }
+#qteBar { height: 100%; width: 0; background: var(--blood); }
+@keyframes pulse { from { transform: translate(-50%, -50%) scale(1); } to { transform: translate(-50%, -50%) scale(1.03); } }
+
+/* dialogue: film-subtitle style inside the letterbox */
+#dlg { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 2.2vh); display: grid; justify-items: center; gap: 10px; padding: 0 16px;
+  opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+#dlg.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+#dlgName { font-size: 11px; letter-spacing: 0.4em; color: var(--ember); min-height: 1em; }
+#dlgText { max-width: 40em; font-family: var(--serif); font-size: clamp(17px, 1.7vw, 23px); line-height: 1.75; letter-spacing: 0.06em; text-align: center; min-height: 1.75em; text-shadow: 0 1px 10px #000; }
+#dlgText.narr { color: #bdb5a6; font-style: normal; font-size: clamp(15px, 1.4vw, 19px); }
+#dlgText.broken { animation: shiver 0.12s infinite; }
+@keyframes shiver { 0% { transform: translateX(0); } 50% { transform: translateX(0.6px); opacity: 0.93; } 100% { transform: translateX(-0.6px); } }
+#choices { display: grid; gap: 8px; justify-items: stretch; width: min(30rem, 100%); }
+#choices button { text-align: left; font: 15px var(--serif); letter-spacing: 0.06em; color: var(--ink); background: rgba(9, 11, 15, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid var(--faint); padding: 10px 14px; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+#choices button:hover, #choices button:focus-visible { border-left-color: var(--ember); background: rgba(30, 24, 18, 0.9); outline: none; }
+.dlgHint { font-size: 11px; color: var(--faint); letter-spacing: 0.16em; }
+
+/* cards */
+#card { position: fixed; inset: 0; display: grid; place-content: center; gap: 18px; padding: 0 16px; text-align: center; background: radial-gradient(ellipse at center, rgba(4, 5, 7, 0.82), rgba(4, 5, 7, 0.95));
+  opacity: 0; pointer-events: none; transition: opacity 1s; }
+#card.on { opacity: 1; pointer-events: auto; cursor: pointer; }
+#cardTitle { margin: 0; font: 900 clamp(26px, 3.6vw, 44px) var(--serif); letter-spacing: 0.16em; text-wrap: balance; }
+#cardText { margin: 0 auto; max-width: 30em; font-family: var(--serif); font-size: clamp(15px, 1.4vw, 19px); line-height: 2; color: #cbc2b2; white-space: pre-line; }
+.cardHint { font-size: 11px; letter-spacing: 0.3em; color: var(--faint); }
+body.cine #help, body.cine #bars, body.cine #topleft { opacity: 0; transition: opacity 0.6s; }
+#help, #bars, #topleft { transition: opacity 0.6s; }
+/* your people: a card each, bottom right; command view adds an order bar and post labels */
+#squad { position: absolute; right: clamp(16px, 2.4vw, 32px); bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(16px, 3vh, 30px)); display: grid; gap: 8px; width: min(210px, 40vw); }
+.dcard { display: grid; gap: 4px; padding: 8px 10px; background: rgba(9, 11, 15, 0.62); border-left: 2px solid var(--faint); font-size: 11px; color: #b9b1a2; transition: border-color 0.2s, background 0.2s, opacity 0.4s; }
+.dcard .dtop { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+.dcard .dname { font: 600 13px var(--serif); color: var(--ink); letter-spacing: 0.1em; }
+.dcard .drole { font-size: 10.5px; color: var(--dim); letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dcard .dorder { color: var(--moon); letter-spacing: 0.08em; }
+.dcard .dbars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.dcard i { display: block; height: 3px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+.dcard i b { display: block; height: 100%; width: 100%; transition: width 0.15s linear; }
+.dblood b { background: var(--blood); } .dsta b { background: var(--ink); } .dmor b { background: var(--ember); }
+.dcard .dstat { color: #f08a70; letter-spacing: 0.08em; } .dcard .dstat:empty { display: none; }
+.dcard.sel { border-left-color: var(--ember); background: rgba(40, 30, 18, 0.78); }
+.dcard.alarm { border-left-color: #e0573c; animation: alarm 0.5s infinite alternate; }
+.dcard.dead { opacity: 0.45; }
+.dcard.ctrl { border-left-color: var(--moon); background: rgba(18, 28, 42, 0.82); }
+.dcard.ctrl .dorder { color: #cfe0f4; }
+.dcard .dbars.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@keyframes alarm { from { background: rgba(40, 10, 8, 0.7); } to { background: rgba(78, 16, 10, 0.82); } }
+body.cmd .dcard { pointer-events: auto; cursor: pointer; }
+.dtag { position: absolute; left: 0; top: 0; font: 600 12px var(--sans); letter-spacing: 0.08em; color: #cfe0f4; text-shadow: 0 0 5px #000, 0 0 2px #000; white-space: nowrap; opacity: 0; transition: opacity 0.2s; }
+.dtag.hot { color: #ff8a6a; font-size: 13px; }
+.plabel { position: absolute; left: 0; top: 0; font: 11px var(--sans); letter-spacing: 0.16em; color: #9fb6d4; text-shadow: 0 0 5px #000; white-space: nowrap; opacity: 0; transition: opacity 0.2s; }
+.plabel.hot { color: #ff8a6a; }
+.flabel.say { font: 600 13px var(--sans); color: #e8dcc6; letter-spacing: 0.04em; }
+#cmdbar { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(16px, 3vh, 30px)); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; width: max-content; max-width: min(92vw, 620px); }
+body.cmd #cmdbar { display: flex; }
+#cmdtitle { font: 600 11px var(--sans); letter-spacing: 0.4em; color: var(--moon); text-shadow: 0 0 6px #000; }
+#cmdbar .btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+#cmdbar button { font: 14px var(--serif); letter-spacing: 0.12em; color: var(--ink); background: rgba(9, 11, 15, 0.84); border: 1px solid rgba(255, 255, 255, 0.12); border-bottom: 2px solid var(--moon); padding: 7px 12px 7px 8px; cursor: pointer; }
+#cmdbar button:hover, #cmdbar button:focus-visible { background: rgba(30, 36, 48, 0.94); outline: none; border-bottom-color: var(--ember); }
+#cmdbar small { font-size: 11px; color: #9fb6d4; letter-spacing: 0.06em; text-align: center; text-shadow: 0 0 6px #000; }
+body.cmd #bars, body.cmd #prompt { opacity: 0.3; }
+body.cmd #help { opacity: 0; }
+body.cmd::after { content: ''; position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(30, 50, 80, 0.45); border: 1px solid rgba(147, 178, 216, 0.25); }
+@media (max-width: 640px) { #help { display: none; } .keys { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { #qte.on, #dlgText.broken, #bars.spent #barSta, .doll .art, .dcard.alarm { animation: none; } }
+</style>
+
+<canvas id="c"></canvas>
+
+<div id="hud" class="layer">
+  <div id="topleft"><div class="loc">林场小屋 · 第 21 天 · <span id="wx">暴雨</span></div><div id="obj"></div><div id="camp"></div></div>
+  <div id="bars">
+    <div id="stealth"></div>
+    <div class="bar" id="adrRow"><span class="lab" id="labAdr">肾上腺素</span><i><b id="barAdr"></b></i></div>
+    <div class="bar"><span class="lab">体力<em id="staState"></em></span><i><b id="barSta"></b><s id="barFat"></s></i></div>
+    <div class="bar"><span class="lab" id="labBat">强光手电</span><i><b id="barBat"></b></i></div>
+    <div class="bar"><span class="lab" id="durLabel">钉头球棍 · 耐久</span><i><b id="barDur"></b></i></div>
+  </div>
+  <div id="perf" aria-live="off"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="help">
+    <div class="ttl">操作 · H 隐藏</div>
+    <div class="row"><kbd>WASD</kbd>移动　<kbd>Shift</kbd>跑　<kbd>C</kbd>潜行</div>
+    <div class="row"><kbd>左键</kbd>挥击　按住蓄力重击（<kbd>J</kbd><kbd>K</kbd>）</div>
+    <div class="row"><kbd>Q</kbd>/右键轻点 踢开；对倒地、爬行的：踩头、踩断手脚</div>
+    <div class="row">站着挥击打身体　蓄力劈头　蹲着(<kbd>C</kbd>)挥击打腿</div>
+    <div class="row"><kbd>1</kbd>球棍　<kbd>2</kbd>消防斧（能断肢）</div>
+    <div class="row"><kbd>空格</kbd>闪避　被按住时连按挣脱</div>
+    <div class="row"><kbd>F</kbd>强光手电　<kbd>V</kbd>遮住提灯　<kbd>X</kbd>口哨引诱</div>
+    <div class="row"><kbd>E</kbd>互动：开关门、钉木板　<kbd>B</kbd>门闩</div>
+    <div class="row"><kbd>E</kbd>没被发现时从背后：无声刺杀；对倒地、昏迷的：补刀</div>
+    <div class="row"><kbd>Z</kbd>指挥守军（时间放慢，点人点位置）</div>
+    <div class="row"><kbd>N</kbd>附身下一个人，亲手打（你的身体自己守着）</div>
+    <div class="row"><kbd>Y</kbd><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd><kbd>P</kbd>守住 · 后撤 · 堵缺口 · 出击 · 打头领</div>
+    <div class="row"><kbd>Tab</kbd>切换镜头</div>
+    <div class="row"><kbd>←→</kbd>/右键拖动 转镜头　滚轮缩放</div>
+    <div class="row"><kbd>L</kbd>让泛光灯熄灭　<kbd>T</kbd>天气</div>
+    <div class="row"><kbd>G</kbd>画质（自动 · 极高…最低）　<kbd>`</kbd>帧数</div>
+    <div class="row"><kbd>M</kbd>静音　<kbd>R</kbd>重来</div>
+  </div>
+  <div id="squad" aria-label="你的人"></div>
+  <div id="cmdbar"><div id="cmdtitle">指挥</div><div class="btns"><button type="button" data-o="hold"><kbd>Y</kbd>守住</button><button type="button" data-o="fallback"><kbd>U</kbd>后撤</button><button type="button" data-o="plug"><kbd>I</kbd>堵缺口</button><button type="button" data-o="sally"><kbd>O</kbd>出击</button><button type="button" data-o="focus"><kbd>P</kbd>打头领</button><button type="button" data-p="1"><kbd>N</kbd>附身</button></div><small>点守军选人（Shift 多选 · 1–3 · 4 全体）　点蓝圈或地面把人派过去　N 附身选中的人　Z 退出</small></div>
+  <div id="labels"></div>
+  <div id="threats"></div>
+  <div id="clinch">被抓住了领口！<small>连按 空格 推开 · Q 顶膝 · 左键 用柄砸它的脸 — 不挣开就会被拖倒</small><div class="track"><div id="clinchBar"></div></div><div class="track"><div id="clinchTime"></div></div></div>
+  <div id="qte">被按住了！<small>连按 空格 挣脱（肾上腺素越高越有力）· F 用手电照它的脸 · 被抓住脚踝时 Q 蹬它的脸</small><div class="track"><div id="qteBar"></div></div></div>
+</div>
+
+<div id="splat"></div>
+<div id="dlg"><div id="dlgName"></div><div id="dlgText"></div><div id="choices"></div><div class="dlgHint">空格 / 点击 继续</div></div>
+<div id="card"><h2 id="cardTitle"></h2><p id="cardText"></p><p class="cardHint">点击继续</p></div>
+
+<div id="opening" class="layer">
+  <p>那一夜，天空下了一场雨。</p>
+  <p>雨停以后，人类失去了语言、思想和灵魂。</p>
+  <p>它们只剩一个目标：感染，和猎杀。</p>
+</div>
+
+<div id="title" class="layer">
+  <div class="tcard">
+    <p class="eyebrow">原型场景 · 林场小屋 · 第 21 天</p>
+    <h1>雨夜摇篮曲</h1>
+    <p class="lede">院子里那盏泛光灯，只能让它们迟疑一下。灯外的黑暗里有东西在绕圈。屋里，你的三个人守着门窗；一个被咬了三天的母亲，还在给孩子喂奶。</p>
+    <button id="startBtn" type="button">进入场景</button>
+    <p class="hint">建议戴耳机。需要键盘和鼠标，Mac 上用 Safari 或 Chrome。</p>
+    <p class="touchnote">这个原型需要键盘和鼠标，手机上只能看画面。</p>
+    <div class="keys">
+      <div><kbd>WASD</kbd>移动</div><div><kbd>左键</kbd>挥击 · 按住重击</div>
+      <div><kbd>Q</kbd>踢开</div><div><kbd>空格</kbd>闪避 / 挣脱</div>
+      <div><kbd>1</kbd><kbd>2</kbd>球棍 / 消防斧</div><div><kbd>C</kbd>潜行</div>
+      <div><kbd>F</kbd>强光手电</div><div><kbd>Tab</kbd>切换镜头</div>
+      <div><kbd>Z</kbd>指挥守军</div><div><kbd>Y</kbd>–<kbd>P</kbd>下命令</div>
+      <div><kbd>N</kbd>附身切换</div><div><kbd>Q</kbd>附身时：盾撞 / 矛杆推 / 踢</div>
+    </div>
+  </div>
+</div>
+{{SCRIPTS}}
+<script>
+(function () {
+'use strict';
+{{CODE}}
+})();
+</script>
