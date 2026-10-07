@@ -84,11 +84,13 @@ function updateTrail(dt) {
 }
 
 /* wounds: blood painted straight onto the clothes and skin, so a body shows every hit it took */
+function fleshSpot(mat, region) { const R = mat.userData.flesh.A.meta.regions || {}, list = R[region] || R.torso || [[0.5, 0.5]]; return list[Math.floor(Math.random() * list.length)]; }
 function paintWound(mat, n, big, front) {
   const tex = mat && mat.map; if (!tex || !tex.image || !tex.image.getContext) return;
-  const c = tex.image, g = c.getContext('2d'), W = c.width, H = c.height;
+  const c = tex.image, g = c.getContext('2d'), W = c.width, H = c.height, fr = mat.userData && mat.userData.fleshRegion;
   for (let i = 0; i < n; i++) {
-    const x = (front ? 0.25 + rnd(-0.09, 0.09) : rnd(0.05, 0.95)) * W, y = (front ? rnd(0.3, 0.75) : rnd(0.12, 0.8)) * H, r = rnd(0.035, big ? 0.12 : 0.065) * Math.min(W, H) * (front ? 0.6 : 1);
+    let x = (front ? 0.25 + rnd(-0.09, 0.09) : rnd(0.05, 0.95)) * W, y = (front ? rnd(0.3, 0.75) : rnd(0.12, 0.8)) * H, r = rnd(0.035, big ? 0.12 : 0.065) * Math.min(W, H) * (front ? 0.6 : 1);
+    if (fr) { const sp = fleshSpot(mat, fr); x = sp[0] * W; y = sp[1] * H; r = rnd(0.006, big ? 0.02 : 0.012) * W; }
     const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(62,5,5,.92)'); gr.addColorStop(0.55, 'rgba(70,6,6,.7)'); gr.addColorStop(1, 'rgba(50,4,4,0)');
     g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, r, r * rnd(0.6, 1.25), rnd(0, 3), 0, 7); g.fill();
     g.strokeStyle = 'rgba(58,5,5,.6)'; g.lineCap = 'round';
@@ -99,7 +101,8 @@ function paintWound(mat, n, big, front) {
 // a blade wound on cloth: a dark slash, a wet halo, blood running down from it
 function paintCut(mat, heavy) {
   const tex = mat && mat.map; if (!tex || !tex.image || !tex.image.getContext) return;
-  const c = tex.image, g = c.getContext('2d'), W = c.width, H = c.height, x = rnd(0.15, 0.85) * W, y = rnd(0.2, 0.7) * H, len = (heavy ? rnd(0.3, 0.5) : rnd(0.15, 0.3)) * W, a = rnd(-0.6, 0.6);
+  const c = tex.image, g = c.getContext('2d'), W = c.width, H = c.height, fr = mat.userData && mat.userData.fleshRegion, sp = fr ? fleshSpot(mat, fr) : null;
+  const x = (sp ? sp[0] : rnd(0.15, 0.85)) * W, y = (sp ? sp[1] : rnd(0.2, 0.7)) * H, len = (heavy ? rnd(0.3, 0.5) : rnd(0.15, 0.3)) * W * (sp ? 0.12 : 1), a = rnd(-0.6, 0.6);
   g.save(); g.translate(x, y); g.rotate(a); g.lineCap = 'round';
   g.globalAlpha = 0.55; g.strokeStyle = 'rgba(90,8,8,1)'; g.lineWidth = (heavy ? 7 : 4) * W / 128; g.beginPath(); g.moveTo(-len / 2, 1); g.lineTo(len / 2, 1); g.stroke();
   g.globalAlpha = 1; g.strokeStyle = 'rgba(30,2,2,.95)'; g.lineWidth = (heavy ? 2.6 : 1.8) * W / 128; g.beginPath(); g.moveTo(-len / 2, 0); g.lineTo(len / 2, rnd(-1.5, 1.5)); g.stroke();
@@ -169,9 +172,9 @@ function clearGore() {
   for (const w of [P.club, P.axe]) for (const m of w.userData.stain) if (m.userData.base) { m.userData.blood = 0; m.color.copy(m.userData.base); }
 }
 
-function disposeTree(root) { root.traverse(m => { if (!m.isMesh) return; m.geometry.dispose(); if (m.isSkinnedMesh && m.skeleton && m.skeleton.boneTexture) m.skeleton.dispose(); const mt = m.material; if (mt === meatMat || mt === boneMat || mt === decalMat) return; if (mt.map) mt.map.dispose(); mt.dispose(); }); }
+function disposeTree(root) { root.traverse(m => { if (!m.isMesh) return; if (!m.geometry.userData.keep) m.geometry.dispose(); if (m.isSkinnedMesh && m.skeleton && m.skeleton.boneTexture) m.skeleton.dispose(); const mt = m.material; if (mt === meatMat || mt === boneMat || mt === decalMat) return; if (mt.map && !mt.map.userData.keep) mt.map.dispose(); mt.dispose(); }); }
 /* hit flash on a body's materials (eyes keep their own glow) */
-function collectMats(h) { const s = new Set(); h.root.traverse(m => { if (m.isMesh && m.material && m.material.emissive && m.material.emissive.getHex() === 0) s.add(m.material); }); return [...s]; }
+function collectMats(h) { const s = new Set(); h.root.traverse(m => { if (m.isMesh && m.material && m.material.emissive && m.material.emissive.getHex() === 0) s.add(m.material); }); return (h.mats = [...s]); } // a body that turns realistic later adds its material here
 function setFlash(mats, k) { for (const m of mats) m.emissive.setRGB(k * 0.2, k * 0.13, k * 0.1); }
 
 /* blood on the lens: only up close, only for the worst hits */

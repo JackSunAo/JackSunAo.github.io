@@ -104,7 +104,7 @@ function bashPose(a) { // shoulder behind the shield, step in, slam it
 class Defender {
   constructor(key) {
     const D = this.D = DEF_T[key]; this.key = key; this.name = D.name; this.isPlayer = false;
-    this.h = makeHuman(Object.assign({}, D.look)); scene.add(this.h.root); initSprings(this.h); this.mats = collectMats(this.h);
+    this.h = makeHuman(Object.assign({ assetId: key }, D.look)); scene.add(this.h.root); initSprings(this.h); this.mats = collectMats(this.h);
     const hand = this.h.armR.hand;
     if (D.kit === 'spear') { this.weapon = makeSpear(); hand.add(this.weapon); this.weapon.position.set(0, -0.05, 0.02); this.weapon.rotation.set(0.15, 0, 0); }
     else if (D.kit === 'shield') {
@@ -247,7 +247,7 @@ class Defender {
     this.state = 'clinch'; this.st = 0; this.clinchBy = e; this.atk = null; this.clinchProg = 0; this.clinchTick = rnd(0.2, 0.35);
     this.clinchNeed = clamp(Math.round(1.5 + 3 * (e.T.weight / 75) * (e.arms >= 2 ? 1 : 0.6) - this.D.str), 2, 6); this.clinchMax = 1.6 + 0.3 * this.D.str;
     this.yaw = Math.atan2(toE.x, toE.z); e.setState('grab'); e.holding = this;
-    SND.growl(e.pos, 0.9, 0.5); this.yell(0.8); floatLabel(this.name + '被抓住了', this.headPos(), 'heavy', 1.2); makeNoise(this.pos, 7, 'struggle');
+    SND.growl(e.pos, 0.9, 0.5, e.T.voice); this.yell(0.8); floatLabel(this.name + '被抓住了', this.headPos(), 'heavy', 1.2); makeNoise(this.pos, 7, 'struggle');
   }
   pinnedByE(e) {
     if (this.clinchBy && this.clinchBy !== e) { const c = this.clinchBy; c.holding = null; c.setState('recover'); c.cool = rnd(1, 1.6); }

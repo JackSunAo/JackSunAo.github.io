@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, existsSync } from 'fs';
 const dir = new URL('.', import.meta.url).pathname;
 const libs = ['build/three.min.js', 'examples/js/shaders/CopyShader.js', 'examples/js/shaders/LuminosityHighPassShader.js',
   'examples/js/postprocessing/EffectComposer.js', 'examples/js/postprocessing/RenderPass.js', 'examples/js/postprocessing/ShaderPass.js',
@@ -16,4 +16,7 @@ mkdirSync(dir + 'dist', { recursive: true });
 writeFileSync(dir + 'dist/site.html', site);
 writeFileSync(dir + 'dist/yuye-yaolanqu.html', cdn);
 writeFileSync(dir + 'dist/test.html', local);
+// the characters' baked meshes and textures sit next to the page
+mkdirSync(dir + 'dist/chars', { recursive: true });
+if (existsSync(dir + '../chars')) for (const f of readdirSync(dir + '../chars')) copyFileSync(dir + '../chars/' + f, dir + 'dist/chars/' + f);
 console.log('built', (cdn.length / 1024).toFixed(1) + ' KB');

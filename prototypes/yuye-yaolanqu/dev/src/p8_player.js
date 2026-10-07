@@ -213,7 +213,7 @@ function grabPlayer(e) {
   P.state = 'clinch'; P.st = 0; P.clinchBy = e; P.atk = null; P.charging = false; P.clinchProg = 0; P.yaw = Math.atan2(toE.x, toE.z);
   P.clinchNeed = clamp(Math.round(1.5 + 3 * (e.T.weight / 75) * (e.arms >= 2 ? 1 : 0.6) - 2 * P.adr - (P.stamina > 50 ? 0.5 : 0)), 2, 7);
   P.clinchMax = 1.5 + 0.4 * P.adr;
-  e.setState('grab'); e.holding = P; e.vel.set(0, 0, 0); G.shake = Math.max(G.shake, 0.25); SND.grunt(); SND.growl(e.pos, 0.9, 0.5); impactReact(P.h, 0, -1, 0.6, 'quick');
+  e.setState('grab'); e.holding = P; e.vel.set(0, 0, 0); G.shake = Math.max(G.shake, 0.25); SND.grunt(); SND.growl(e.pos, 0.9, 0.5, e.T.voice); impactReact(P.h, 0, -1, 0.6, 'quick');
   $('clinch').classList.add('on'); makeNoise(P.pos, 7, 'struggle'); P.adr = Math.min(1, P.adr + 0.2);
 }
 function clinchAct(kind) { // Space: shove it off · Q: knee to the gut · attack: the haft into its face

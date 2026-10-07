@@ -14,10 +14,12 @@ const fwdOf = yaw => new V3(Math.sin(yaw), 0, Math.cos(yaw));
 function toLocal(d, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw); return { x: d.x * c - d.z * s, z: d.x * s + d.z * c }; }
 function toWorld(lx, lz, yaw) { const c = Math.cos(yaw), s = Math.sin(yaw); return new V3(lx * c + lz * s, 0, -lx * s + lz * c); }
 
+const PLAYER_LOOK = { height: 1.76, girth: 1.06, skin: '#c38f6e', top: '#59503f', coat: '#4a4434', bottom: '#2b3035', shoes: '#1b1612', hair: '#1d140e', hairStyle: 'short', cap: '#6a3b2c', scarf: '#8a6638', backpack: '#3b382e', seed: 3, assetId: 'you' };
+const MOTHER_LOOK = { female: true, downcast: true, height: 1.62, girth: 0.92, skin: '#d9b49b', pale: 0.5, top: '#76604e', topWear: 0.55, skirt: '#3b4656', shoes: '#2a201a', hair: '#2a1c12', hairStyle: 'bun', seed: 21, assetId: 'mother' };
 /* ---------------- player ---------------- */
 const P = {};
 (function initPlayer() {
-  const h = makeHuman({ height: 1.76, girth: 1.06, skin: '#c38f6e', top: '#59503f', coat: '#4a4434', bottom: '#2b3035', shoes: '#1b1612', hair: '#1d140e', hairStyle: 'short', cap: '#6a3b2c', scarf: '#8a6638', backpack: '#3b382e', seed: 3 });
+  const h = makeHuman(PLAYER_LOOK);
   scene.add(h.root); initSprings(h);
   const club = makeClub(); h.armR.hand.add(club); club.position.set(0, -0.05, 0.01); club.rotation.set(0.32, 0, 0);
   const axe = makeAxe(); h.armR.hand.add(axe); axe.position.set(0, -0.05, 0.01); axe.rotation.set(0.32, 0, 0); axe.visible = false;
@@ -50,7 +52,7 @@ const CTRL = { who: P };
 
 /* ---------------- mother & baby ---------------- */
 const mother = (function () {
-  const h = makeHuman({ female: true, downcast: true, height: 1.62, girth: 0.92, skin: '#d9b49b', pale: 0.5, top: '#76604e', topWear: 0.55, skirt: '#3b4656', shoes: '#2a201a', hair: '#2a1c12', hairStyle: 'bun', seed: 21 });
+  const h = makeHuman(MOTHER_LOOK);
   rock.add(h.root); h.root.position.set(0, 0, 0.0);
   const seat = Object.assign({}, SEATED, { pelY: 0.5 - h.pelvisY0, spX: -0.06, headX: 0.48, headY: 0.24, headZ: 0.06, shLx: -0.42, shLy: -1.05, shLz: -0.04, elL: 1.62, shRx: -0.58, shRy: 0.95, shRz: 0.06, elR: 1.42, chY: 0.08 });
   h.cur = Object.assign({}, NEUTRAL, seat); applyPose(h);

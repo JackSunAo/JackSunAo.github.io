@@ -274,6 +274,7 @@ function makeHuman(o) {
   root.traverse(m => { if (!m.isMesh) return; const gm = m.geometry; if (!gm.boundingSphere) gm.computeBoundingSphere(); if (gm.boundingSphere.radius * Math.max(m.scale.x, m.scale.y, m.scale.z) < 0.045) m.castShadow = false; });
   root.userData.human = true;
   applyPose(h); skinHuman(h);
+  if (o.assetId) { loadChar(o.assetId); if (CHAR_ASSETS[o.assetId]) fleshUp(h, CHAR_ASSETS[o.assetId]); else if (CHAR_WAIT[o.assetId]) CHAR_WAIT[o.assetId].push(h); }
   return h;
 }
 
@@ -395,6 +396,91 @@ function unskin(part) {
   part.traverse(o => { if (o.userData.rb) { o.userData.rb.sig = -1; o.userData.rb.meshes = []; o.userData.rb.shadows = []; } });
 }
 
+
+/* ---------- realistic bodies: one continuous mesh per character, sculpted, retopologised and baked offline ----------
+   It is skinned with smooth weights to the same rig nodes the rigid parts hang from, so every pose, spring, hit reaction
+   and planted foot drives it unchanged, and the rigid parts stay on as invisible stand-ins for hit tests and severed
+   pieces. A limb cut off folds its share of the body into the stump; wounds are painted into the body's own texture
+   where they land; blood loss pales only the skin; the infected's eyes catch light. Near: ~8k triangles; far and in
+   shadow maps: ~2.4k. Until (or unless) a character's files load, the stand-in body is what you see. */
+const CHAR_DIR = 'chars/', CHAR_ASSETS = {}, CHAR_WAIT = {}, FLESH_NEAR = 9, FLESH_FAR = 10.5;
+function loadChar(id) {
+  if (CHAR_ASSETS[id] || CHAR_WAIT[id]) return;
+  CHAR_WAIT[id] = [];
+  const get = (url, type) => new Promise((res, rej) => { const x = new XMLHttpRequest(); x.open('GET', url); x.responseType = type; x.onload = () => (x.status === 200 || x.status === 0) && x.response ? res(x.response) : rej(url); x.onerror = () => rej(url); x.send(); });
+  const img = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(url); im.src = url; });
+  Promise.all([get(CHAR_DIR + id + '.mesh.json', 'json'), get(CHAR_DIR + id + '.mesh.bin', 'arraybuffer'), img(CHAR_DIR + id + '_albedo.webp'), img(CHAR_DIR + id + '_nrm.webp'), img(CHAR_DIR + id + '_mr.webp')])
+    .then(([meta, bin, alb, nrm, mr]) => {
+      const tex = (im, srgb) => { const t = new THREE.Texture(im); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.needsUpdate = true; t.userData.keep = true; return t; };
+      const A = CHAR_ASSETS[id] = { id, meta, lods: meta.lods.map(L => charGeo(L, bin)), alb, nrmTex: tex(nrm, false), mrTex: tex(mr, false) };
+      for (const h of CHAR_WAIT[id]) if (!h.dead) fleshUp(h, A);
+      CHAR_WAIT[id] = null;
+    })
+    .catch(e => { console.warn('character files missing, keeping the stand-in body:', id, e); CHAR_WAIT[id] = null; CHAR_ASSETS[id] = null; });
+}
+function charGeo(L, bin) {
+  const arr = (k, T) => { const [off, , n] = L.buf[k]; return new T(bin, off, n); };
+  const qp = arr('pos', Uint16Array), lo = L.lo, hi = L.hi, n = L.nv, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) pos[i * 3 + c] = lo[c] + qp[i * 3 + c] / 65535 * (hi[c] - lo[c]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(arr('nrm', Int8Array), 3, true));
+  g.setAttribute('uv', new THREE.BufferAttribute(arr('uv', Uint16Array), 2, true));
+  g.setAttribute('tangent', new THREE.BufferAttribute(arr('tan', Int8Array), 4, true));
+  g.setAttribute('skinIndex', new THREE.BufferAttribute(arr('si', Uint8Array), 4));
+  g.setAttribute('skinWeight', new THREE.BufferAttribute(arr('sw', Uint8Array), 4, true));
+  g.setIndex(new THREE.BufferAttribute(L.buf.idx[1] === 'uint32' ? arr('idx', Uint32Array) : arr('idx', Uint16Array), 1));
+  g.boundingSphere = SKIN_BOUNDS.clone(); g.userData.keep = true; return g;
+}
+const _flP = new V3(), _flM = new THREE.Matrix4(), _flCam = new V3();
+function fleshUp(h, A) {
+  if (h.flesh || !A) return;
+  const map = A.meta.bones, rb = RIG_BONES(h), bones = map.map(k => rb[k]);
+  // bind in the pose it was sculpted in (springs off), then go back to whatever pose it had
+  const keep = h.cur, spr = h.spr; h.spr = null; h.cur = Object.assign({}, NEUTRAL, BIND); applyPose(h); h.root.updateMatrixWorld(true);
+  const inv = bones.map(b => b.matrixWorld.clone().invert());
+  const info = bones.map(b => { let p = b.parent, pi = -1; while (p && pi < 0) { pi = bones.indexOf(p); p = p.parent; } return { parent: b.parent, local: b.position.clone(), probe: b.children.find(c => c.isMesh), pi }; });
+  const skel = new THREE.Skeleton(bones, inv), coll = new Array(bones.length);
+  skel.update = function () { // a severed or hidden limb folds into its joint, and everything below it with it
+    const out = this.boneMatrices;
+    for (let i = 0; i < bones.length; i++) {
+      const b = bones[i], f = info[i]; coll[i] = null;
+      if (f.pi >= 0 && coll[f.pi]) { coll[i] = coll[f.pi]; }
+      else if ((f.probe && f.probe.userData.skinOff) || b.parent !== f.parent || !b.visible) coll[i] = _flP.copy(f.local).applyMatrix4(f.parent.matrixWorld).clone();
+      if (coll[i]) { const c = coll[i]; _flM.set(0, 0, 0, c.x, 0, 0, 0, c.y, 0, 0, 0, c.z, 0, 0, 0, 1).toArray(out, i * 16); }
+      else _skM.multiplyMatrices(b.matrixWorld, inv[i]).toArray(out, i * 16);
+    }
+    if (this.boneTexture) this.boneTexture.needsUpdate = true;
+  };
+  // its own copy of the colour, so its wounds are its own
+  const canvas = mkCanvas(A.alb.width, A.alb.height); canvas.getContext('2d').drawImage(A.alb, 0, 0);
+  const tex = toTex(canvas, true, false); tex.anisotropy = 4;
+  const pale = new THREE.Color(1, 1, 1), glow = { value: h.o.infected ? 1.6 : 0 };
+  const mat = new THREE.MeshStandardMaterial({ map: tex, normalMap: A.nrmTex, roughnessMap: A.mrTex, roughness: 1, metalness: 0 });
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.fleshPale = { value: pale }; sh.uniforms.fleshGlow = glow; sh.uniforms.fleshMR = { value: A.mrTex };
+    sh.fragmentShader = 'uniform vec3 fleshPale;\nuniform float fleshGlow;\nuniform sampler2D fleshMR;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\n  vec3 fmr = texture2D(fleshMR, vUv).rgb;\n  diffuseColor.rgb *= mix(vec3(1.0), fleshPale, fmr.r);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += vec3(0.9, 0.86, 0.66) * fmr.b * fleshGlow;');
+  };
+  mat.customProgramCacheKey = () => 'flesh';
+  const sm = new THREE.SkinnedMesh(A.lods[0], mat); sm.receiveShadow = true; sm.castShadow = false; h.root.add(sm); sm.updateMatrixWorld(true); sm.bind(skel, sm.matrixWorld);
+  const shm = new THREE.SkinnedMesh(A.lods[A.lods.length - 1], SKIN_SHADOW_MAT); shm.castShadow = true; shm.visible = false; h.root.add(shm); shm.updateMatrixWorld(true); shm.bind(skel, shm.matrixWorld);
+  let far = false; // near enough to see a face: the full mesh; further: the light one
+  sm.onBeforeRender = (r, sc, cam) => { if (!cam.isPerspectiveCamera || cam !== camera) return; const d = h.root.getWorldPosition(_flCam).distanceTo(cam.position); const f = far ? d > FLESH_NEAR : d > FLESH_FAR; if (f !== far) { far = f; sm.geometry = A.lods[far ? A.lods.length - 1 : 0]; } };
+  h.cur = keep; h.spr = spr; applyPose(h);
+  // the stand-in body steps aside
+  for (const m of [...(h.skinned || []), ...(h.shadows || [])]) { if (m.parent) m.parent.remove(m); if (!m.geometry.userData.keep) m.geometry.dispose(); }
+  if (h.skel && h.skel.boneTexture) h.skel.dispose();
+  h.skinned = [sm]; h.shadows = [shm]; h.skel = skel; h.atlas = null; h.bodyMat = mat;
+  h.flesh = { sm, shm, mat, tex, canvas, pale, glow, A };
+  // what the game paints and tints: wounds land in the right part of this texture, paling reaches only skin
+  const wash = () => { canvas.getContext('2d').drawImage(A.alb, 0, 0); tex.needsUpdate = true; };
+  const stand = region => { const o = { color: pale, emissive: new THREE.Color(), userData: { fleshRegion: region, flesh: h.flesh }, needsUpdate: false, dispose() {} }; Object.defineProperty(o, 'map', { get: () => tex, set: () => wash() }); return o; };
+  h.coatMat = stand('torso'); h.topMat = stand('torso'); h.faceMat = stand('face'); h.skinMat = stand('arms'); h.botMat = stand('legs');
+  if (h.mats) h.mats.push(mat);
+}
+
 /* physical layer: damped springs added on top of the animated pose (hit reactions, recoil, bumps) */
 const SPRING_KEYS = ['spX', 'spY', 'spZ', 'chX', 'chY', 'headX', 'headY', 'headZ', 'shLx', 'shRx', 'shLz', 'shRz', 'elL', 'elR', 'knL', 'knR', 'pelY', 'bodyX', 'bodyZ', 'bodyY'];
 const ZERO_SPR = {}; SPRING_KEYS.forEach(k => { ZERO_SPR[k] = 0; });
@@ -498,6 +584,17 @@ function walkPose(ph, amt, run = 0, sp = null, s = 1, st = GAIT_DEFAULT) {
     bodyZ: Math.cos(ph) * 0.028 * (1 - run) * w * st.sway + drift * 0.025, chX: breath * 0.018, spZ: -Math.cos(ph) * 0.02 * w * st.sway + (st.limp ? (fL.stance ? 0.06 : -0.02) * w : 0),
     headX: -(0.03 * amt + 0.22 * run + st.lean) * 0.6, headY: -sw * 0.07 * w
   };
+}
+// the pose every body is modelled and bound in: arms out in an A, legs a little apart, joints straight
+const BIND = { shLz: 0.75, shRz: -0.75, elL: 0, elR: 0, hipLz: 0.05, hipRz: -0.05, knL: 0, knR: 0 };
+const RIG_BONES = h => ({ pelvis: h.pelvis, spine: h.spine, chest: h.chest, head: h.head, hipL: h.L.hip, kneeL: h.L.knee, ankleL: h.L.ankle, hipR: h.R.hip, kneeR: h.R.knee, ankleR: h.R.ankle,
+  shL: h.armL.sh, elL: h.armL.el, handL: h.armL.hand, shR: h.armR.sh, elR: h.armR.el, handR: h.armR.hand });
+// where every joint sits in the bind pose, in the body's own space (feet on y = 0, facing +z): what the modeller builds around
+function rigDump(h) {
+  const keep = h.cur; h.cur = Object.assign({}, NEUTRAL, BIND); applyPose(h); h.root.position.set(0, 0, 0); h.root.rotation.set(0, 0, 0); h.root.updateMatrixWorld(true);
+  const out = { s: h.s, joints: {} }, v = new V3();
+  for (const [k, b] of Object.entries(RIG_BONES(h))) { b.getWorldPosition(v); out.joints[k] = [+v.x.toFixed(5), +v.y.toFixed(5), +v.z.toFixed(5)]; }
+  h.cur = keep; applyPose(h); return out;
 }
 // a seated pose (used by the mother)
 const SEATED = { hipLx: -1.5, hipRx: -1.5, hipLz: 0.05, hipRz: -0.05, knL: 1.45, knR: 1.5, pelY: -0.42, spX: -0.12 };
