@@ -400,7 +400,9 @@ function updatePlayer(dt) {
   // how far away they can make you out: lantern, torch, floodlight, lightning; crouching and bushes help
   P.vis = (0.2 + (P.shutter ? 0.02 : 0.4) + (P.torchOn ? 0.45 : 0) + (inFlood(P.pos) ? 0.7 : 0) + flashLight.intensity * 0.35) * (P.crouch ? 0.6 : 1) * (bushCover(P.pos) ? 0.45 : 1) * (1 - 0.2 * G.rain) * (P.indoor ? 0.8 : 1);
   // footsteps are noise
-  const prevS = Math.sin(P.ph); P.ph += dt * sp * 3.3;
+  const prevS = Math.sin(P.ph); const turnR = Math.abs(angDiff(P.yawPrev ?? P.yaw, P.yaw)) / Math.max(dt, 1e-3); P.yawPrev = P.yaw;
+  const spG = Math.max(sp, Math.min(0.8, turnR * 0.3)); // turning on the spot takes steps
+  P.ph += dt * spG * gaitK(spG, P.h.s);
   if (sp > 0.4 && Math.sign(Math.sin(P.ph)) !== Math.sign(prevS)) {
     const surf = P.indoor ? 'wood' : (P.pos.z < 5.45 && Math.abs(P.pos.x) < 3.7 ? 'porch' : 'mud');
     SND.step(P.pos, surf, P.crouch ? 0.22 : sprint ? 0.65 : 0.45);
@@ -438,7 +440,7 @@ function updatePlayer(dt) {
     }
   }
   // pose
-  let pose = walkPose(P.ph, clamp(sp / 2.25, 0, 1), clamp((sp - 2.6) / 1.4, 0, 1));
+  let pose = walkPose(P.ph, clamp(sp / 2.25, 0, 1), clamp((sp - 2.6) / 1.4, 0, 1), spG, P.h.s);
   Object.assign(pose, { shRx: (pose.shRx || 0) * 0.55 - 0.32, elR: 0.75, shRz: -0.1, shLx: (pose.shLx || 0) * 0.4 - 0.3, elL: 1.0, shLz: 0.14 });
   if (P.crouch) Object.assign(pose, { knL: (pose.knL || 0) + 0.75, knR: (pose.knR || 0) + 0.75, hipLx: (pose.hipLx || 0) - 0.5, hipRx: (pose.hipRx || 0) - 0.5, pelY: -0.22, spX: (pose.spX || 0) + 0.38, headX: -0.25 });
   if (P.carrying) Object.assign(pose, { shLx: -0.62, shLz: 0.42, elL: 1.85 });

@@ -330,7 +330,7 @@ function prewarmShadows() { for (const S of SHADOWS) shadowPass(S, PREWARM); SHA
 
 // the next wave is built ahead of time, one body every few frames while there is time to spare, off stage
 const POOL = [];
-function nextWave() { const n = Math.min(10, 4 + 2 * G.wave), types = ['butcher', 'student', 'office', 'fireman'], need = {}; for (let i = 0; i < n; i++) need[types[i % 4]] = (need[types[i % 4]] || 0) + 1; return need; }
+function nextWave() { const need = {}; for (const t of waveTypes(G.wave + 1)) need[t] = (need[t] || 0) + 1; return need; }
 function feedPool() {
   const need = nextWave(); for (const e of POOL) need[e.type]--;
   const type = Object.keys(need).find(t => need[t] > 0); if (!type) return false;

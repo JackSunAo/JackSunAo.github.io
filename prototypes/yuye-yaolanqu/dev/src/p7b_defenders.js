@@ -627,9 +627,11 @@ class Defender {
     }
     this.pos.y = groundY(this.pos.x, this.pos.z);
     // pose: guard stance over a walk, unless a state took over
-    const sp2 = Math.hypot(this.vel.x, this.vel.z); this.ph += dt * sp2 * 3.3;
+    const sp2 = Math.hypot(this.vel.x, this.vel.z); const turnR = Math.abs(angDiff(this.yawPrev ?? this.yaw, this.yaw)) / Math.max(dt, 1e-3); this.yawPrev = this.yaw;
+    const spG = Math.max(sp2, Math.min(0.8, turnR * 0.3)); // turning on the spot takes steps
+    this.ph += dt * spG * gaitK(spG, h.s);
     if (!pose) {
-      pose = walkPose(this.ph, clamp(sp2 / 2.2, 0, 1), clamp((sp2 - 2.6) / 1.4, 0, 1));
+      pose = walkPose(this.ph, clamp(sp2 / 2.2, 0, 1), clamp((sp2 - 2.6) / 1.4, 0, 1), spG, h.s);
       const g = this.spearUp ? REST_SPEAR : GUARD[this.D.kit], f = this.fatigue();
       for (const k in g) pose[k] = k.startsWith('sh') || k.startsWith('el') ? g[k] : (pose[k] || 0) + g[k] * (1 - clamp(sp2 / 2, 0, 0.6));
       if (f > 0.05) { pose.spX = (pose.spX || 0) + 0.25 * f + Math.sin(G.t * lerp(4, 9, f)) * 0.03 * f; pose.headX = (pose.headX || 0) + 0.2 * f; }

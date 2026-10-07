@@ -1,10 +1,49 @@
 /* ===== P7 infected: senses (sight, hearing), roar signals, squad tactics, physical hit reactions, wounds ===== */
 const INF = {
-  butcher: { name: '屠夫', height: 1.8, girth: 1.5, skin: '#b9937c', top: '#6d6658', bottom: '#2b2825', hair: '#3a2e25', hairStyle: 'sparse', apron: true, weight: 125, stab: 1.6, skull: 120, limb: 70, speed: 2.1, seed: 31, smart: 0.5, voice: 0.78, lightSens: 1, hesitate: 4.0 },
-  student: { name: '学生 · 原发型', height: 1.6, girth: 0.82, skin: '#c7a48c', top: '#273250', coat: '#273250', collar: '#d7d7d0', tie: '#7a2a2a', bottom: '#273250', hair: '#120c09', hairStyle: 'messy', backpack: '#7a3b2e', weight: 52, stab: 0.72, skull: 70, limb: 42, speed: 3.3, seed: 41, smart: 0.2, voice: 1.3, feral: true, lightSens: 0.15, hesitate: 0 },
-  fireman: { name: '消防员', height: 1.82, girth: 1.18, skin: '#c29a80', top: '#3a3a30', coat: '#3a3a30', bottom: '#33322a', shoes: '#1a1714', hair: '#1a120c', hairStyle: 'short', helmet: '#8a6a22', stripes: true, weight: 92, stab: 1.25, skull: 105, limb: 62, speed: 2.35, seed: 61, smart: 0.6, voice: 0.86, lightSens: 1, hesitate: 3.0, axe: true },
-  office: { name: '白领', height: 1.74, girth: 1.0, skin: '#c9a084', top: '#c9ccd0', tie: '#2b3340', lanyard: true, bottom: '#1f2226', hair: '#2a1f17', hairStyle: 'short', weight: 76, stab: 1.0, skull: 90, limb: 55, speed: 2.7, seed: 51, smart: 0.9, voice: 1.0, lightSens: 1, hesitate: 2.2 }
+  butcher: { name: '屠夫', height: 1.8, girth: 1.5, skin: '#b9937c', top: '#6d6658', bottom: '#2b2825', hair: '#3a2e25', hairStyle: 'sparse', apron: true, weight: 125, gait: { sway: 1.9, lift: 0.55, arm: 0.3, wide: 0.8 }, stab: 1.6, skull: 120, limb: 70, speed: 2.1, seed: 31, smart: 0.5, voice: 0.78, lightSens: 1, hesitate: 4.0 },
+  student: { name: '学生 · 原发型', height: 1.6, girth: 0.82, skin: '#c7a48c', top: '#273250', coat: '#273250', collar: '#d7d7d0', tie: '#7a2a2a', bottom: '#273250', hair: '#120c09', hairStyle: 'messy', backpack: '#7a3b2e', weight: 52, gait: { lift: 1.3, arm: 0.6, lean: 0.1 }, stab: 0.72, skull: 70, limb: 42, speed: 3.3, seed: 41, smart: 0.2, voice: 1.3, feral: true, lightSens: 0.15, hesitate: 0 },
+  fireman: { name: '消防员', height: 1.82, girth: 1.18, skin: '#c29a80', top: '#3a3a30', coat: '#3a3a30', bottom: '#33322a', shoes: '#1a1714', hair: '#1a120c', hairStyle: 'short', helmet: '#8a6a22', stripes: true, weight: 92, gait: { sway: 1.3, arm: 0.35, lift: 0.8, wide: 0.3 }, stab: 1.25, skull: 105, limb: 62, speed: 2.35, seed: 61, smart: 0.6, voice: 0.86, lightSens: 1, hesitate: 3.0, axe: true },
+  office: { name: '白领', height: 1.74, girth: 1.0, skin: '#c9a084', top: '#c9ccd0', tie: '#2b3340', lanyard: true, bottom: '#1f2226', hair: '#2a1f17', hairStyle: 'short', weight: 76, gait: { arm: 0.55, lift: 0.9 }, stab: 1.0, skull: 90, limb: 55, speed: 2.7, seed: 51, smart: 0.9, voice: 1.0, lightSens: 1, hesitate: 2.2 }
 };
+/* everyone else the night took: mostly young women and men in whatever they were wearing when it found them. The virus
+   picks its hosts: an old body bitten bleeds out or gives up before the virus can take it, so there are no old ones here.
+   Each wears one of four ways of moving; looks vary a little from one to the next (skin, hair, which seed of cloth) */
+const INF_TPL = {
+  walker: { weight: 56, stab: 0.8, skull: 72, limb: 46, speed: 2.6, smart: 0.45, voice: 1.35, lightSens: 0.9, hesitate: 2.0 },
+  runner: { weight: 54, stab: 0.75, skull: 70, limb: 44, speed: 3.1, smart: 0.3, voice: 1.42, lightSens: 0.45, hesitate: 0.6 },
+  smart: { weight: 58, stab: 0.85, skull: 75, limb: 48, speed: 2.7, smart: 0.85, voice: 1.3, lightSens: 1, hesitate: 2.2 },
+  heavy: { weight: 96, stab: 1.35, skull: 100, limb: 64, speed: 2.25, smart: 0.5, voice: 0.85, lightSens: 1, hesitate: 3.2 }
+};
+const SHE = { female: true, height: 1.65, girth: 0.87, gait: { sway: 1.35, wide: -0.15, arm: 0.7 } };
+const INF_CIV = {
+  nurse: ['walker', SHE, { name: '护士', height: 1.63, skin: '#d8b49c', top: '#e6eae8', skirt: '#e6eae8', skirtLen: 'knee', legs: '#ebe6dc', shoes: '#ece8e0', shoeStyle: 'flats', hair: '#1c130d', hairStyle: 'bun', nurseCap: true, lanyard: true, seed: 81 }],
+  station: ['smart', SHE, { name: '地铁站务员', height: 1.66, skin: '#d2ad94', top: '#2a3552', coat: '#2a3552', collar: '#e8e8e2', scarf: '#a8323a', skirt: '#28324c', skirtLen: 'knee', legs: '#2a2a30', shoes: '#141414', shoeStyle: 'flats', hair: '#120c09', hairStyle: 'bun', cap: '#2a3552', seed: 83 }],
+  clerk: ['runner', SHE, { name: '制服职员', height: 1.69, girth: 0.86, skin: '#dcb8a0', top: '#2b2e38', coat: '#2b2e38', collar: '#ecebe6', skirt: '#23252d', skirtLen: 'knee', legs: '#18181c', shoes: '#121214', shoeStyle: 'heels', hair: '#100b08', hairStyle: 'long', lip: '#a3343e', stab: 0.65, seed: 85, gait: { sway: 1.5, wide: -0.2, arm: 0.5, lift: 0.75, limp: true } }], // one heel snapped off on the way here
+  officeF: ['smart', SHE, { name: '白领', height: 1.65, skin: '#dfbea6', top: '#e9e6ea', skirt: '#4a4c55', skirtLen: 'knee', legs: '#c39f88', shoes: '#3a2622', shoeStyle: 'heels', hair: '#2a1a12', hairStyle: 'bob', lanyard: true, stab: 0.72, seed: 87 }],
+  waitress: ['walker', SHE, { name: '服务员', height: 1.62, skin: '#d6b097', top: '#1e1c1e', skirt: '#1e1c1e', skirtLen: 'knee', apron: true, apronCol: '#e8e4dc', legs: '#1a1a1d', shoes: '#151515', shoeStyle: 'flats', hair: '#22160e', hairStyle: 'ponytail', seed: 89 }],
+  trainer: ['runner', SHE, { name: '健身教练', height: 1.68, girth: 0.88, skin: '#cf9f80', top: '#2f7f8c', sleeves: 'short', bottom: '#1d1e24', shoes: '#e4e4e4', shoeStyle: 'flats', hair: '#1a120c', hairStyle: 'ponytail', speed: 3.4, seed: 91 }],
+  schoolgirl: ['runner', SHE, { name: '女学生', height: 1.6, girth: 0.82, skin: '#d9b9a2', top: '#f0f0ec', coat: '#283250', tie: '#7a2a2a', skirt: '#2f3550', skirtLen: 'knee', legs: '#efece5', shoes: '#1a1412', shoeStyle: 'flats', hair: '#100b08', hairStyle: 'ponytail', backpack: '#c7a37a', seed: 93 }],
+  police: ['smart', SHE, { name: '女警', height: 1.7, girth: 0.9, skin: '#d0a98e', top: '#25324a', bottom: '#1f2636', shoes: '#121212', shoeStyle: 'boots', cap: '#1f2840', hair: '#140e0a', hairStyle: 'bun', stab: 0.95, seed: 95 }],
+  doctor: ['smart', SHE, { name: '医生', height: 1.67, skin: '#dcb8a2', top: '#7f98a8', coat: '#eceeec', bottom: '#7f98a8', shoes: '#e8e8e8', shoeStyle: 'flats', hair: '#2a1c14', hairStyle: 'bob', lanyard: true, seed: 97 }],
+  barista: ['walker', SHE, { name: '咖啡店员', height: 1.63, skin: '#d4ab90', top: '#f0eee8', bottom: '#34405a', apron: true, apronCol: '#2f5a44', shoes: '#e6e6e6', shoeStyle: 'flats', hair: '#5a3a22', hairStyle: 'ponytail', seed: 99 }],
+  biker: ['runner', SHE, { name: '机车女孩', height: 1.7, girth: 0.88, skin: '#d6b29a', top: '#3a3a40', coat: '#1c1a1a', bottom: '#2a3550', shoes: '#151313', shoeStyle: 'tall', hair: '#3a2416', hairStyle: 'long', lip: '#7a2a32', seed: 101 }],
+  bride: ['walker', SHE, { name: '新娘', height: 1.64, skin: '#e0c0aa', top: '#f3f1ec', skirt: '#f3f1ec', shoes: '#efece6', shoeStyle: 'heels', hair: '#1a120c', hairStyle: 'long', lip: '#b23a44', seed: 103 }],
+  chef: ['heavy', { name: '厨师', height: 1.76, girth: 1.3, skin: '#c49a7e', top: '#efefea', bottom: '#3a3a3a', apron: true, apronCol: '#e8e4dc', cap: '#efefea', hair: '#1c140e', hairStyle: 'short', seed: 105 }],
+  rider: ['runner', { name: '外卖骑手', height: 1.74, girth: 1.0, skin: '#c08f70', top: '#e2b322', coat: '#e2b322', bottom: '#2a2a2e', cap: '#e2b322', backpack: '#e2b322', hair: '#120c09', hairStyle: 'messy', voice: 1.0, seed: 107 }],
+  worker: ['walker', { name: '地铁检修工', height: 1.75, girth: 1.1, skin: '#b98a6c', top: '#2b3448', vest: '#e0662a', stripes: true, bottom: '#2b3448', cap: '#2b3448', hair: '#2a231d', hairStyle: 'short', voice: 0.92, weight: 84, stab: 1.1, seed: 109 }]
+};
+for (const [k, [tpl, ...looks]] of Object.entries(INF_CIV)) INF[k] = Object.assign({ civ: true }, INF_TPL[tpl], ...looks, { tpl });
+// a little of each body's own: skin a shade lighter or darker, one of a few cloth seeds (so canvases are shared, not endless)
+const SKINS_F = ['#e2c2ac', '#d8b49c', '#cfa58a', '#c4967a', '#b98a6e'], HAIRS = ['#100b08', '#1c130d', '#2a1a12', '#3a2416', '#5a3a22', '#6a4a30'];
+function civVariant(T) { if (!T.civ) return null; const i = Math.floor(Math.random() * 3);
+  return { seed: T.seed + i * 211, skin: T.female ? SKINS_F[(SKINS_F.indexOf(T.skin) + i + 5) % 5] || T.skin : T.skin, hair: i === 2 && T.female ? HAIRS[(T.seed + i) % HAIRS.length] : T.hair }; }
+// who comes in a wave: the same for the pool that builds it ahead and the wave that calls it
+function waveTypes(w) {
+  const R = rng(w * 7919 + 13), n = Math.min(10, 4 + 2 * (w - 1)), civ = Object.keys(INF).filter(k => INF[k].civ), out = ['office'];
+  if (w >= 2) out.push('fireman'); if (w % 2 === 1 || w >= 4) out.push('butcher'); if (R() < 0.7) out.push('student');
+  while (out.length < n) out.push(civ[Math.floor(R() * civ.length)]);
+  return out.slice(0, n);
+}
 // the dark ring around the floodlight where they lurk
 const SAFE = [];
 const floodConeFull = floodCone;
@@ -157,7 +196,7 @@ const _eye = new V3(), _tg = new V3();
 
 class Infected {
   constructor(type, ang, pooled) {
-    const T = this.T = INF[type]; this.type = type;
+    const T = this.T = INF[type]; this.type = type; this.vari = civVariant(T);
     this.vel = new V3(); this.lastKnown = new V3(); this.lungeT = new V3(); this.fleeTo = new V3(); this.inbox = [];
     this.h = null; this.dirty = true; this.home = ang;
     const bar = document.createElement('div'); bar.className = 'ebar';
@@ -174,7 +213,7 @@ class Infected {
   }
   rebuild() {
     if (this.h) { scene.remove(this.h.root); disposeTree(this.h.root); }
-    this.h = makeHuman(Object.assign({ infected: true, blood: true, topWear: 0.85, bottomWear: 0.8 }, this.T)); scene.add(this.h.root);
+    this.h = makeHuman(Object.assign({ infected: true, blood: true, topWear: 0.85, bottomWear: 0.8 }, this.T, this.vari)); scene.add(this.h.root);
     initSprings(this.h); this.mats = collectMats(this.h); this.dirty = false;
     if (this.T.axe) { this.axe = makeAxe(); this.h.armR.hand.add(this.axe); this.axe.position.set(0, -0.05, 0.01); this.axe.rotation.set(0.32, 0, 0); }
   }
@@ -604,8 +643,8 @@ class Infected {
   moveDir(dir, spd, dt, k = 6) { this.vel.x = damp(this.vel.x, dir.x * spd, k, dt); this.vel.z = damp(this.vel.z, dir.z * spd, k, dt); }
   moveTo(target, spd, dt) { const d = target.clone().sub(this.pos); d.y = 0; const l = d.length(); if (l < 0.3) { this.moveDir(new V3(), 0, dt); return; } this.moveDir(d.divideScalar(l), Math.min(spd, l * 1.5), dt); }
   face(target, dt, k = 8) { const a = Math.atan2(target.x - this.pos.x, target.z - this.pos.z); this.yaw += angDiff(this.yaw, a) * (1 - Math.exp(-k * dt)); }
-  gait(amt, run) {
-    const w = walkPose(this.ph, amt, run), B = this.body;
+  gait(amt, run = 0, crouch = 0) { // their own walk: the butcher rolls, the student scampers, nobody guards a wound
+    const w = walkPose(this.ph, amt, run, this._sp, this.h.s, crouch ? Object.assign({ crouch }, this.T.gait) : this.T.gait), B = this.body;
     for (const sd of ['L', 'R']) if (B.leg[sd] === 'broken') {
       const stance = Math.max(0, sd === 'L' ? -Math.cos(this.ph) : Math.cos(this.ph)) * Math.max(amt, 0.3);
       w['kn' + sd] = -0.12 - 0.4 * stance; w['hip' + sd + 'x'] *= 0.5; w.spZ = (w.spZ || 0) + (sd === 'L' ? 1 : -1) * 0.14 * stance; w.bodyY = (w.bodyY || 0) - 0.06 * stance;
@@ -648,7 +687,7 @@ class Infected {
     if ((G.playT < 40 && !this.provoked && !floodOff()) || this.regroupT > 0) this.aware = Math.min(this.aware, 0.95);
     const canHunt = G.mode === 'play' && !P.dead && !Q.dead && (Q.indoor === this.inside() || (dP < 3 && openingBetween(this.pos, Q.pos)));
     if (this.aware >= 1 && canHunt && (this.state === 'lurk' || this.state === 'investigate' || this.state === 'search')) this.onSpot();
-    let pose = {}, hard = null; const sp = Math.hypot(this.vel.x, this.vel.z);
+    let pose = {}, hard = null; const sp = Math.hypot(this.vel.x, this.vel.z); const turnR = Math.abs(angDiff(this.yawPrev ?? this.yaw, this.yaw)) / Math.max(dt, 1e-3); this.yawPrev = this.yaw; this._sp = Math.max(sp, Math.min(0.8, turnR * 0.3));
     switch (this.state) {
       case 'lurk': {
         if (SIEGE.on && Q.indoor && this.aware > 0.6 && G.mode === 'play') { this.setState('siege'); break; }
@@ -664,7 +703,7 @@ class Infected {
         if (this.aware > 0.45 && (this.provoked || G.playT > 40) && canHunt && this.regroupT <= 0) { this.setState('investigate'); this.investT = 0; }
         if (floodOff() && !P.dead) { if (Q.indoor) { if (SIEGE.on) this.setState('siege'); } else if (dP < 17 && G.mode === 'play') { this.aware = Math.max(this.aware, 1.05); this.provoked = true; } }
         if (this.voiceT < 0) { SND.growl(this.pos, 0.3, rnd(0.8, 1.4)); this.voiceT = rnd(8, 15); }
-        pose = Object.assign(this.gait(clamp(sp / 0.9, 0, 1) * 0.7), { spX: 0.42, knL: 0.35, knR: 0.35, pelY: -0.07, headX: watching ? -0.45 : -0.32, shLx: -0.35, shRx: -0.4, elL: 0.55, elR: 0.6, spZ: Math.sin(G.t * 0.9 + this.mood * 5) * 0.06 });
+        pose = Object.assign(this.gait(clamp(sp / 0.9, 0, 1) * 0.7, 0, 0.1), { spX: 0.42, headX: watching ? -0.45 : -0.32, shLx: -0.35, shRx: -0.4, elL: 0.55, elR: 0.6, spZ: Math.sin(G.t * 0.9 + this.mood * 5) * 0.06 });
         break;
       }
       case 'investigate': { // walk to where it saw or heard something, low and slow, head sweeping
@@ -680,7 +719,7 @@ class Infected {
         if (l < 0.9 || this.investT > 8 || (!dir.lengthSq() && this.investT > 2.5)) { this.setState('search'); this.searchYaw = this.yaw; }
         else if (Q.indoor && floodOff()) this.setState('porch');
         if (this.voiceT < 0) { SND.clicks(this.pos, 2); this.voiceT = rnd(3, 6); }
-        pose = Object.assign(this.gait(clamp(sp / 1.4, 0, 1)), { spX: 0.36, knL: 0.3, knR: 0.3, pelY: -0.06, headX: -0.15 + Math.sin(G.t * 3) * 0.08, headY: Math.sin(G.t * 1.3 + this.mood * 4) * 0.6, shLx: -0.3, shRx: -0.3, elL: 0.5, elR: 0.5 });
+        pose = Object.assign(this.gait(clamp(sp / 1.4, 0, 1), 0, 0.08), { spX: 0.36, headX: -0.15 + Math.sin(G.t * 3) * 0.08, headY: Math.sin(G.t * 1.3 + this.mood * 4) * 0.6, shLx: -0.3, shRx: -0.3, elL: 0.5, elR: 0.5 });
         break;
       }
       case 'search': { // stand where the trail went cold: turn, sniff, click
@@ -1042,7 +1081,7 @@ class Infected {
       const dc = this.pos.clone().sub(LURK_C); dc.y = 0; if (dc.length() > 21) this.pos.copy(LURK_C).addScaledVector(dc.normalize(), 21);
     }
     this.pos.y = this.state === 'climb' ? this.climbY : groundY(this.pos.x, this.pos.z);
-    if (this.state !== 'crawl') this.ph += dt * Math.max(sp, 0.001) * 3.3;
+    if (this.state !== 'crawl') this.ph += dt * Math.max(this._sp, 0.001) * gaitK(this._sp, this.h.s);
     // an axe hanging from a slack arm drags its head through the mud
     if (this.hasAxe && this.standing && !['work', 'axeWind', 'axeSwing', 'climb', 'pinning'].includes(this.state)) { pose.shRx = 0.04 + Math.sin(this.ph) * 0.08 * clamp(sp / 2, 0, 1); pose.elR = 0.12; pose.shRz = -0.12; if (sp > 0.6 && Math.random() < dt * 0.8) SND.scrape(this.pos); }
     springStep(h, dt);

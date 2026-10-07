@@ -431,8 +431,8 @@ function resetGame() {
 function spawnWave() { // they answer each other from far off, then come
   G.wave++; const base = rnd(0, 6.28);
   for (let i = infected.length - 1; i >= 0 && infected.filter(o => o.dead).length > 4; i--) if (infected[i].dead) { const e = infected[i]; scene.remove(e.h.root); disposeTree(e.h.root); e.bar.remove(); e.arrow.remove(); infected.splice(i, 1); }
-  const types = ['butcher', 'student', 'office', 'fireman'], n = Math.min(10, 4 + 2 * (G.wave - 1)); // every wave brings more of them
-  for (let i = 0; i < n; i++) { const a = base + i * (6.28 / n), e = takePooled(types[i % 4], a) || new Infected(types[i % 4], a); e.reset(true); e.provoked = true; e.aware = 0.7; e.lastKnown.copy(P.pos); e.setState('investigate'); }
+  const types = waveTypes(G.wave), n = types.length; // every wave brings more of them, and more of everyone else
+  for (let i = 0; i < n; i++) { const a = base + i * (6.28 / n), e = takePooled(types[i], a) || new Infected(types[i], a); e.reset(true); e.provoked = true; e.aware = 0.7; e.lastKnown.copy(P.pos); e.setState('investigate'); }
   SND.roar(LURK_C.clone().addScaledVector(dirA(base), 24), 'rally', 0.9);
   toast('远处的嘶吼一声接一声地应和着。它们又来了。', 3.5); setObj('第 ' + G.wave + ' 波。它们听见了刚才的动静。');
 }
@@ -497,5 +497,5 @@ function tick(rdt) {
   gradePass.uniforms.time.value = G.t;
 }
 requestAnimationFrame(frame);
-window.__dbg = { perfFrame, perfSkip, composerRender: () => drawFrame(), POOL, feedPool, takePooled, makeHumanForTest: o => makeHuman(o), clothCanvas, faceCanvas, skinCanvas, DOOR_RB, cats: { decalMat, poolTex, gougeMat, crackMat, puddleMat, streakMat, ringTex, doorLeaf: door.leaf, doorPivot: door.pivot, barMesh, glowTex }, PERF, QUALITY, SHADOWS, BATCHES, PROXIES, SHADOW_STATIC, setQuality, setReference, checkStatic, renderShadows, rigs,
+window.__dbg = { perfFrame, perfSkip, composerRender: () => drawFrame(), POOL, feedPool, takePooled, makeHumanForTest: o => makeHuman(o), walkPose, poseTo, gaitK, initSprings, INF, waveTypes, clothCanvas, faceCanvas, skinCanvas, DOOR_RB, cats: { decalMat, poolTex, gougeMat, crackMat, puddleMat, streakMat, ringTex, doorLeaf: door.leaf, doorPivot: door.pivot, barMesh, glowTex }, PERF, QUALITY, SHADOWS, BATCHES, PROXIES, SHADOW_STATIC, setQuality, setReference, checkStatic, renderShadows, rigs,
   renderFrame: dt => { const t0 = performance.now(); tick(dt); const t1 = performance.now(); drawFrame(); return { tick: t1 - t0, render: performance.now() - t1 }; }, drawFrame, FSR, CTRL, possess, possessNext, ctrlKey, aiPlayer, defenders, CMD, POSTS, setCommand, orderDefenders, assignPost, cmdSelect, cmdClick, entryPressure, doorBraced, PREY, G, P, cam, mother, infected, SQUAD, stompTarget, takedownTarget, clinchAct, grabPlayer, ENTRIES, door, winBack, winLeft, SIEGE, doorChop, doorRam, smashGlass, hitBoard, interact, toggleBar, setBar, planSiege, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, dodge, switchWeapon, toggleTorch, startPin, roar, makeNoise, spawnWave, fatigue, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };
