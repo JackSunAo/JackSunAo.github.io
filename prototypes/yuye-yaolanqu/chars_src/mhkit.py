@@ -130,3 +130,34 @@ def top4(W):
     w = np.take_along_axis(W, idx, 1)
     w = w / np.maximum(w.sum(1, keepdims=True), 1e-9)
     return idx.astype(np.uint8), w
+
+
+def raster_positions(U, F, P, size):
+    """where on the body each texel of a part's texture lies (for painting dirt and blood by position)"""
+    from numba import njit
+
+    @njit(cache=True)
+    def _r(U, F, P, size, out, cov):
+        for t in range(F.shape[0]):
+            a, b, c = F[t, 0], F[t, 1], F[t, 2]
+            ax, ay = U[a, 0] * size, (1 - U[a, 1]) * size
+            bx, by = U[b, 0] * size, (1 - U[b, 1]) * size
+            cx, cy = U[c, 0] * size, (1 - U[c, 1]) * size
+            x0 = max(int(min(ax, bx, cx)) - 1, 0); x1 = min(int(max(ax, bx, cx)) + 2, size)
+            y0 = max(int(min(ay, by, cy)) - 1, 0); y1 = min(int(max(ay, by, cy)) + 2, size)
+            den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+            if abs(den) < 1e-12:
+                continue
+            for y in range(y0, y1):
+                for x in range(x0, x1):
+                    px, py = x + 0.5, y + 0.5
+                    w0 = ((by - cy) * (px - cx) + (cx - bx) * (py - cy)) / den
+                    w1 = ((cy - ay) * (px - cx) + (ax - cx) * (py - cy)) / den
+                    w2 = 1 - w0 - w1
+                    if w0 >= -0.02 and w1 >= -0.02 and w2 >= -0.02:
+                        for k in range(3):
+                            out[y, x, k] = P[a, k] * w0 + P[b, k] * w1 + P[c, k] * w2
+                        cov[y, x] = True
+    out = np.zeros((size, size, 3)); cov = np.zeros((size, size), np.bool_)
+    _r(np.ascontiguousarray(U, np.float64), np.ascontiguousarray(F, np.int64), np.ascontiguousarray(P, np.float64), size, out, cov)
+    return out, cov

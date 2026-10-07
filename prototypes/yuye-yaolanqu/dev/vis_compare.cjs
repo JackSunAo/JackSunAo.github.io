@@ -4,10 +4,12 @@ const { chromium } = require('playwright'); const path = require('path'); const 
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--allow-file-access-from-files'] });
   const W = 1600, H = 1300, p = await b.newPage({ viewport: { width: W, height: H } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('file://' + path.join(__dirname, 'dist/test.html')); await p.waitForTimeout(2000);
-  const [lookId, ...assets] = (process.argv[2] || 'mei:mei_real,mei_paint').replace(':', ',').split(',');
-  const url = await p.evaluate(async ([lookId, assets, W, H]) => {
-    const D = __dbg, base = lookId === 'you' ? D.PLAYER_LOOK : lookId === 'mother' ? D.MOTHER_LOOK : D.DEF_T[lookId] ? D.DEF_T[lookId].look : Object.assign({ infected: true, blood: true }, D.INF[lookId]);
-    const hs = assets.map(a => { const h = D.makeHumanForTest(Object.assign({}, base, { assetId: a })); D.initSprings(h); return h; });
+  // 'look:asset,asset' (one look, several assets) or 'look:asset,look:asset' (a pair per character)
+  const arg = process.argv[2] || 'mei:mei_real,mei_paint', items = arg.split(','), pairs = items.every(x => x.includes(':'));
+  const specs = pairs ? items.map(x => x.split(':')) : (() => { const [l, a0] = items[0].split(':'); return [[l, a0], ...items.slice(1).map(a => [l, a])]; })();
+  const url = await p.evaluate(async ([specs, W, H]) => {
+    const D = __dbg, lk = id => id === 'you' ? D.PLAYER_LOOK : id === 'mother' ? D.MOTHER_LOOK : D.DEF_T[id] ? D.DEF_T[id].look : Object.assign({ infected: true, blood: true }, D.INF[id]);
+    const hs = specs.map(([l, a]) => { const h = D.makeHumanForTest(Object.assign({}, lk(l), { assetId: a })); D.initSprings(h); return h; });
     for (let i = 0; i < 300 && !hs.every(h => h.flesh); i++) await new Promise(r => setTimeout(r, 100));
     const r = D.renderer; r.setRenderTarget(null); r.setPixelRatio(1); r.setSize(W, H, false); r.setScissorTest(true); r.autoClear = false;
     const scenes = [];
@@ -18,6 +20,7 @@ const { chromium } = require('playwright'); const path = require('path'); const 
       const rm = new THREE.DirectionalLight(0x6a86b8, 0.8); rm.position.set(2, 2, -4); S.add(rm); scenes.push(S); }
     const cam = new THREE.PerspectiveCamera(22, 1, 0.05, 60), n = hs.length, cw = W / 2 / n, rh = 500;
     scenes.forEach((S, si) => {
+      D.FLESH_WET.value = si === 1 ? 0.85 : 0;   // dry in the studio, soaked in the night rain
       const y0 = 300 + (1 - si) * rh;
       r.setViewport(0, y0, W, rh); r.setScissor(0, y0, W, rh); r.setClearColor(S.background); r.clear();
       hs.forEach((h, i) => {
@@ -30,13 +33,14 @@ const { chromium } = require('playwright'); const path = require('path'); const 
       });
     });
     { // the game's view: a few metres up and back, in the night light
+      D.FLESH_WET.value = 0.85;
       const S = scenes[1]; r.setViewport(0, 0, W, 300); r.setScissor(0, 0, W, 300); r.setClearColor(S.background); r.clear();
       hs.forEach((h, i) => { S.add(h.root); h.root.position.set((i - (n - 1) / 2) * 1.2, 0, 0); h.root.rotation.y = 0.3; h.root.updateMatrixWorld(true); h.skel.update(); });
       cam.aspect = W / 300; cam.fov = 26; cam.updateProjectionMatrix(); cam.position.set(0, 2.6, 6.2); cam.lookAt(0, 0.9, 0);
       r.setViewport(0, 0, W, 300); r.render(S, cam); hs.forEach(h => S.remove(h.root));
     }
     r.setScissorTest(false); r.autoClear = true; return r.domElement.toDataURL('image/png');
-  }, [lookId, assets, W, H]);
+  }, [specs, W, H]);
   fs.writeFileSync(path.join(__dirname, 'shots', process.argv[3] || 'compare.png'), Buffer.from(url.split(',')[1], 'base64'));
   console.log(errs.slice(0, 5).join('\n') || 'no errors'); await b.close();
 })();

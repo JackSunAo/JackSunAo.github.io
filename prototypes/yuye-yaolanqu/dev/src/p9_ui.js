@@ -305,7 +305,7 @@ function updateHUD(dt) {
 /* ---------------- audio sync ---------------- */
 function updateAudioMix(dt) {
   if (!SND.ready) return;
-  const C = CTRL.who, L = SND.listener; L.pos.copy(C.pos); L.right.set(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)); L.indoor = C.indoor;
+  FLESH_WET.value = Math.min(1, (G.rain || 0) * 0.95); const C = CTRL.who, L = SND.listener; L.pos.copy(C.pos); L.right.set(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)); L.indoor = C.indoor;
   SND.rainLevel = G.rain;
   const mp = new V3(); mother.h.head.getWorldPosition(mp); const d = C.pos.distanceTo(mp);
   let hum = 0.55 / (1 + d * d / 5); if (!C.indoor) hum *= 0.35; if (G.mode === 'dialog' || G.mode === 'cutscene') hum = mother.talking ? 0.12 : 0.5;
@@ -497,5 +497,5 @@ function tick(rdt) {
   gradePass.uniforms.time.value = G.t;
 }
 requestAnimationFrame(frame);
-window.__dbg = { SND, perfFrame, perfSkip, composerRender: () => drawFrame(), POOL, feedPool, takePooled, makeHumanForTest: o => makeHuman(o), walkPose, poseTo, gaitK, initSprings, INF, waveTypes, DEF_T, PLAYER_LOOK, MOTHER_LOOK, rigDump, BIND, clothCanvas, faceCanvas, skinCanvas, DOOR_RB, cats: { decalMat, poolTex, gougeMat, crackMat, puddleMat, streakMat, ringTex, doorLeaf: door.leaf, doorPivot: door.pivot, barMesh, glowTex }, PERF, QUALITY, SHADOWS, BATCHES, PROXIES, SHADOW_STATIC, setQuality, setReference, checkStatic, renderShadows, rigs,
+window.__dbg = { SND, FLESH_WET, perfFrame, perfSkip, composerRender: () => drawFrame(), POOL, feedPool, takePooled, makeHumanForTest: o => makeHuman(o), walkPose, poseTo, gaitK, initSprings, INF, waveTypes, DEF_T, PLAYER_LOOK, MOTHER_LOOK, rigDump, BIND, clothCanvas, faceCanvas, skinCanvas, DOOR_RB, cats: { decalMat, poolTex, gougeMat, crackMat, puddleMat, streakMat, ringTex, doorLeaf: door.leaf, doorPivot: door.pivot, barMesh, glowTex }, PERF, QUALITY, SHADOWS, BATCHES, PROXIES, SHADOW_STATIC, setQuality, setReference, checkStatic, renderShadows, rigs,
   renderFrame: dt => { const t0 = performance.now(); tick(dt); const t1 = performance.now(); drawFrame(); return { tick: t1 - t0, render: performance.now() - t1 }; }, drawFrame, FSR, CTRL, possess, possessNext, ctrlKey, aiPlayer, defenders, CMD, POSTS, setCommand, orderDefenders, assignPost, cmdSelect, cmdClick, entryPressure, doorBraced, PREY, G, P, cam, mother, infected, SQUAD, stompTarget, takedownTarget, clinchAct, grabPlayer, ENTRIES, door, winBack, winLeft, SIEGE, doorChop, doorRam, smashGlass, hitBoard, interact, toggleBar, setBar, planSiege, startDialog, resetGame, skipOpening, startGame, scene, camera, renderer, setFX, choose, advanceDialog, startAttack, dodge, switchWeapon, toggleTorch, startPin, roar, makeNoise, spawnWave, fatigue, LURK_C, step: (n, dt = 1 / 30) => { for (let i = 0; i < n; i++) tick(dt); } };

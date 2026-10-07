@@ -9,7 +9,13 @@ from scipy import ndimage
 import mh, mhkit as K
 
 A = K.MHA
+C = os.environ.get('MH_COMMUNITY', '/tmp/claude-0/mhc/x')   # the community asset packs (CC0), unpacked
 BONES = mh.GAME_BONES
+
+
+def ap(p):
+    """an asset path: 'c/...' in the community packs, else in the base library"""
+    return f'{C}/{p[2:]}' if p.startswith('c/') else (p if os.path.isabs(p) else f'{A}/{p}')
 
 # what each sample wears: asset folders, and how to recolour them
 OUTFITS = {
@@ -17,6 +23,18 @@ OUTFITS = {
             'eyes': 'eyes/brownlight_eye.png', 'brows': 'eyebrows/eyebrow010/eyebrow010.mhclo', 'lashes': 'eyelashes/eyelashes02/eyelashes02.mhclo',
             'hair': ('hair/ponytail01/ponytail01.mhclo', (0.16, 0.11, 0.08)),
             'clothes': [('clothes/female_casualsuit01/female_casualsuit01.mhclo', {'top': '#6e7f84'}), ('clothes/shoes03/shoes03.mhclo', {})]},
+    # survivor: a knit sweater, wool trousers, ankle boots, hair up; mud on the boots and the turn-ups
+    'mei2': {'look': 'mei', 'proxy': 'proxymeshes/female_generic/female_generic.proxy', 'skin': 'c/skins/onlytheghosts_young_eurasian_female', 'skin_tint': (1.0, 0.98, 0.95),
+             'eyes': 'eyes/brownlight_eye.png', 'brows': 'eyebrows/eyebrow010/eyebrow010.mhclo', 'lashes': 'eyelashes/eyelashes02/eyelashes02.mhclo',
+             'hair': ('c/hair/rehmanpolanski_hair_bun_brown/rehmanpolanski_hair_bun_brown.mhclo', (0.12, 0.085, 0.06)),
+             'clothes': [('c/clothes/toigo_wool_pants/toigo_wool_pants.mhclo', {'all': '#2e3138'}), ('c/clothes/toigo_fisherman_sweater/toigo_fisherman_sweater.mhclo', {'all': '#66767c'}),
+                         ('c/clothes/toigo_ankle_boots_female/toigo_ankle_boots_female.mhclo', {'all': '#2a211b'})], 'mud': 0.7},
+    # infected nurse: a white uniform dress, tights, flats; the grey skin of the turned, blood at the mouth and down the front
+    'nurse2': {'look': 'nurse', 'proxy': 'proxymeshes/female_generic/female_generic.proxy', 'skin': 'c/skins/sohh_female_zombie_skin', 'skin_tint': (1.0, 1.0, 1.0),
+               'eyes': 'eyes/brownlight_eye.png', 'eye_cloud': True, 'brows': 'eyebrows/eyebrow010/eyebrow010.mhclo', 'lashes': 'eyelashes/eyelashes02/eyelashes02.mhclo',
+               'hair': ('c/hair/toigo_blunt_bob/toigo_blunt_bob.mhclo', (0.1, 0.07, 0.05)),
+               'clothes': [('c/clothes/kwnet_at_pantyhose01/kwnet_at_pantyhose01.mhclo', {'all': '#d9cfc2', 'sheer': True}), ('c/clothes/toigo_shift_dress/toigo_shift_dress.mhclo', {'all': '#dfe3e0'}),
+                           ('c/clothes/toigo_ballet_flats/toigo_ballet_flats.mhclo', {'all': '#e4e2dc'})], 'mud': 0.9, 'blood': 1.0},
 }
 
 
@@ -33,7 +51,7 @@ def mhmat(path):
     out = {}
     for line in open(path, errors='ignore'):
         p = line.split()
-        if len(p) >= 2 and p[0] in ('diffuseTexture', 'normalmapTexture', 'aomapTexture'):
+        if len(p) >= 2 and p[0] in ('diffuseTexture', 'normalmapTexture', 'aomapTexture', 'bumpmapTexture'):
             out[p[0]] = os.path.normpath(os.path.join(os.path.dirname(path), p[1]))
     return out
 
@@ -54,6 +72,77 @@ def uv_mask(size, U, F, sel):
     for f in F[sel]:
         d.polygon([(U[i, 0] * size, (1 - U[i, 1]) * size) for i in f], fill=255)
     return ndimage.binary_dilation(np.asarray(im) > 0, iterations=3)
+
+
+def weather(tx, P, TV, TT, UV, kind, O, B, G):
+    """mud splashed up from the ground, grime in the cloth, and on the infected the blood: at the mouth, down the front, on the hands"""
+    import sdf
+    size = tx.shape[0]
+    Pc = P[TV].reshape(-1, 3); Uc = UV[TT].reshape(-1, 2); Fc = np.arange(len(Pc)).reshape(-1, 3)
+    pos, cov = K.raster_positions(Uc, Fc, Pc, size)
+    q = pos.reshape(-1, 3)
+    nz = lambda f, sy=1.0, off=0.0: sdf.fbm_at(q + off, f, sy).reshape(size, size)
+    y = pos[..., 1]
+    rgb = tx[..., :3]
+    if kind == 'cloth':  # wear and grime
+        rgb = rgb * (1 - 0.14 * np.clip(nz(5.0) + 0.3, 0, 1))[..., None]
+    mud = O.get('mud', 0) * np.clip((0.5 - y) / 0.42, 0, 1) ** 1.4 * np.clip(nz(14.0, 1.0, 3.0) * 1.6 + 0.55, 0, 1)
+    mud *= {'skin': 0.5, 'hair': 0.0}.get(kind, 1.0)
+    rgb = rgb * (1 - mud[..., None] * 0.72) + np.array([0.19, 0.145, 0.1]) * mud[..., None] * 0.72
+    bl = O.get('blood', 0)
+    if bl and kind in ('skin', 'cloth'):
+        em = (B['eyes'][0][0] + B['eyes'][1][0]) / 2
+        src = [(em + [0, -0.065, -0.005], 0.04), (np.array([0.03, G['chest'][1] - 0.06, 0.12]), 0.08),
+               (np.array(G['handL']) + [0, -0.06, 0], 0.07), (np.array(G['handR']) + [0, -0.06, 0], 0.06)]
+        b = np.zeros(y.shape)
+        for c, r in src:
+            d = np.linalg.norm(pos - c, axis=-1) / r
+            b = np.maximum(b, np.clip(1.3 - d, 0, 1) * np.clip(nz(30.0, 1.0, 7.0) * 1.4 + 0.75, 0, 1))
+        # runs: down from the chin and the chest wound, thin and uneven
+        top = em[1] - 0.06 - 0.12 * np.clip(nz(3.0, 1.0, 9.0) + 0.5, 0, 1)              # each run starts and stops at its own height
+        run = np.clip(nz(45.0, 0.08, 2.0) * 3.4 - 0.55, 0, 1) * np.clip(nz(8.0, 0.3, 4.0) * 2 + 0.4, 0, 1)
+        run *= (np.abs(pos[..., 0] - 0.015) < 0.1) * (y < top) * (y > G['pelvis'][1] - 0.2 + 0.15 * np.clip(nz(2.0, 1.0, 5.0), 0, 1)) * (pos[..., 2] > 0.0)
+        b = np.clip(np.maximum(b, run * 0.8) * bl, 0, 1)
+        blood = np.array([0.24, 0.02, 0.02]) * (0.8 + 0.4 * np.clip(nz(90.0, 1.0, 1.0)[..., None], -0.5, 0.5))
+        rgb = rgb * (1 - b[..., None] * 0.88) + blood * b[..., None] * 0.88
+    out = tx.copy(); out[..., :3] = np.where(cov[..., None], np.clip(rgb, 0, 1), tx[..., :3])
+    return out
+
+
+def covered(Pv, Nv, outer):
+    """vertices lying under a layer of cloth (its nearest surface right over them, not off past its edge)"""
+    import igl
+    if not outer: return np.zeros(len(Pv), bool)
+    V = np.concatenate([o[0] for o in outer]); off = np.cumsum([0] + [len(o[0]) for o in outer])[:-1]
+    F = np.concatenate([o[1] + k for o, k in zip(outer, off)]).astype(np.int64)
+    d2, fi, C = igl.point_mesh_squared_distance(np.ascontiguousarray(Pv, np.float64), V.astype(np.float64), F)
+    fn = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]]); fn /= np.maximum(np.linalg.norm(fn, axis=1, keepdims=True), 1e-12)
+    dv = Pv - C; n = fn[fi]
+    along = (dv * n).sum(1); tang = np.linalg.norm(dv - n * along[:, None], axis=1)
+    # near an opening (collar, cuff, hem) keep what's under: the cloth's edge must not leave a gap when it moves
+    E = np.sort(np.concatenate([F[:, [0, 1]], F[:, [1, 2]], F[:, [2, 0]]]), axis=1)
+    u, c = np.unique(E, axis=0, return_counts=True)
+    edge = V[np.unique(u[c == 1])]
+    from scipy.spatial import cKDTree
+    de = cKDTree(edge).query(C)[0] if len(edge) else np.full(len(C), 9.0)
+    return (np.sqrt(d2) < 0.035) & (tang < 0.004) & (de > 0.018)
+
+
+def recolour(tx, hexs):
+    """a whole garment in another colour, its weave, folds and wear kept (prints and logos flattened out)"""
+    lum = tx[..., :3].mean(-1, keepdims=True)
+    ls = ndimage.median_filter(lum[..., 0], 25)[..., None]
+    lum = np.where(np.abs(lum - ls) > 0.12, ls, lum)
+    m = np.median(lum[lum > 0.02]) if (lum > 0.02).any() else 0.5
+    out = tx.copy(); out[..., :3] = np.clip(lum / max(m, 1e-3) * hexc(hexs), 0, 1)
+    return out
+
+
+def bump_to_normal(h, strength=6.0):
+    gx = ndimage.sobel(h, 1) / 8.0; gy = ndimage.sobel(h, 0) / 8.0
+    n = np.stack([-gx * strength, gy * strength, np.ones_like(h)], -1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True)
+    return n * 0.5 + 0.5
 
 
 def kuwahara(img, r):
@@ -124,8 +213,8 @@ def build(cid, rig, out, style):
         print(f'  {name}: {len(Pp)} verts {len(F)} tris', flush=True)
 
     def asset(path):
-        M = K.read_map(f'{A}/{path}')
-        d = os.path.dirname(f'{A}/{path}')
+        M = K.read_map(ap(path))
+        d = os.path.dirname(ap(path))
         V0, UV, faces = K.read_obj(f'{d}/{M["obj"] or os.path.basename(path).replace(".mhclo", ".obj")}')
         P = K.fit_map(M, Va)
         W = (Wall[M['refs']] * M['w'][:, :, None]).sum(1)
@@ -138,18 +227,36 @@ def build(cid, rig, out, style):
     for path, recol in O['clothes']:
         M, P, W, UV, faces, mt = asset(path)
         deleted |= M['delete']
-        loaded.append((path, recol, M, P, W, UV, faces, mt))
+        TV, TT = K.tris(faces)
+        loaded.append([path, recol, M, P, W, UV, TV, TT, mt])
+    # each layer of clothes hides what is under it (from the outermost in): inner garments' faces and, below, the skin
+    for i in range(len(loaded) - 1, -1, -1):
+        outer = [(o[3], o[6]) for o in loaded[i + 1:] if not o[1].get('sheer')]
+        if outer:
+            P, TV = loaded[i][3], loaded[i][6]
+            hid = covered(P, K.vertex_normals(P, TV), outer)
+            keep = ~hid[TV].all(1)
+            loaded[i][6], loaded[i][7] = TV[keep], loaded[i][7][keep]
 
     # the body: a lighter mesh than the base, skin where nothing covers it
-    pm = K.read_map(f'{A}/{O["proxy"]}')
-    pd = os.path.dirname(f'{A}/{O["proxy"]}')
+    pm = K.read_map(ap(O["proxy"]))
+    pd = os.path.dirname(ap(O["proxy"]))
     _, puv, pf = K.read_obj(f'{pd}/{pm["obj"]}')
     PP = K.fit_map(pm, Va); WP = (Wall[pm['refs']] * pm['w'][:, :, None]).sum(1)
     hidden = np.isin(pm['refs'][:, 0], np.array(sorted(deleted), np.int64)) if deleted else np.zeros(len(PP), bool)
-    TV, TT = K.tris(pf, keep=lambda vs, g: not hidden[vs].all())
-    skin = load(f'{A}/{O["skin"]}', 2048)
-    g = skin.mean(-1, keepdims=True); skin = (g + (skin - g) * 0.8) * np.array(O['skin_tint'], np.float32)   # a little less pink, a little more olive
-    add('skin', PP, TV, TT, puv, WP, {'map': texsave(skin, 'skin')}, 'skin')
+    TV0, _ = K.tris(pf)
+    hidden |= covered(PP, K.vertex_normals(PP, TV0), [(o[3], o[6]) for o in loaded if not o[1].get('sheer')])
+    TV, TT = K.tris(pf, keep=lambda vs, g: not hidden[vs].all())   # skin under clothes goes (or it pokes through when they bend)
+    sp = ap(O['skin']); stex = {}
+    if os.path.isdir(sp):  # a skin pack folder: its material says which images
+        stex = mhmat(os.path.join(sp, [f for f in os.listdir(sp) if f.endswith('.mhmat')][0])); sp = stex['diffuseTexture']
+    skin = load(sp, 2048)
+    g = skin.mean(-1, keepdims=True); skin = (g + (skin - g) * (0.8 if not O.get('blood') else 1.0)) * np.array(O['skin_tint'], np.float32)
+    skin = weather(skin, PP, TV, TT, puv, 'skin', O, B, G)
+    st = {'map': texsave(skin, 'skin')}
+    if 'bumpmapTexture' in stex and os.path.exists(stex['bumpmapTexture']):
+        fn = f'{tag}_skin_n.webp'; save(bump_to_normal(load(stex['bumpmapTexture'], 2048).mean(-1)), f'{out}/{fn}', 92); st['nrm'] = fn
+    add('skin', PP, TV, TT, puv, WP, st, 'skin')
 
     # eyes: the base mesh's own eyeballs, with an iris texture
     bV, bUV, bfaces = K.read_obj(f'{mh.MHD}/3dobjs/base.obj')
@@ -159,7 +266,9 @@ def build(cid, rig, out, style):
     for c, r in B['eyes']:
         vi = np.unique(TV[np.linalg.norm(Va[TV].mean(1) - c, axis=1) < r * 1.5])
         EU[vi, 0] = 0.293 + (Va[vi, 0] - c[0]) / r * 0.2; EU[vi, 1] = 0.297 + (Va[vi, 1] - c[1]) / r * 0.2
-    eye = load(f'{A}/{O["eyes"]}', 512)
+    eye = load(ap(O["eyes"]), 512)
+    if O.get('eye_cloud'):  # the turned: irises gone milky
+        lum = eye.mean(-1, keepdims=True); eye = np.clip(0.55 + lum * 0.45, 0, 1) * np.array([0.95, 0.93, 0.82])
     add('eyes', Va, TV, TV, EU, Wall, {'map': texsave(eye, 'eyes')}, 'eye')
 
     for key, kind, size in (('brows', 'brow', 512), ('lashes', 'lash', 256)):
@@ -172,14 +281,17 @@ def build(cid, rig, out, style):
     M, P, W, UV, faces, mt = asset(hp)
     TV, TT = K.tris(faces)
     tx = load(mt['diffuseTexture'], 1024, alpha=True)
-    lum = tx[..., :3].mean(-1, keepdims=True); tx[..., :3] = np.clip(lum / max(lum[tx[..., 3] > 0.5].mean(), 1e-3) * np.array(hcol), 0, 1)
+    if hcol is not None:
+        lum = tx[..., :3].mean(-1, keepdims=True); tx[..., :3] = np.clip(lum / max(lum[tx[..., 3] > 0.5].mean(), 1e-3) * np.array(hcol), 0, 1)
     add('hair', P, TV, TT, UV, W, {'map': texsave(tx, 'hair')}, 'hair', alpha=0.45, double=True)
 
-    for path, recol, M, P, W, UV, faces, mt in loaded:
+    for path, recol, M, P, W, UV, TV, TT, mt in loaded:
         name = os.path.basename(path).replace('.mhclo', '')
-        TV, TT = K.tris(faces)
-        size = 512 if 'shoes' in name else 1024
-        tx = load(mt['diffuseTexture'], size)
+        size = 512 if ('shoes' in name or 'boots' in name or 'flats' in name) else 1024
+        tx = load(mt['diffuseTexture'], size, alpha=True)
+        has_a = bool((tx[..., 3] < 0.5).mean() > 0.01 and (tx[..., 3] > 0.5).mean() > 0.2)
+        if not has_a: tx = tx[..., :3]
+        if 'all' in recol: tx = recolour(tx, recol['all'])
         if 'aomapTexture' in mt and os.path.exists(mt['aomapTexture']):
             ao = load(mt['aomapTexture'], size).mean(-1, keepdims=True); tx = tx * (0.35 + 0.65 * ao)
         if 'top' in recol:  # the upper garment recoloured, its shading and folds kept
@@ -190,10 +302,11 @@ def build(cid, rig, out, style):
             lum = np.where(np.abs(lum - ls) > 0.1, ls, lum); m = lum[msk].mean()
             tx = np.where(msk[..., None], np.clip(lum / m * hexc(recol['top']) * 1.05, 0, 1), tx)
             masks[name] = msk
+        tx = weather(tx, P, TV, TT, UV, 'cloth', O, B, G)
         t = {'map': texsave(tx, name)}
         if 'normalmapTexture' in mt and os.path.exists(mt['normalmapTexture']):
             fn = f'{tag}_{name}_n.webp'; save(load(mt['normalmapTexture'], size), f'{out}/{fn}', 92); t['nrm'] = fn
-        add(name, P, TV, TT, UV, W, t, 'cloth')
+        add(name, P, TV, TT, UV, W, t, 'cloth', alpha=0.5 if has_a else 0.0, double=has_a)
     if style == 'real':  # the dressed high model, for baking down to one low mesh and one texture (bake_lp.py)
         hi = {'joints': G, 's': rig['s'], 'mh_v': B['V'], 'mh_f': B['F'], 'mh_w': mh.game_weights(B, G)}
         names = []
@@ -239,4 +352,4 @@ def export(parts, out, tag, joints, style):
 
 if __name__ == '__main__':
     cid, rigs, out, style = sys.argv[1], json.load(open(sys.argv[2])), sys.argv[3], sys.argv[4]
-    build(cid, rigs[cid], out, style)
+    build(cid, rigs[OUTFITS[cid].get('look', cid)], out, style)

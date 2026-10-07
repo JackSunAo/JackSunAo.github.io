@@ -490,6 +490,22 @@ function fleshUp(h, A) {
   if (h.mats) h.mats.push(mat);
 }
 
+// rain on what people wear: cloth soaks dark, skin and hair and blood go glossy; tops of shoulders and heads most
+const FLESH_WET = { value: 0 };
+const WET_KIND = { cloth: [0.38, 0.3], skin: [0.06, 0.55], hair: [0.3, 0.65], brow: [0.2, 0.3], lash: [0.2, 0.3], eye: [0, 0] };
+function wetten(mat, kind) {
+  const [dark, gloss] = WET_KIND[kind] || [0.3, 0.3];
+  if (!dark && !gloss) return;
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.wet = FLESH_WET;
+    sh.fragmentShader = 'uniform float wet;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+  vec3 wN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+  float wetA = wet * (0.55 + 0.45 * clamp(wN.y, 0.0, 1.0));
+  diffuseColor.rgb *= 1.0 - wetA * ${dark.toFixed(3)};
+  roughnessFactor = mix(roughnessFactor, 0.16, wetA * ${gloss.toFixed(3)});`);
+  };
+  mat.customProgramCacheKey = () => 'wet_' + kind;
+}
 // the dressed kind: one skinned mesh per part on the same skeleton. 'real' lights them as they are; 'paint' in soft bands
 let TOON_RAMP = null;
 function fleshParts(h, A, skel, keep, spr) {
@@ -503,6 +519,7 @@ function fleshParts(h, A, skel, keep, spr) {
     if (p.nrm) o.normalMap = p.nrm;
     const R = { skin: 0.6, eye: 0.15, hair: 0.55, brow: 0.8, lash: 0.8, cloth: 0.92 }[p.kind] || 0.8;
     const mat = paint ? new THREE.MeshToonMaterial(Object.assign(o, { gradientMap: TOON_RAMP })) : new THREE.MeshStandardMaterial(Object.assign(o, { roughness: R, metalness: 0 }));
+    if (!paint) wetten(mat, p.kind);
     if (p.kind === 'eye' && h.o.infected) { mat.emissive = new THREE.Color(0.9, 0.86, 0.66); mat.emissiveIntensity = 0.5; }
     if (p.kind === 'skin') skinMat = mat;
     const sm = new THREE.SkinnedMesh(p.lods[0], mat); sm.castShadow = !p.alpha && p.kind !== 'eye'; sm.receiveShadow = true;
