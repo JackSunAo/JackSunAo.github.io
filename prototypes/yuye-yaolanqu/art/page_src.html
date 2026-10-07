@@ -1,0 +1,103 @@
+<title>雨夜摇篮曲角色原画</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;500&display=swap">
+<style>
+:root{--bg:#0b0d10;--panel:#12161b;--line:#232a32;--fg:#e9e1d2;--dim:#9a958b;--warm:#e0a35f;--cold:#9fb8c8;--blood:#c0574a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.7 "Noto Sans SC",system-ui,sans-serif;margin:0;padding-inline:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:40px 80px}
+h1,h2,h3{font-family:"Noto Serif SC",serif;font-weight:700;text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,5vw,44px);letter-spacing:.04em}
+h2{font-size:24px;margin:56px 0 6px;letter-spacing:.06em}
+.lede{color:var(--dim);max-width:62ch;margin:10px 0 0}
+.tag{font-size:12px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.sec-note{color:var(--dim);max-width:65ch;margin:0 0 22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.card canvas.plate{display:block;width:100%;aspect-ratio:520/720;max-width:100%}
+.card canvas.sil{display:block;width:100%;aspect-ratio:520/150;max-width:100%;border-top:1px solid var(--line)}
+.body{padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.head h3{font-size:22px}
+.role{font-size:13px;color:var(--warm)}
+.inf .role{color:var(--blood)}
+.stats{font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.sw{display:flex;gap:4px;flex-wrap:wrap}
+.sw span{width:22px;height:14px;border-radius:2px;border:1px solid rgba(255,255,255,.08)}
+.body ul{margin:2px 0 0;padding-left:18px;color:#cfc8ba;font-size:13.5px}
+.body li{margin:2px 0}
+.poses{font-size:12px;color:var(--dim);padding:6px 18px 12px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:#10151c}
+.scroll canvas{display:block;width:1100px;height:360px}
+.pain{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.pain div{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--blood);border-radius:4px;padding:14px 16px;min-width:0}
+.pain h3{font-size:16px;margin-bottom:6px}
+.pain p{margin:0;color:#cfc8ba;font-size:13.5px}
+.model{columns:2 300px;column-gap:28px;color:#cfc8ba;font-size:14px}
+.model p{margin:0 0 10px;break-inside:avoid}
+footer{margin-top:60px;color:var(--dim);font-size:12.5px}
+</style>
+<div class="wrap">
+  <div class="tag">雨夜摇篮曲 · 角色原画 v0.1</div>
+  <h1>守夜的人，和门外的东西</h1>
+  <p class="lede">九个角色在同一套比例和光线下绘制：幸存者站在提灯的暖光里，感染者站在泛光灯的冷光里。剪影条是俯视镜头下的读法，颜色和道具都取自游戏里的实际数值，改模型时照着这里做。</p>
+
+  <h2>幸存者</h2>
+  <p class="sec-note">各自靠一个强调色和一件改造武器来区分：你的提灯、小赵的木板盾、老周的长矛、阿梅的红围巾。</p>
+  <div class="grid" id="camp"></div>
+
+  <h2>感染者</h2>
+  <p class="sec-note">冷光、去饱和的灰绿皮肤，眼睛像动物一样反光。每个类型的剪影都对应一种威胁：屠夫是墙，学生是野兽，白领是指挥，消防员能破门。</p>
+  <div class="grid" id="inf"></div>
+
+  <h2>身高对比</h2>
+  <p class="sec-note">同一比例，刻度单位是米。俯视镜头下，头肩高度差是辨认角色的第一线索。</p>
+  <div class="scroll"><canvas id="lineup"></canvas></div>
+
+  <h2>痛觉切断</h2>
+  <p class="sec-note">感染切断了痛觉。这条设定决定了它们怎么动、怎么挨打、怎么才会倒下，也决定了原画里它们的样子。</p>
+  <div class="pain">
+    <div><h3>挨打只有物理反应</h3><p>不缩手、不惨叫、不因伤后退。重击只会把它推开，或者让它失去平衡踉跄、摔倒；站稳了就继续往前。</p></div>
+    <div><h3>伤了照样用</h3><p>白领的断臂反向耷拉着，照样拿来挥；腿断了就拖着走、爬着来；屠夫肩上卡着刀，他从没注意过。它们会迎着刀刃往前压。</p></div>
+    <div><h3>只有三种方式能停下</h3><p>破坏大脑；失血到撑不住；身体结构上动不了（腿毁了只能爬，脊柱断了才算完）。打断手不会让它停。</p></div>
+    <div><h3>脸上什么都没有</h3><p>表情松弛，下巴耷拉，眼睛不眨。受伤的部位没有任何保护姿态，这是和人最大的区别：人会捂伤口、会龇牙、会瘸。</p></div>
+    <div><h3>声音只用来通信</h3><p>被打不会叫。它们发出的每一声都是信号：发现猎物、包抄、同伴倒下、灯灭了围上去、撤。</p></div>
+  </div>
+
+  <h2>改模型的要点</h2>
+  <div class="model">
+    <p><b>刚性部件不变。</b>头、躯干、上臂、前臂、手、大腿、小腿、靴分开建，继续挂在现有骨骼上，动画系统不用改。</p>
+    <p><b>3/4 体块。</b>躯干做成前后有厚度的形状，胸、腹、臀有起伏，替换现在的圆柱；肩部用三角肌过渡，消除“香肠接头”。</p>
+    <p><b>外套是一层壳。</b>外套比身体外扩约 2.5 cm，下摆作为单独垂片随骨盆摆动；消防员的长外套和屠夫的围裙一直垂到膝盖。</p>
+    <p><b>道具独立。</b>球棍、钢管、长矛、砍刀、消防斧都是独立模型，握把位置对准手心；木板盾挂在胸前。</p>
+    <p><b>强调色只给一处。</b>每个角色只有一块高饱和颜色：围巾、帽子、领带、头盔、反光条。其余部分压暗、去饱和。</p>
+    <p><b>感染者的“错”。</b>断臂、卡在肩上的刀、破膝盖都做成模型上的固定部件，不靠贴图，俯视镜头也看得到。</p>
+  </div>
+  <footer>程序化绘制；上色厚涂版另交 Codex 出图，以此页的比例与色值为准。</footer>
+</div>
+<script>/*PAINTER*/</script>
+<script>/*CAST*/</script>
+<script>
+const META = {
+  you: { role: '提灯 · 钉头球棍', body: '1.76 m · 结实', notes: ['普通人，装备全是捡来改的：胸前一支手电，背包里有刀。', '左手的提灯是光源，会投影；被看见与否取决于它亮不亮。', '能把婴儿抱起转移，也能附身同伴操控他们。'], sil: [{ armF: [20, 30], propF: 'bat', propFAng: 40, armN: [10, 20], propN: 'lantern' }, { lean: 14, armF: [120, 20], propF: 'bat', propFAng: 160, armN: [10, 30], propN: 'lantern', footF: 0.3, footN: -0.2, crouch: 0.2 }, { crouch: 0.7, lean: 22, armF: [30, 50], propF: 'bat', propFAng: 70, armN: [20, 40], propN: 'lantern', footF: 0.25, footN: -0.25 }], poses: '警戒 · 挥棍 · 潜行' },
+  mother: { role: '母亲与婴儿', body: '1.62 m · 瘦弱、苍白', notes: ['全作的情感核心。几乎不离开摇椅。', '婴儿的哭声会把感染者引来，她会哼摇篮曲安抚。', '左前臂缠着绷带，会咳嗽，原因留白。'], sil: [{ sit: true, C: { chair: true }, lean: 5, headDrop: 7, handN: [-0.02, 0.27], handF: [0.17, 0.33], farArmFront: true }, { headDrop: 4, handN: [0.0, 0.3], handF: [0.17, 0.35], farArmFront: true }, { lean: -6, headDrop: 2, handN: [0.05, 0.42], handF: [0.3, 0.5], farArmFront: true, footF: 0.12, footN: -0.1 }], poses: '摇椅 · 抱紧 · 递出婴儿' },
+  zhao: { role: '盾牌 · 铁管 · 守正门', body: '1.78 m · 偏瘦 · 72 kg', notes: ['年轻，胆量一般，硬顶。台词“门我顶着。”', '盾挂在胸前，人靠在门上就能顶住门。', '盾面的爪痕和血说明他顶过几轮。'], sil: [{ lean: 18, armN: [42, 72], propN: 'shield', armF: [10, 30], propF: 'pipe', propFAng: 30, footF: 0.3, footN: -0.3, crouch: 0.3 }, { armN: [42, 72], propN: 'shield', armF: [100, 66], propF: 'pipe', propFAng: 215, footF: 0.26, footN: -0.2, crouch: 0.2 }, { lean: 10, armN: [70, 40], propN: 'shield', armF: [10, 20], propF: 'pipe', propFAng: 15, footF: 0.35, footN: -0.2, crouch: 0.2 }], poses: '顶门 · 砸 · 盾推' },
+  zhou: { role: '长矛 · 守后窗', body: '1.72 m · 敦实 · 80 kg', notes: ['年长，沉稳，话少。台词“后窗我看着。”', '2.1 m 的白蜡木杆，头上绑一把菜刀：靠长度让牙离自己远一点。', '剪影里最长的一根线，远处一眼认得出。'], sil: [{ lean: 12, crouch: 0.24, handN: [-0.06, 0.14], propN: 'spear', propNAng: 98, gripF: 0.46, farArmFront: true, footF: 0.32, footN: -0.22 }, { lean: 22, crouch: 0.3, handN: [0.2, 0.3], propN: 'spear', propNAng: 92, gripF: 0.5, farArmFront: true, footF: 0.45, footN: -0.3 }, { handN: [0.02, 0.1], propN: 'spear', propNAng: 172, armF: [8, 16] }], poses: '戒备 · 前刺 · 立矛' },
+  mei: { role: '砍刀 · 护士 · 屋中', body: '1.63 m · 偏瘦', notes: ['声音高，干脆。台词“谁伤了喊我。”', '红围巾是全队最显眼的强调色，混战里一眼找到医护。', '斜挎急救包，红十字已经褪色。'], sil: [{ lean: 8, armF: [60, 10], propF: 'machete', propFAng: 80, armN: [10, 20], footF: 0.2, footN: -0.15 }, { crouch: 1.6, lean: 30, handF: [0.45, 0.2], handN: [0.35, 0.25], footF: 0.3, footN: -0.25 }, { headTilt: -10, armF: [8, 16], propF: 'machete', propFAng: 12, armN: [150, 20], fistN: false }], poses: '横斩 · 包扎 · 喊人' },
+  butcher: { role: '感染者 · 重型', body: '1.80 m · 巨胖 · 125 kg', notes: ['慢（2.1 m/s），极难撞倒，头和四肢都很耐打。', '怕光：在光里会犹豫约 4 秒。嗓音最低。', '肩上卡着剁肉刀，他从没注意过。'], sil: [{ lean: 12, hunch: 16, headDrop: 9, armN: [-6, 12], armF: [20, 24], footF: 0.14, footN: -0.16 }, { lean: 25, hunch: 10, armF: [80, 20], armN: [70, 30], footF: 0.3, footN: -0.2, crouch: 0.2 }, { lean: -8, headTilt: -30, armN: [20, 30], armF: [30, 30], footF: 0.1, footN: -0.1 }], poses: '蹒跚 · 扑抱 · 仰头低吼' },
+  student: { role: '感染者 · 原发型', body: '1.60 m · 瘦小 · 52 kg', notes: ['第一代感染者，像野兽一样四肢着地狂奔，最快（3.3 m/s）。', '几乎不怕光，从不犹豫，嗓音尖。', '小小的身体做野兽动作，是最让人不安的一个。'], sil: [{ crouch: 2.0, lean: 70, hunch: 10, headTilt: -55, handF: [0.62, -0.47], handN: [0.4, -0.48], footF: 0.22, footN: -0.3 }, { crouch: 0.6, lean: 50, headTilt: -40, armF: [120, 10], armN: [110, 20], footF: -0.1, footN: -0.45 }, { crouch: 1.4, lean: 40, headTilt: -30, armF: [40, 30], armN: [30, 30], footF: 0.2, footN: -0.2 }], poses: '四肢冲刺 · 扑跳 · 伏低潜行' },
+  office: { role: '感染者 · 头领', body: '1.74 m · 普通', notes: ['最聪明，通常由他当头领，用嘶吼指挥同类包抄、围攻、撤退。', '左臂肘部断了，反向耷拉着，还照样拿来挥。', '工牌和领带让他在一群里最好认：先打他。'], sil: [{ lean: -10, headTilt: -45, armF: [60, 10], armN: [-2, -30], brokenN: true, footF: 0.1, footN: -0.1 }, { lean: 25, hunch: 10, crouch: 0.4, armF: [30, 20], armN: [-4, -38], brokenN: true, footF: 0.2, footN: -0.2 }, { lean: 10, armF: [20, 20], armN: [80, -40], brokenN: true, footF: 0.25, footN: -0.15 }], poses: '长嚎指挥 · 潜行 · 断臂挥打' },
+  fireman: { role: '感染者 · 破门', body: '1.82 m · 高壮 · 92 kg', notes: ['拿着消防斧，能劈开门和木板：防线最怕他。', '会举斧过头蓄力再劈下，蓄力就是你的窗口。', '怕光：在光里会犹豫约 3 秒。反光条在灯下会亮。'], sil: [{ lean: 9, hunch: 8, armF: [-14, 6], propF: 'axe', propFAng: -22, propFOpt: { blade: -1 }, armN: [16, 18], footF: 0.18, footN: -0.16 }, { lean: -8, armF: [170, 20], propF: 'axe', propFAng: 200, armN: [150, 30], footF: 0.2, footN: -0.2 }, { lean: 20, armF: [100, -10], propF: 'axe', propFAng: 80, propFOpt: { blade: -1 }, armN: [60, 30], footF: 0.35, footN: -0.2, crouch: 0.2 }], poses: '拖斧 · 蓄力 · 劈门' }
+};
+const PAL = C => [C.skin, C.coat || C.top, C.top, C.bottom, C.hair, C.cap, C.scarf, C.helmet, C.tie, C.backpack, C.shawl].filter((c, i, a) => c && a.indexOf(c) === i);
+const cards = [];
+for (const C of CAST) {
+  const M = META[C.id], el = document.createElement('article'); el.className = 'card' + (C.infected ? ' inf' : '');
+  el.innerHTML = `<canvas class="plate" role="img" aria-label="${C.name}原画"></canvas><canvas class="sil" role="img" aria-label="${C.name}三个动作的剪影"></canvas><div class="poses">剪影：${M.poses}</div><div class="body"><div class="head"><h3>${C.name}</h3><span class="role">${M.role}</span></div><div class="stats">${M.body}</div><div class="sw">${PAL(C).map(c => `<span title="${c}" style="background:${c}"></span>`).join('')}</div><ul>${M.notes.map(n => `<li>${n}</li>`).join('')}</ul></div>`;
+  document.getElementById(C.infected ? 'inf' : 'camp').appendChild(el); cards.push([el, C, M]);
+}
+const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { draw(e.target); io.unobserve(e.target); } }), { rootMargin: '400px' }) : null;
+function draw(el) { const [, C, M] = cards.find(c => c[0] === el); CONCEPT.plate(el.querySelector('.plate'), C, { w: 520, h: 720 }); CONCEPT.silhouettes(el.querySelector('.sil'), C, M.sil, { w: 520, h: 150, bg: '#14191f', ink: C.infected ? '#d98f80' : '#e9e1d2' }); }
+cards.forEach(([el]) => io ? io.observe(el) : draw(el));
+CONCEPT.lineup(document.getElementById('lineup'), CAST, { mono: 'ui-monospace,Menlo,monospace' });
+</script>
