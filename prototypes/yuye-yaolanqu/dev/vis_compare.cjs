@@ -11,12 +11,13 @@ const { chromium } = require('playwright'); const path = require('path'); const 
     const D = __dbg, lk = id => id === 'you' ? D.PLAYER_LOOK : id === 'mother' ? D.MOTHER_LOOK : D.DEF_T[id] ? D.DEF_T[id].look : Object.assign({ infected: true, blood: true }, D.INF[id]);
     const hs = specs.map(([l, a]) => { const h = D.makeHumanForTest(Object.assign({}, lk(l), { assetId: a })); D.initSprings(h); return h; });
     for (let i = 0; i < 300 && !hs.every(h => h.flesh); i++) await new Promise(r => setTimeout(r, 100));
-    const r = D.renderer; r.setRenderTarget(null); r.setPixelRatio(1); r.setSize(W, H, false); r.setScissorTest(true); r.autoClear = false;
+    const r = D.renderer; r.setRenderTarget(null); r.setPixelRatio(2); r.setSize(W, H, false); r.setScissorTest(true); r.autoClear = false;   // twice the pixels, scaled down after: anti-aliasing
+    r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;                                                              // as the game's grade pass does
     const scenes = [];
-    { const S = new THREE.Scene(); S.background = new THREE.Color(0x2a2e34); S.add(new THREE.HemisphereLight(0xc8d4e0, 0x2a2420, 0.8));
-      const k = new THREE.DirectionalLight(0xffe8d0, 2.0); k.position.set(-2, 3, 3); S.add(k); const rm = new THREE.DirectionalLight(0x9fb8dc, 1.0); rm.position.set(3, 2, -3); S.add(rm); scenes.push(S); }
-    { const S = new THREE.Scene(); S.background = new THREE.Color(0x0b0e14); S.fog = new THREE.FogExp2(0x10141c, 0.06); S.add(new THREE.HemisphereLight(0x3a4a66, 0x0a0a0c, 0.35));
-      const f = new THREE.SpotLight(0xffd9a0, 3.2, 30, 0.6, 0.5, 1.2); f.position.set(-3, 5, 4); f.target.position.set(0, 1, 0); S.add(f); S.add(f.target);
+    { const S = new THREE.Scene(); S.background = new THREE.Color(0x2a2e34); S.add(new THREE.HemisphereLight(0xdfe4ea, 0x3a3836, 0.75));   // a neutral studio
+      const k = new THREE.DirectionalLight(0xffffff, 1.7); k.position.set(-2, 3, 3); S.add(k); const rm = new THREE.DirectionalLight(0xdfe8f4, 1.2); rm.position.set(3, 2, -3); S.add(rm); scenes.push(S); }
+    { const S = new THREE.Scene(); S.background = new THREE.Color(0x0b0e14); S.fog = new THREE.FogExp2(0x10141c, 0.05); S.add(new THREE.HemisphereLight(0x2c3d58, 0x100b07, 0.6));   // the game's night and its floodlight
+      const f = new THREE.SpotLight(0xdde8ff, 6.0, 30, 0.6, 0.45, 1.0); f.position.set(-3, 5, 4); f.target.position.set(0, 1, 0); S.add(f); S.add(f.target);
       const rm = new THREE.DirectionalLight(0x6a86b8, 0.8); rm.position.set(2, 2, -4); S.add(rm); scenes.push(S); }
     const cam = new THREE.PerspectiveCamera(22, 1, 0.05, 60), n = hs.length, cw = W / 2 / n, rh = 500;
     scenes.forEach((S, si) => {
@@ -39,8 +40,10 @@ const { chromium } = require('playwright'); const path = require('path'); const 
       cam.aspect = W / 300; cam.fov = 26; cam.updateProjectionMatrix(); cam.position.set(0, 2.6, 6.2); cam.lookAt(0, 0.9, 0);
       r.setViewport(0, 0, W, 300); r.render(S, cam); hs.forEach(h => S.remove(h.root));
     }
-    r.setScissorTest(false); r.autoClear = true; return r.domElement.toDataURL('image/png');
+    r.setScissorTest(false); r.autoClear = true; r.toneMapping = THREE.NoToneMapping; return r.domElement.toDataURL('image/png');
   }, [specs, W, H]);
-  fs.writeFileSync(path.join(__dirname, 'shots', process.argv[3] || 'compare.png'), Buffer.from(url.split(',')[1], 'base64'));
+  const outp = path.join(__dirname, 'shots', process.argv[3] || 'compare.png');
+  fs.writeFileSync(outp, Buffer.from(url.split(',')[1], 'base64'));
+  require('child_process').execFileSync('/tmp/claude-0/bvenv/bin/python', ['-c', `from PIL import Image; im=Image.open('${outp}'); im.resize((im.width//2, im.height//2), Image.LANCZOS).save('${outp}')`]);
   console.log(errs.slice(0, 5).join('\n') || 'no errors'); await b.close();
 })();

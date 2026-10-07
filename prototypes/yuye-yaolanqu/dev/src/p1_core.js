@@ -32,7 +32,7 @@ camera.position.set(0, 12, 14);
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, res: { value: new THREE.Vector2(1, 1) },
-    vig: { value: 0.55 }, grain: { value: 0.02 }, aberr: { value: 0.0008 }, exposure: { value: 1.0 },
+    vig: { value: 0.55 }, grain: { value: 0.02 }, aberr: { value: 0.0003 }, exposure: { value: 1.0 },
     flash: { value: 0 }, hurt: { value: 0 }, desat: { value: 0 }, bars: { value: 0 }
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -46,7 +46,7 @@ const GradeShader = {
       col*=exposure; col+=flash*vec3(0.55,0.65,0.85);
       col=aces(col);
       float l=dot(col,vec3(0.299,0.587,0.114));
-      vec3 cool=col*vec3(0.90,0.99,1.10); vec3 warm=col*vec3(1.10,1.0,0.88);
+      vec3 cool=col*vec3(0.92,0.99,1.08); vec3 warm=col*vec3(1.035,1.0,0.965);
       col=mix(cool,warm,smoothstep(0.22,0.8,l));
       col=mix(vec3(l),col,0.9-desat*0.7);
       col=mix(col,col*vec3(1.0,0.55,0.5),hurt*0.8);

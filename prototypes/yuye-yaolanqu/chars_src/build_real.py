@@ -138,6 +138,34 @@ def recolour(tx, hexs):
     return out
 
 
+def sharpen(img, amount=0.55, radius=1.2):
+    """unsharp mask: the library's textures are soft"""
+    rgb = img[..., :3]
+    bl = np.stack([ndimage.gaussian_filter(rgb[..., c], radius) for c in range(3)], -1)
+    out = img.copy(); out[..., :3] = np.clip(rgb + (rgb - bl) * amount, 0, 1)
+    return out
+
+
+def neutral_skin(skin, target=(0.76, 0.60, 0.50), sat=0.9):
+    """white-balance a skin texture toward a natural East Asian tone (the library's skins run orange)"""
+    m = skin.reshape(-1, 3)
+    body = m[(m.mean(1) > 0.25) & (m.mean(1) < 0.95)]
+    gain = np.array(target) / np.maximum(np.median(body, 0), 1e-3)
+    gain = gain / gain.mean() * (np.mean(target) / np.median(body.mean(1)))
+    out = np.clip(skin * gain, 0, 1)
+    g = out.mean(-1, keepdims=True)
+    return np.clip(g + (out - g) * sat, 0, 1)
+
+
+def skin_normal(skin, size):
+    """pores and fine creases: high-pass of the skin's own shading plus a fine noise, as a normal map"""
+    lum = skin.mean(-1)
+    hp = lum - ndimage.gaussian_filter(lum, 3.0)
+    rs = np.random.default_rng(11)
+    pores = ndimage.gaussian_filter(rs.standard_normal(lum.shape), 0.7) * 0.008
+    return bump_to_normal(hp * 0.4 + pores, strength=4.0)
+
+
 def bump_to_normal(h, strength=6.0):
     gx = ndimage.sobel(h, 1) / 8.0; gy = ndimage.sobel(h, 0) / 8.0
     n = np.stack([-gx * strength, gy * strength, np.ones_like(h)], -1)
@@ -251,12 +279,23 @@ def build(cid, rig, out, style):
     if os.path.isdir(sp):  # a skin pack folder: its material says which images
         stex = mhmat(os.path.join(sp, [f for f in os.listdir(sp) if f.endswith('.mhmat')][0])); sp = stex['diffuseTexture']
     skin = load(sp, 2048)
-    g = skin.mean(-1, keepdims=True); skin = (g + (skin - g) * (0.8 if not O.get('blood') else 1.0)) * np.array(O['skin_tint'], np.float32)
+    if not O.get('blood'): skin = neutral_skin(skin) * np.array(O['skin_tint'], np.float32)
+    skin = sharpen(skin, 0.5)
     skin = weather(skin, PP, TV, TT, puv, 'skin', O, B, G)
     st = {'map': texsave(skin, 'skin')}
     if 'bumpmapTexture' in stex and os.path.exists(stex['bumpmapTexture']):
-        fn = f'{tag}_skin_n.webp'; save(bump_to_normal(load(stex['bumpmapTexture'], 2048).mean(-1)), f'{out}/{fn}', 92); st['nrm'] = fn
+        nm = bump_to_normal(load(stex['bumpmapTexture'], 2048).mean(-1))
+    else:
+        nm = skin_normal(skin, 2048)
+    fn = f'{tag}_skin_n.webp'; save(nm, f'{out}/{fn}', 92); st['nrm'] = fn
     add('skin', PP, TV, TT, puv, WP, st, 'skin')
+    em = (B['eyes'][0][0] + B['eyes'][1][0]) / 2
+    Pc, Uc = PP[TV].reshape(-1, 3), puv[TT].reshape(-1, 2)
+    reg_masks = {'face': (Pc[:, 1] > em[1] - 0.09) & (Pc[:, 1] < em[1] + 0.04) & (Pc[:, 2] > em[2] - 0.03), 'head': Pc[:, 1] > G['head'][1],
+                 'torso': (Pc[:, 1] > G['pelvis'][1] - 0.05) & (Pc[:, 1] < G['chest'][1] + 0.02) & (np.abs(Pc[:, 0]) < 0.17),
+                 'legs': (Pc[:, 1] < G['pelvis'][1] - 0.08) & (Pc[:, 1] > 0.08), 'arms': (np.abs(Pc[:, 0]) > 0.2) & (Pc[:, 1] > G['pelvis'][1])}
+    rs_ = np.random.default_rng(7)
+    regions = {k: [[round(float(Uc[i, 0]), 4), round(1 - float(Uc[i, 1]), 4)] for i in rs_.choice(np.nonzero(m)[0], min(240, int(m.sum())), replace=False)] for k, m in reg_masks.items() if m.any()}
 
     # eyes: the base mesh's own eyeballs, with an iris texture
     bV, bUV, bfaces = K.read_obj(f'{mh.MHD}/3dobjs/base.obj')
@@ -280,18 +319,20 @@ def build(cid, rig, out, style):
     hp, hcol = O['hair']
     M, P, W, UV, faces, mt = asset(hp)
     TV, TT = K.tris(faces)
-    tx = load(mt['diffuseTexture'], 1024, alpha=True)
+    tx = load(mt['diffuseTexture'], 2048, alpha=True)
+    tx = sharpen(tx, 0.4)
     if hcol is not None:
         lum = tx[..., :3].mean(-1, keepdims=True); tx[..., :3] = np.clip(lum / max(lum[tx[..., 3] > 0.5].mean(), 1e-3) * np.array(hcol), 0, 1)
     add('hair', P, TV, TT, UV, W, {'map': texsave(tx, 'hair')}, 'hair', alpha=0.45, double=True)
 
     for path, recol, M, P, W, UV, TV, TT, mt in loaded:
         name = os.path.basename(path).replace('.mhclo', '')
-        size = 512 if ('shoes' in name or 'boots' in name or 'flats' in name) else 1024
+        size = 512 if ('shoes' in name or 'boots' in name or 'flats' in name) else 2048
         tx = load(mt['diffuseTexture'], size, alpha=True)
         has_a = bool((tx[..., 3] < 0.5).mean() > 0.01 and (tx[..., 3] > 0.5).mean() > 0.2)
         if not has_a: tx = tx[..., :3]
         if 'all' in recol: tx = recolour(tx, recol['all'])
+        tx = sharpen(tx, 0.6)
         if 'aomapTexture' in mt and os.path.exists(mt['aomapTexture']):
             ao = load(mt['aomapTexture'], size).mean(-1, keepdims=True); tx = tx * (0.35 + 0.65 * ao)
         if 'top' in recol:  # the upper garment recoloured, its shading and folds kept
@@ -325,11 +366,11 @@ def build(cid, rig, out, style):
             hi.update({f'P{i}': d['P'], 'F%d' % i: d['I'].reshape(-1, 3), f'U{i}': d['U']})
             names.append([p['name'], p['kind'], p['alpha'], 2 * i, 2 * i + 1, p['name'] in masks])
         np.savez(f'{out}/{tag}_hi.npz', names=np.array(json.dumps(names)), n=len(parts), **{k: (np.array(json.dumps(v)) if k == 'joints' else v) for k, v in hi.items()})
-    export(parts, out, tag, G, style)
+    export(parts, out, tag, G, style, regions)
 
 
-def export(parts, out, tag, joints, style):
-    meta = {'id': tag, 'bones': BONES, 'joints': joints, 'style': style, 'parts': []}
+def export(parts, out, tag, joints, style, regions=None):
+    meta = {'id': tag, 'bones': BONES, 'joints': joints, 'style': style, 'parts': [], 'regions': regions or {}}
     blob = bytearray()
     for p in parts:
         d = p['d']

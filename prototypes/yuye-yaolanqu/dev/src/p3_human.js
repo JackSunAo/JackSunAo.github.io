@@ -492,19 +492,22 @@ function fleshUp(h, A) {
 
 // rain on what people wear: cloth soaks dark, skin and hair and blood go glossy; tops of shoulders and heads most
 const FLESH_WET = { value: 0 };
-const WET_KIND = { cloth: [0.38, 0.3], skin: [0.06, 0.55], hair: [0.3, 0.65], brow: [0.2, 0.3], lash: [0.2, 0.3], eye: [0, 0] };
-function wetten(mat, kind) {
+const WET_KIND = { cloth: [0.38, 0.3], skin: [0.06, 0.45], hair: [0.25, 0.35], brow: [0.2, 0.3], lash: [0.2, 0.3], eye: [0, 0] };
+function wetten(mat, kind, wound) {
   const [dark, gloss] = WET_KIND[kind] || [0.3, 0.3];
-  if (!dark && !gloss) return;
+  if (!dark && !gloss && !wound) return;
   mat.onBeforeCompile = sh => {
     sh.uniforms.wet = FLESH_WET;
-    sh.fragmentShader = 'uniform float wet;\n' + sh.fragmentShader.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+    if (wound) sh.uniforms.woundMap = { value: wound };
+    let fs = sh.fragmentShader;
+    if (wound) fs = 'uniform sampler2D woundMap;\n' + fs.replace('#include <map_fragment>', '#include <map_fragment>\n  vec4 wnd = texture2D(woundMap, vUv); diffuseColor.rgb = mix(diffuseColor.rgb, wnd.rgb, wnd.a);');
+    sh.fragmentShader = 'uniform float wet;\n' + fs.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   vec3 wN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
   float wetA = wet * (0.55 + 0.45 * clamp(wN.y, 0.0, 1.0));
   diffuseColor.rgb *= 1.0 - wetA * ${dark.toFixed(3)};
   roughnessFactor = mix(roughnessFactor, 0.16, wetA * ${gloss.toFixed(3)});`);
   };
-  mat.customProgramCacheKey = () => 'wet_' + kind;
+  mat.customProgramCacheKey = () => 'wet_' + kind + (wound ? '_w' : '');
 }
 // the dressed kind: one skinned mesh per part on the same skeleton. 'real' lights them as they are; 'paint' in soft bands
 let TOON_RAMP = null;
@@ -514,12 +517,13 @@ function fleshParts(h, A, skel, keep, spr) {
   let skinTex = null, canvas = null, skinMat = null;
   for (const p of A.parts) {
     let map = p.map;
-    if (p.kind === 'skin') { canvas = mkCanvas(p.img.width, p.img.height); canvas.getContext('2d').drawImage(p.img, 0, 0); map = skinTex = toTex(canvas, true, false); map.anisotropy = 4; }
+    // the skin texture is shared by everyone wearing it; each body's wounds go on a small overlay of its own
+    if (p.kind === 'skin') { canvas = mkCanvas(256, 256); skinTex = toTex(canvas, true, false); }
     const o = { map, side: p.double ? THREE.DoubleSide : THREE.FrontSide, alphaTest: p.alpha || 0 };
     if (p.nrm) o.normalMap = p.nrm;
     const R = { skin: 0.6, eye: 0.15, hair: 0.55, brow: 0.8, lash: 0.8, cloth: 0.92 }[p.kind] || 0.8;
     const mat = paint ? new THREE.MeshToonMaterial(Object.assign(o, { gradientMap: TOON_RAMP })) : new THREE.MeshStandardMaterial(Object.assign(o, { roughness: R, metalness: 0 }));
-    if (!paint) wetten(mat, p.kind);
+    if (!paint) wetten(mat, p.kind, p.kind === 'skin' ? skinTex : null);
     if (p.kind === 'eye' && h.o.infected) { mat.emissive = new THREE.Color(0.9, 0.86, 0.66); mat.emissiveIntensity = 0.5; }
     if (p.kind === 'skin') skinMat = mat;
     const sm = new THREE.SkinnedMesh(p.lods[0], mat); sm.castShadow = !p.alpha && p.kind !== 'eye'; sm.receiveShadow = true;
@@ -532,7 +536,7 @@ function fleshParts(h, A, skel, keep, spr) {
   h.skinned = meshes; h.shadows = []; h.skel = skel; h.atlas = null; h.bodyMat = skinMat;
   h.flesh = { sm: meshes[0], mat: skinMat, tex: skinTex, canvas, pale, A, parts: meshes };
   const sp = A.parts.find(p => p.kind === 'skin');
-  const wash = () => { canvas.getContext('2d').drawImage(sp.img, 0, 0); skinTex.needsUpdate = true; };
+  const wash = () => { canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height); skinTex.needsUpdate = true; };
   const stand = region => { const o = { color: pale, emissive: new THREE.Color(), userData: { fleshRegion: region, flesh: h.flesh }, needsUpdate: false, dispose() {} }; Object.defineProperty(o, 'map', { get: () => skinTex, set: () => wash() }); return o; };
   h.coatMat = stand('torso'); h.topMat = stand('torso'); h.faceMat = stand('face'); h.skinMat = stand('arms'); h.botMat = stand('legs');
   if (h.mats) meshes.forEach(m => h.mats.push(m.material));
