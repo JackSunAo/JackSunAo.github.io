@@ -76,7 +76,7 @@ class Char:
         # clothes don't follow every hollow and bump: they hang from a smoothed body (the whole-body volume blurred)
         from scipy.ndimage import gaussian_filter
         o, h, d = grids[-1]
-        for layer, sig in ((L_DRAPE, 0.014), (L_DRAPE_LO, 0.006)):
+        for layer, sig in ((L_DRAPE, 0.02), (L_DRAPE_LO, 0.007)):
             self.P.grid(o, h, gaussian_filter(d, sig / h, mode='nearest'), layer=layer)
         f = 0.94 if self.fem else 1.0
         em = (B['J']['eyeL'] + B['J']['eyeR']) / 2
@@ -224,9 +224,16 @@ class Char:
         py, cy = pel[1], ch[1]
         gw = s * self.g ** 0.75
         legs_bare = L.get('skirt') is not None
+        und = L.get('undress')
+        if und in ('underwear', 'nude'):  # caught at night, at home, in a ward: what they had on, or nothing
+            if und == 'underwear':
+                if self.fem: self.bra(); self.panties()
+                else: self.boxers()
+            self.hair(L.get('hairStyle', 'short'))
+            return
         # top: a shirt, sweater, blouse or a dress's bodice
         sleeves = L.get('sleeves', 'long')
-        self.garment_upper(L_TOP, 0.0055 if L.get('skirt') else 0.0095, sleeves, hem=py - (0.04 if L.get('skirt') else 0.09) * s, folds=0.0012)
+        self.garment_upper(L_TOP, 0.009 if L.get('skirt') else 0.014, sleeves, hem=py - (0.04 if L.get('skirt') else 0.09) * s, folds=0.0012)
         # trousers unless a skirt; tights under a short skirt
         if not legs_bare:
             tight = self.id in ('trainer',) or L.get('bottomStyle') == 'leggings'
@@ -241,7 +248,22 @@ class Char:
             self.garment_upper(L_VEST, 0.026, 'none', hem=py - 0.06 * s, folds=0.001, neck_drop=0.05)
         if L.get('apron'):
             self.apron()
-        self.shoes(L.get('shoeStyle', 'boots'))
+        if L.get('topOpen'):  # torn open down the front, the bra under it
+            if self.fem: self.bra(L_ACC)
+            P.cone([0, cy + 0.04 * s, 0.14 * s], [0.02 * s, py + 0.0 * s, 0.12 * s], 0.075 * s, 0.03 * s, layer=L_TOP, op=SUB, k=0.01, ax=X, sx=1.0, sz=1.6, noise=(0.006, 40, 1.0))
+        if L.get('tears'):  # ripped by hands and teeth
+            rs = np.random.default_rng(L.get('seed', 1))
+            for _ in range(int(L['tears'])):
+                lay = rs.choice([L_TOP, L_SKIRT if L.get('skirt') else L_BOTTOM])
+                y = rs.uniform(py - 0.3 * s, cy - 0.05 * s) if lay == L_TOP else rs.uniform(J['kneeL'][1], py - 0.05 * s)
+                a = rs.uniform(0, 2 * np.pi); r_ = 0.16 * s
+                P.ell([np.sin(a) * r_ * 0.8, y, np.cos(a) * r_ * 0.7], [rs.uniform(0.025, 0.05) * s, rs.uniform(0.03, 0.07) * s, 0.05 * s], layer=lay, op=SUB, k=0.006, noise=(0.006, 50, 1.0))
+        if L.get('shoeStyle') == 'none' or L.get('barefoot'):
+            pass
+        elif L.get('oneShoe'):
+            self.shoes(L.get('shoeStyle', 'boots'), sides=(1,))
+        else:
+            self.shoes(L.get('shoeStyle', 'boots'))
         self.hair(L.get('hairStyle', 'short'))
         if L.get('cap'): self.cap()
         if L.get('helmet'): self.helmet()
@@ -273,7 +295,7 @@ class Char:
                     continue
                 end = {'long': wr - nrm(wr - el) * 0.012 * s, 'rolled': el + (wr - el) * 0.35, 'short': sh + (el - sh) * 0.48}[sleeves]
                 if sleeves == 'long' or sleeves == 'rolled':
-                    P.cone(sh, el, 0.11, 0.11, layer=-1, k=0.0, t=CAPCONE); P.cone(el, end, 0.1, 0.1, layer=-1, k=0.0, t=CAPCONE)
+                    P.cone(sh, el, 0.11, 0.11, layer=-1, k=0.0, t=CAPCONE); P.cone(el, end, 0.1, 0.1, layer=-1, k=0.03, t=CAPCONE)
                 else:
                     P.cone(sh, end, 0.11, 0.11, layer=-1, k=0.0, t=CAPCONE)
             # neckline: a scoop at the front, higher at the back
@@ -284,13 +306,13 @@ class Char:
         if sleeves == 'none':
             # a vest: torso only, trimmed by plane, armholes carved after (as a separate subtract on the layer)
             def masks2():
-                P.cone([0, hem, 0], [0, cy + 0.2 * s, 0], 0.3, 0.3, layer=-1, k=0.0, t=CAPCONE)
+                P.cone([0, hem, 0], [0, cy + 0.07 * s, 0], 0.3, 0.3, layer=-1, k=0.0, t=CAPCONE)
                 self.neckhole(neck_drop)
-            P.garment(layer, t, [masks2], k=0.01, noise=(folds, 30, 0.5))
+            P.garment(layer, t, [masks2], k=0.01, noise=(folds, 30, 0.5), base=L_DRAPE if USE_MH else 0)
             for sh in (J['shL'], J['shR']):
                 P.ell(sh + v3([0, -0.035 * s, 0]), [0.07 * s, 0.1 * s, 0.085 * s], layer=layer, op=SUB, k=0.01)
             return
-        P.garment(layer, t, [masks], k=0.01, noise=(folds, 36, 0.6))
+        P.garment(layer, t, [masks], k=0.01, noise=(folds, 36, 0.6), base=L_DRAPE if USE_MH else 0)
 
     def neckhole(self, drop=0.0):
         """a neckline: a hole round the neck (lower at the front, deeper for a scoop), the shoulders stay covered"""
@@ -299,17 +321,20 @@ class Char:
         P.capcone([0, cy + 0.03 * s - drop * s, 0.012 * s + drop * 0.6 * s], [0, cy + 0.45 * s, 0.03 * s], r + drop * 0.4 * s, r + 0.01 * s, layer=-1, op=SUB, k=0.008, ax=[1, 0, 0], sx=1.0, sz=1.12)
         P.ell(self.hc + v3([0, -0.005, 0.01]) * s, [0.098 * s, 0.135 * s, 0.125 * s], layer=-1, op=SUB, k=0.01)  # and never over the head
 
-    def garment_lower(self, layer, t, top, folds, to_ankle_bottom=False):
+    def garment_lower(self, layer, t, top, folds, to_ankle_bottom=False, end_frac=None):
         P, J, s = self.P, self.J, self.s
         def masks():
             P.cone([0, top, 0], [0, J['pelvis'][1] - 0.14 * s, 0], 0.25, 0.25, layer=-1, k=0.0, t=CAPCONE)
             for hp, kn, an in ((J['hipL'], J['kneeL'], J['ankleL']), (J['hipR'], J['kneeR'], J['ankleR'])):
+                if end_frac is not None:  # shorts: down the thigh only
+                    P.cone(hp, hp + (kn - hp) * end_frac, 0.13, 0.13, layer=-1, k=0.0, t=CAPCONE)
+                    continue
                 end = an + v3([0, (-0.03 if to_ankle_bottom else 0.03) * s, 0])
-                P.cone(hp, kn, 0.13, 0.13, layer=-1, k=0.0, t=CAPCONE); P.cone(kn, end, 0.11, 0.11, layer=-1, k=0.0, t=CAPCONE)
+                P.cone(hp, kn, 0.13, 0.13, layer=-1, k=0.0, t=CAPCONE); P.cone(kn, end, 0.11, 0.11, layer=-1, k=0.03, t=CAPCONE)
                 if to_ankle_bottom:  # tights cover the foot too
                     P.cone(an, an + v3([0, -0.03 * s, 0.17 * s]), 0.06, 0.06, layer=-1, k=0.0, t=CAPCONE)
             P.plane([0, top, 0], [0, 1, 0], layer=-1, op=INTER, k=0.004)
-        P.garment(layer, t, [masks], k=0.008, noise=(folds, 26, 0.35))
+        P.garment(layer, t, [masks], k=0.008, noise=(folds, 26, 0.35), base=(L_DRAPE_LO if layer != L_LEGS else 0) if USE_MH else 0)
 
     def skirt(self, length):
         P, J, s = self.P, self.J, self.s
@@ -330,11 +355,14 @@ class Char:
             P.cone([0, top_y, 0], [0, crotch - 0.02 * s, 0], 0.3, 0.3, layer=-1, k=0.0, t=CAPCONE)
             P.plane([0, top_y, 0], [0, 1, 0], layer=-1, op=INTER, k=0.004)
             P.plane([0, crotch - 0.03 * s, 0], [0, -1, 0], layer=-1, op=INTER, k=0.01)
-        P.garment(layer, t, [m], k=0.008, noise=noise)
+        P.garment(layer, t, [m], k=0.008, noise=noise, base=L_DRAPE if USE_MH else 0)
         if hem_y < crotch - 0.01:
             xm, zf, zb = self.span(crotch + 0.02 * s, hem_y)   # as wide as the hips and thighs really are, all the way down
-            hw, hd, cz = xm + t + 0.006, (zf - zb) / 2 + t + 0.004, (zf + zb) / 2
-            P.capcone([0, crotch + 0.06 * s, cz], [0, hem_y, cz - 0.004], hw, hw + flare * s, layer=layer, k=0.07, ax=X, sx=1.0, sz=hd / hw, noise=noise)
+            hw, hd, cz = xm + t + 0.008, (zf - zb) / 2 * 1.22 + t + 0.004, (zf + zb) / 2
+            x0, f0, b0 = self.extent(top_y)                      # from inside the waist down in one smooth fall: no step at the crotch or the waist
+            hn = (zf - zb) / 2 + t + 0.004                         # as deep as the hips; the fall below a little deeper, for the thighs' corners
+            P.capcone([0, top_y + 0.02 * s, (f0 + b0) / 2], [0, crotch - 0.01 * s, cz], x0 * 0.85, hw * 0.97, layer=layer, k=0.04, ax=X, sx=1.0, sz=hn / hw, noise=noise)
+            P.capcone([0, crotch, cz], [0, hem_y, cz - 0.004], hw * 0.97, hw + flare * s, layer=layer, k=0.05, ax=X, sx=1.0, sz=hn * 1.12 / hw, noise=noise)
 
     def coat(self, length, open_front):
         P, J, s = self.P, self.J, self.s
@@ -346,7 +374,7 @@ class Char:
         self.garment_upper(L_COAT, thick, 'long', hem=max(hem, crotch - 0.02 * s), folds=0.0025, neck_drop=0.0)
         if length != 'short' and hem < crotch - 0.01:  # below the crotch it hangs as one skirt round both legs
             xm, zf, zb = self.span(crotch + 0.02 * s, hem)
-            hw, hd, cz = xm + thick + 0.006, (zf - zb) / 2 + thick + 0.004, (zf + zb) / 2
+            hw, hd, cz = xm + thick + 0.008, (zf - zb) / 2 * 1.22 + thick + 0.004, (zf + zb) / 2
             P.capcone([0, crotch + 0.06 * s, cz], [0, hem, cz - 0.006], hw, hw + (0.05 if length == 'long' else 0.012) * s, layer=L_COAT, k=0.07, ax=X, sx=1.0, sz=hd / hw, noise=(0.0028, 16, 0.25))
         if self.g > 1.2:  # round a belly
             P.ell([0, py + 0.14 * s, (0.08 + 0.1 * (self.g - 1.2)) * s], [0.17 * gw, 0.17 * s, 0.14 * gw], layer=L_COAT, k=0.04)
@@ -357,25 +385,70 @@ class Char:
             P.cone([0, cy + 0.06 * s, 0.17 * s], [0, py - 0.02 * s, 0.16 * s], 0.075 * s, 0.014 * s, layer=L_COAT, op=SUB, k=0.004)
 
 
+    def bust(self):
+        """the points of the chest, left and right (from the real body when there is one)"""
+        J, s = self.J, self.s
+        if hasattr(self, 'mhB'):
+            V = self.mhB['V']; out = []
+            for sx in (1, -1):
+                m = (V[:, 0] * sx > 0.02) & (V[:, 0] * sx < 0.16 * s) & (V[:, 1] > J['pelvis'][1] + 0.15) & (V[:, 1] < J['chest'][1] - 0.02) & (np.abs(V[:, 0]) < 0.2)
+                out.append(V[m][np.argmax(V[m][:, 2])])
+            return out
+        return [v3([sx * 0.064 * s, J['chest'][1] - 0.135 * s, 0.1 * s]) for sx in (1, -1)]
+
+    def bra(self, layer=L_TOP):
+        """cups over the breasts, a band under them, straps over the shoulders"""
+        P, J, s = self.P, self.J, self.s
+        bl, br = self.bust()
+        ub = min(bl[1], br[1]) - 0.055 * s
+        def m():
+            for b in (bl, br):
+                P.ell(b + v3([0, 0.008 * s, -0.035 * s]), [0.072 * s, 0.07 * s, 0.07 * s], layer=-1, k=0.0)
+            P.cone([0, ub - 0.012 * s, 0], [0, ub + 0.02 * s, 0], 0.19 * s, 0.19 * s, layer=-1, k=0.0, t=CAPCONE)
+            for b, sh in ((bl, J['shL']), (br, J['shR'])):
+                top = b + v3([0, 0.06 * s, -0.01 * s]); over = sh + v3([-np.sign(sh[0]) * 0.045 * s, 0.03 * s, 0.0])
+                P.cone(top, over, 0.009 * s, 0.009 * s, layer=-1, k=0.0)
+                P.cone(over, v3([over[0] * 0.8, ub + 0.01 * s, -0.12 * s]), 0.009 * s, 0.009 * s, layer=-1, k=0.0)
+        P.garment(layer, 0.0035, [m], k=0.004, base=L_DRAPE_LO if USE_MH else 0)
+
+    def panties(self):
+        P, J, s = self.P, self.J, self.s
+        top = J['hipL'][1] + 0.06 * s
+        crotch = J['hipL'][1] - 0.085 * s
+        def m():
+            P.cone([0, top, 0], [0, crotch - 0.03 * s, 0], 0.3, 0.3, layer=-1, k=0.0, t=CAPCONE)
+            for side in (1, -1):  # leg openings: cut from the crotch up to the hip bone, a high V
+                c = v3([side * 0.02 * s, crotch + 0.012 * s, 0.0]); n = nrm([-side * 0.7, 1.0, 0.0])
+                P.box(c - n * 0.2, [0.2, 0.2, 0.3], layer=-1, op=SUB, k=0.008, up=n, ax=[0, 0, 1], round_=0.0)
+        P.garment(L_BOTTOM, 0.003, [m], k=0.004, base=L_DRAPE_LO if USE_MH else 0)
+
+    def boxers(self):
+        J, s = self.J, self.s
+        self.garment_lower(L_BOTTOM, 0.007, top=J['pelvis'][1] + 0.05 * s, folds=0.0016, end_frac=0.38)
+
     def apron(self):
         P, J, s = self.P, self.J, self.s
         py, cy = J['pelvis'][1], J['chest'][1]
         gw = s * self.g ** 0.75
         def masks():
             P.box([0, (cy - 0.1 * s + py) / 2, 0.2], [0.13 * gw, (cy - 0.1 * s - py) / 2 + 0.02, 0.2], layer=-1, k=0.0, t=MASKBOX)
-        P.garment(L_APRON, 0.012 if self.g < 1.2 else 0.018, [masks], k=0.006, noise=(0.0012, 22, 0.4))
-        # the skirt of it, hanging in front of the thighs
+        P.garment(L_APRON, 0.012 if self.g < 1.2 else 0.018, [masks], k=0.006, noise=(0.0012, 22, 0.4), base=L_DRAPE if USE_MH else 0)
+        # the skirt of it, hanging in front of the thighs: a panel round the front of the fall of the legs
         low = J['kneeL'][1] + (0.04 if self.id != 'butcher' else -0.02) * s
-        cz = 0.02 + 0.06 * max(0, self.g - 1.1)
-        P.capcone([0, py + 0.02 * s, cz], [0, low, cz + 0.01], 0.2 * gw, 0.215 * gw, layer=L_APRON, k=0.0, ax=X, sx=1.0, sz=0.72, noise=(0.002, 16, 0.3))
-        P.capcone([0, py + 0.05 * s, cz], [0, low - 0.02, cz + 0.01], 0.188 * gw, 0.203 * gw, layer=L_APRON, op=SUB, k=0.0, ax=X, sx=1.0, sz=0.72)
-        P.plane([0, 0, 0.06 * s + cz * 0.5], [0, 0, -1], layer=L_APRON, op=INTER, k=0.004, lo=(-1, low - 0.05, -1), hi=(1, py + 0.06 * s, 1))
+        top = py + 0.03 * s
+        xm, zf, zb = self.span(top, low)
+        hw, hd, cz = xm + 0.02, (zf - zb) / 2 * 1.25 + 0.02, (zf + zb) / 2
+        th = 0.012 if self.g < 1.2 else 0.016
+        P.capcone([0, top, cz], [0, low, cz + 0.01], hw, hw + 0.01, layer=L_APRON, k=0.0, ax=X, sx=1.0, sz=hd / hw, noise=(0.002, 16, 0.3))
+        P.capcone([0, top + 0.03, cz], [0, low - 0.02, cz + 0.01], hw - th, hw + 0.01 - th, layer=L_APRON, op=SUB, k=0.0, ax=X, sx=1.0, sz=(hd - th) / (hw - th))
+        P.plane([0, 0, cz + 0.02], [0, 0, -1], layer=L_APRON, op=INTER, k=0.004, lo=(-1, low - 0.05, -1), hi=(1, top + 0.01, 1))
         for sx in (-1, 1):  # neck strap
             P.cone([sx * 0.06 * gw, cy - 0.1 * s, 0.1 * s], [sx * 0.045, cy + 0.06 * s, 0.0], 0.006 * s, 0.006 * s, layer=L_APRON, k=0.004)
 
-    def shoes(self, style):
+    def shoes(self, style, sides=(1, -1)):
         P, J, s = self.P, self.J, self.s
         for side, an in ((1, J['ankleL']), (-1, J['ankleR'])):
+            if side not in sides: continue
             toe = an + v3([side * 0.012 * s, -0.03 * s, 0.15 * s])
             if style == 'heels':
                 def m(an=an):
@@ -429,16 +502,25 @@ class Char:
             P.ell(H(0, 0.045, -0.103), [0.022 * s] * 3, layer=L_HAIR, k=0.01)
             P.cone(H(0, 0.04, -0.11), H(0, -0.17, -0.15), 0.026 * s, 0.014 * s, layer=L_HAIR, k=0.01, ax=X, sx=1.15, sz=0.8, noise=(0.002, 90, 0.2))
         if style in ('bob', 'long'):
-            bot = -0.085 if style == 'bob' else -0.11
-            P.ell(H(0, -0.005, -0.012), self.Rk([0.097 * s * f, 0.118 * s, 0.112 * s]), layer=L_HAIR, k=0.01, noise=(0.0014, 90, 0.2))
-            P.plane(H(0, bot, 0), [0, -1, 0], layer=L_HAIR, op=INTER, k=0.01)
-            P.box(H(0, -0.03, 0.085), self.Rk([0.062 * s * f, 0.075 * s, 0.07 * s]), layer=L_HAIR, op=SUB, k=0.012)     # the face stays clear
-            P.ell(H(0, 0.062, 0.064), self.Rk([0.068 * s * f, 0.03 * s, 0.04 * s]), layer=L_HAIR, k=0.012, noise=strand)   # fringe swept across
-            if style == 'long':
-                ch = self.J['chest']
-                P.cone(H(0, -0.035, -0.082), [0, ch[1] - 0.13 * self.s, -0.098 * self.s], 0.068 * s, 0.06 * s, layer=L_HAIR, k=0.035, ax=X, sx=1.05, sz=0.45, noise=(0.0025, 70, 0.15))
-                for sx in (-1, 1):
-                    P.cone(H(sx * 0.072, -0.03, 0.02), [sx * 0.085 * self.s, ch[1] - 0.06 * self.s, 0.045 * self.s], 0.02 * s, 0.014 * s, layer=L_HAIR, k=0.02, noise=(0.002, 90, 0.2))
+            # hair that hangs: a shell round the skull, falling straight from its widest to the cut, open at the face
+            R = self.Rk([0.09 * s * f, 0.112 * s, 0.106 * s])
+            c = H(0, 0.0, -0.012)
+            cut = H(0, -0.095, 0)[1] if style == 'bob' else self.J['chest'][1] - 0.03 * self.s
+            hang = (0.0016, 85, 0.12)
+            P.ell(c, R, layer=L_HAIR, k=0.01, noise=hang)
+            P.capcone(H(0, -0.01, -0.016), [c[0], cut, c[2] - 0.012 * self.s], R[0] * 0.99, R[0] * (1.02 if style == 'bob' else 0.96), layer=L_HAIR, k=0.03, ax=X, sx=1.0, sz=R[2] / R[0] * 0.92, noise=hang)
+            P.ell(H(0, -0.045, 0.1), self.Rk([0.064 * s * f, 0.1 * s, 0.09 * s]), layer=L_HAIR, op=SUB, k=0.014)           # the face, an oval
+            jaw = H(0, -0.1, 0)[1]
+            P.box([0, jaw - 0.15, H(0, 0, 0.0)[2] + 0.15], [0.25, 0.15, 0.15], layer=L_HAIR, op=SUB, k=0.02, round_=0.01)   # nothing under the chin
+            P.ell(self.hc + v3([0, -0.16, -0.01]) * s, [0.07 * s, 0.09 * s, 0.07 * s], layer=L_HAIR, op=SUB, k=0.02)          # nor round the neck
+            P.ell(H(0, 0.06, 0.066), self.Rk([0.07 * s * f, 0.028 * s, 0.04 * s]), layer=L_HAIR, k=0.014, noise=strand)      # fringe swept across
+            if style == 'long':  # and down the back, lying on it
+                J = self.J; top = self.J['head'][1] + 0.02 * self.s; low = J['chest'][1] - 0.2 * self.s
+                def mb():
+                    P.cone([0, top, -0.12], [0, low, -0.12], 0.115 * self.s, 0.075 * self.s, layer=-1, k=0.0, ax=X, sx=1.0, sz=2.0, t=CAPCONE)
+                    P.plane([0, 0, -0.02], [0, 0, 1], layer=-1, op=INTER, k=0.01)
+                P.garment(L_HAIR, 0.013, [mb], k=0.03, noise=(0.0018, 80, 0.1), base=L_DRAPE if USE_MH else 0)
+                P.plane([0, low, 0], [0, -1, -0.25], layer=L_HAIR, op=INTER, k=0.02)
 
     def cap(self):
         P, s, H = self.P, self.s, self.H
@@ -465,9 +547,8 @@ class Char:
         cy = J['chest'][1]
         jaw = self.H(0, -0.1, 0)[1]
         def m():
-            P.cone([0, cy - 0.01 * s, 0], [0, jaw - 0.012 * s, 0], 0.2, 0.2, layer=-1, k=0.0, t=CAPCONE)
+            P.cone([0, cy - 0.01 * s, 0.005], [0, jaw - 0.012 * s, 0.0], 0.085 * s, 0.075 * s, layer=-1, k=0.0, t=CAPCONE)
             P.ell(self.hc + v3([0, -0.005, 0.01]) * s, [0.098 * s, 0.135 * s, 0.125 * s], layer=-1, op=SUB, k=0.01)
-            P.ell([0, cy - 0.06 * s, 0], [0.13 * s, 0.07 * s, 0.13 * s], layer=-1, op=SUB, k=0.03)  # off the shoulders
         P.garment(L_SCARF, 0.022, [m], k=0.012, noise=(0.004, 30, 0.6))
         z0 = self.front_z(0.04 * s, cy - 0.01 * s)
         P.cone([0.035 * s, cy + 0.0 * s, z0 + 0.008], [0.06 * s, cy - 0.2 * s, self.front_z(0.06 * s, cy - 0.2 * s) + 0.01], 0.032 * s, 0.028 * s, layer=L_SCARF, k=0.03, ax=X, sx=1.2, sz=0.32, noise=(0.003, 30, 0.3))
@@ -477,7 +558,8 @@ class Char:
         cy = J['chest'][1]
         big = self.id == 'rider'
         hw, hh, hd = (0.2, 0.22, 0.17) if big else (0.135, 0.17, 0.065)
-        P.box([0, cy - 0.17 * s, -0.16 * s - hd + 0.02], [hw * s, hh * s, hd * s], layer=L_PACK, k=0.02, round_=(0.03 if big else 0.045) * s, noise=(0.001, 30, 1))
+        zb = min(self.extent(y)[2] for y in (cy - 0.08 * s, cy - 0.17 * s, cy - 0.26 * s)) - 0.018   # the back, with what's worn on it
+        P.box([0, cy - 0.17 * s, zb - hd * s + 0.01], [hw * s, hh * s, hd * s], layer=L_PACK, k=0.02, round_=(0.03 if big else 0.045) * s, noise=(0.001, 30, 1))
         for sx in (-1, 1):
             P.cone([sx * 0.085 * s, cy + 0.05 * s, -0.03 * s], [sx * 0.11 * s, cy - 0.3 * s, 0.08 * s], 0.012 * s, 0.012 * s, layer=L_PACK, k=0.01, ax=X, sx=1.6, sz=0.45)
 

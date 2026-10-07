@@ -192,6 +192,38 @@ def rig_and_weights(low, joints, s):
     return ao
 
 
+def transfer_weights(low, mv, mf, mw):
+    """skin weights from the body underneath: each vertex takes the weights of the nearest point on the bare body (where it
+    is close to it); what hangs off the body (skirt falls, long hair, packs) keeps the bone-heat weights"""
+    import igl
+    me = low.data
+    P = np.array([v.co[:] for v in me.vertices])
+    d2, fi, C = igl.point_mesh_squared_distance(P, mv.astype(np.float64), mf.astype(np.int64))
+    tri = mv[mf[fi]]
+    v0, v1, v2 = tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0], C - tri[:, 0]
+    d00, d01, d11 = (v0 * v0).sum(1), (v0 * v1).sum(1), (v1 * v1).sum(1); d20, d21 = (v2 * v0).sum(1), (v2 * v1).sum(1)
+    den = np.maximum(d00 * d11 - d01 * d01, 1e-12); b1 = (d11 * d20 - d01 * d21) / den; b2 = (d00 * d21 - d01 * d20) / den; b0 = 1 - b1 - b2
+    Wt = mw[mf[fi, 0]] * b0[:, None] + mw[mf[fi, 1]] * b1[:, None] + mw[mf[fi, 2]] * b2[:, None]
+    d = np.sqrt(d2); k = np.clip((0.05 - d) / 0.03, 0, 1)
+    gi = {g.name: g for g in low.vertex_groups}
+    for b in BONES:
+        if b not in gi: gi[b] = low.vertex_groups.new(name=b)
+    for i, v in enumerate(me.vertices):
+        if k[i] <= 0: continue
+        auto = np.zeros(len(BONES))
+        for g in v.groups:
+            nm = low.vertex_groups[g.group].name
+            if nm in BONES: auto[BONES.index(nm)] = g.weight
+        if auto.sum() > 0: auto /= auto.sum()
+        w = auto * (1 - k[i]) + Wt[i] * k[i]
+        for j, b in enumerate(BONES):
+            if w[j] > 0.002: gi[b].add([i], float(w[j]), 'REPLACE')
+            elif auto[j] > 0: gi[b].remove([i])
+    select_only(low)
+    bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+    bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
+
+
 SEGS = {}
 def nearest_bone(co):
     best, bi = 1e9, 0
@@ -271,6 +303,7 @@ if __name__ == '__main__':
     unwrap(low, neck)
     bake_maps(low, his, tex, work, cid)
     ao = rig_and_weights(low, rig['joints'], rig['s'])
+    if 'mh_w' in d: transfer_weights(low, d['mh_v'], d['mh_f'], d['mh_w'])
     lod0 = gather(low)
     l1 = low.copy(); l1.data = low.data.copy(); bpy.context.scene.collection.objects.link(l1)
     for m in list(l1.modifiers): l1.modifiers.remove(m)

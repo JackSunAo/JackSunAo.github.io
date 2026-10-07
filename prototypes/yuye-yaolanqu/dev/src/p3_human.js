@@ -409,14 +409,22 @@ function loadChar(id) {
   CHAR_WAIT[id] = [];
   const get = (url, type) => new Promise((res, rej) => { const x = new XMLHttpRequest(); x.open('GET', url); x.responseType = type; x.onload = () => (x.status === 200 || x.status === 0) && x.response ? res(x.response) : rej(url); x.onerror = () => rej(url); x.send(); });
   const img = url => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(url); im.src = url; });
-  Promise.all([get(CHAR_DIR + id + '.mesh.json', 'json'), get(CHAR_DIR + id + '.mesh.bin', 'arraybuffer'), img(CHAR_DIR + id + '_albedo.webp'), img(CHAR_DIR + id + '_nrm.webp'), img(CHAR_DIR + id + '_mr.webp')])
-    .then(([meta, bin, alb, nrm, mr]) => {
-      const tex = (im, srgb) => { const t = new THREE.Texture(im); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.needsUpdate = true; t.userData.keep = true; return t; };
-      const A = CHAR_ASSETS[id] = { id, meta, lods: meta.lods.map(L => charGeo(L, bin)), alb, nrmTex: tex(nrm, false), mrTex: tex(mr, false) };
-      for (const h of CHAR_WAIT[id]) if (!h.dead) fleshUp(h, A);
-      CHAR_WAIT[id] = null;
-    })
-    .catch(e => { console.warn('character files missing, keeping the stand-in body:', id, e); CHAR_WAIT[id] = null; CHAR_ASSETS[id] = null; });
+  const tex = (im, srgb) => { const t = new THREE.Texture(im); if (srgb) t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; t.needsUpdate = true; t.userData.keep = true; return t; };
+  const fail = e => { console.warn('character files missing, keeping the stand-in body:', id, e); CHAR_WAIT[id] = null; CHAR_ASSETS[id] = null; };
+  const done = A => { CHAR_ASSETS[id] = A; for (const h of CHAR_WAIT[id]) if (!h.dead) fleshUp(h, A); CHAR_WAIT[id] = null; };
+  // a dressed character: several parts (skin, eyes, hair, each garment), each with its own textures
+  Promise.all([get(CHAR_DIR + id + '.mesh.json', 'json'), get(CHAR_DIR + id + '.mesh.bin', 'arraybuffer')]).then(([meta, bin]) => {
+    if (!meta.parts) return legacy(meta, bin);
+    const files = [...new Set(meta.parts.flatMap(p => Object.values(p.tex)))];
+    return Promise.all(files.map(f => img(CHAR_DIR + f))).then(ims => {
+      const im = {}; files.forEach((f, i) => { im[f] = ims[i]; });
+      done({ id, meta, parts: meta.parts.map(p => Object.assign({}, p, { lods: p.lods.map(L => charGeo(L, bin)), img: im[p.tex.map], map: tex(im[p.tex.map], true), nrm: p.tex.nrm ? tex(im[p.tex.nrm], false) : null })) });
+    });
+  }).catch(fail);
+  const legacy = (meta, bin) => Promise.all([img(CHAR_DIR + id + '_albedo.webp'), img(CHAR_DIR + id + '_nrm.webp'), img(CHAR_DIR + id + '_mr.webp')])
+    .then(([alb, nrm, mr]) => {
+      done({ id, meta, lods: meta.lods.map(L => charGeo(L, bin)), alb, nrmTex: tex(nrm, false), mrTex: tex(mr, false) });
+    });
 }
 function charGeo(L, bin) {
   const arr = (k, T) => { const [off, , n] = L.buf[k]; return new T(bin, off, n); };
@@ -452,6 +460,7 @@ function fleshUp(h, A) {
     }
     if (this.boneTexture) this.boneTexture.needsUpdate = true;
   };
+  if (A.parts) { fleshParts(h, A, skel, keep, spr); return; }
   // its own copy of the colour, so its wounds are its own
   const canvas = mkCanvas(A.alb.width, A.alb.height); canvas.getContext('2d').drawImage(A.alb, 0, 0);
   const tex = toTex(canvas, true, false); tex.anisotropy = 4;
@@ -479,6 +488,37 @@ function fleshUp(h, A) {
   const stand = region => { const o = { color: pale, emissive: new THREE.Color(), userData: { fleshRegion: region, flesh: h.flesh }, needsUpdate: false, dispose() {} }; Object.defineProperty(o, 'map', { get: () => tex, set: () => wash() }); return o; };
   h.coatMat = stand('torso'); h.topMat = stand('torso'); h.faceMat = stand('face'); h.skinMat = stand('arms'); h.botMat = stand('legs');
   if (h.mats) h.mats.push(mat);
+}
+
+// the dressed kind: one skinned mesh per part on the same skeleton. 'real' lights them as they are; 'paint' in soft bands
+let TOON_RAMP = null;
+function fleshParts(h, A, skel, keep, spr) {
+  const paint = A.meta.style === 'paint', meshes = [];
+  if (paint && !TOON_RAMP) { const d = new Uint8Array([46, 62, 104, 150, 190, 214]); TOON_RAMP = new THREE.DataTexture(d, d.length, 1, THREE.RedFormat); TOON_RAMP.magFilter = TOON_RAMP.minFilter = THREE.LinearFilter; TOON_RAMP.needsUpdate = true; }
+  let skinTex = null, canvas = null, skinMat = null;
+  for (const p of A.parts) {
+    let map = p.map;
+    if (p.kind === 'skin') { canvas = mkCanvas(p.img.width, p.img.height); canvas.getContext('2d').drawImage(p.img, 0, 0); map = skinTex = toTex(canvas, true, false); map.anisotropy = 4; }
+    const o = { map, side: p.double ? THREE.DoubleSide : THREE.FrontSide, alphaTest: p.alpha || 0 };
+    if (p.nrm) o.normalMap = p.nrm;
+    const R = { skin: 0.6, eye: 0.15, hair: 0.55, brow: 0.8, lash: 0.8, cloth: 0.92 }[p.kind] || 0.8;
+    const mat = paint ? new THREE.MeshToonMaterial(Object.assign(o, { gradientMap: TOON_RAMP })) : new THREE.MeshStandardMaterial(Object.assign(o, { roughness: R, metalness: 0 }));
+    if (p.kind === 'eye' && h.o.infected) { mat.emissive = new THREE.Color(0.9, 0.86, 0.66); mat.emissiveIntensity = 0.5; }
+    if (p.kind === 'skin') skinMat = mat;
+    const sm = new THREE.SkinnedMesh(p.lods[0], mat); sm.castShadow = !p.alpha && p.kind !== 'eye'; sm.receiveShadow = true;
+    h.root.add(sm); sm.updateMatrixWorld(true); sm.bind(skel, sm.matrixWorld); meshes.push(sm);
+  }
+  h.cur = keep; h.spr = spr; applyPose(h);
+  for (const m of [...(h.skinned || []), ...(h.shadows || [])]) { if (m.parent) m.parent.remove(m); if (!m.geometry.userData.keep) m.geometry.dispose(); }
+  if (h.skel && h.skel.boneTexture) h.skel.dispose();
+  const pale = new THREE.Color(1, 1, 1);
+  h.skinned = meshes; h.shadows = []; h.skel = skel; h.atlas = null; h.bodyMat = skinMat;
+  h.flesh = { sm: meshes[0], mat: skinMat, tex: skinTex, canvas, pale, A, parts: meshes };
+  const sp = A.parts.find(p => p.kind === 'skin');
+  const wash = () => { canvas.getContext('2d').drawImage(sp.img, 0, 0); skinTex.needsUpdate = true; };
+  const stand = region => { const o = { color: pale, emissive: new THREE.Color(), userData: { fleshRegion: region, flesh: h.flesh }, needsUpdate: false, dispose() {} }; Object.defineProperty(o, 'map', { get: () => skinTex, set: () => wash() }); return o; };
+  h.coatMat = stand('torso'); h.topMat = stand('torso'); h.faceMat = stand('face'); h.skinMat = stand('arms'); h.botMat = stand('legs');
+  if (h.mats) meshes.forEach(m => h.mats.push(m.material));
 }
 
 /* physical layer: damped springs added on top of the animated pose (hit reactions, recoil, bumps) */

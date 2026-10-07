@@ -101,7 +101,8 @@ def run(cid, rigs, work):
     sk = mixc(sk, lin(hexc('#1a0606')), mouth)
     # stubble on the men who have it; blush on the women
     if L.get('stubble') or (not ch.fem and cid in ('you', 'zhou', 'butcher', 'fireman', 'worker', 'chef')):
-        jaw = ((fy < -0.035) & (fy > -0.125) & (fz > -0.03) | ((np.abs(fy + 0.048) < 0.006) & (bx < 0.02))) & (bx < 0.075) & (lips < 0.3)
+        top_ = (mhm['slit'][1] - hc[1]) / s + 0.016 if mhm is not None else -0.035
+        jaw = ((fy < top_) & (fy > -0.125) & (fz > -0.03) | ((np.abs(fy + 0.048) < 0.006) & (bx < 0.02))) & (bx < 0.075) & (lips < 0.3)
         sk = mixc(sk, sk * 0.62, jaw * (0.35 + 0.35 * (noise(600.0) > 0)))
     if infected:  # veins gone dark under grey skin, round the neck, temples and hands
         vn = np.abs(noise(70.0, 1.0, 7.7))
@@ -109,6 +110,22 @@ def run(cid, rigs, work):
         where = np.exp(-((fy + 0.12) / 0.09) ** 2) + np.exp(-(((bx - 0.065) / 0.02) ** 2 + ((fy - 0.02) / 0.04) ** 2)) + (tagd('hand') < 0.003) * 1.0
         sk = mixc(sk, lin(hexc('#3a2040')), np.clip(veins * where, 0, 1) * 0.7)
         sk = mixc(sk, lin(hexc('#5a3a3a')), np.clip(noise(6.0, 1.0, 5.1) * 0.8, 0, 1) * 0.35)  # mottling
+    if L.get('undress') in ('nude', 'underwear') or L.get('topOpen'):  # bare skin that is usually covered: areolae, body hair
+        if ch.fem and L.get('undress') == 'nude':
+            for b in ch.bust():
+                d = np.linalg.norm(P - b, axis=1)
+                ar = 1 - smoothstep(0.012 * s, 0.017 * s, d)
+                sk = mixc(sk, sk * np.array([0.72, 0.55, 0.52]), ar * 0.8)
+        if L.get('undress') == 'nude':
+            J_ = ch.J; cx = 0.0; yb = J_['hipL'][1] - (0.02 if ch.fem else 0.0) * s
+            fz_ = P[:, 2] > 0.02
+            tri = (P[:, 1] < yb + 0.055 * s) & (P[:, 1] > yb - 0.07 * s) & (np.abs(P[:, 0] - cx) < 0.065 * s * np.clip((P[:, 1] - yb + 0.08 * s) / (0.135 * s), 0.15, 1)) & fz_
+            hairp = tri * np.clip(0.55 + 0.6 * noise(380.0, 0.4), 0, 1)
+            sk = mixc(sk, hair_c * 1.1, hairp * 0.85)
+        if not ch.fem:  # a man's chest and belly hair, light
+            ch_y = ch.J['chest'][1]
+            body = (P[:, 2] > 0.04) & (P[:, 1] < ch_y - 0.06) & (P[:, 1] > ch.J['pelvis'][1] - 0.05) & (np.abs(P[:, 0]) < 0.1 * s)
+            sk = mixc(sk, hair_c, body * np.clip(noise(420.0, 0.5) * 0.8, 0, 1) * 0.35)
     m = lay == L_SKIN
     col[m] = sk[m]; rough[m] = 0.55 - lips[m] * 0.15; skinm[m] = 1.0
 
@@ -162,8 +179,14 @@ def run(cid, rigs, work):
         grime = np.clip(noise(12.0, 1.0, 4.4), 0, 1) * 0.25 * dirt
         c *= (1 - grime)[:, None]
         col[mm] = c[mm]; rough[mm] = rgh
-    cloth(L_TOP, L.get('top', '#4b5a52'), kind='knit' if cid in ('mother', 'mei') else 'plain', dirt=0.3)
-    cloth(L_BOTTOM, L.get('bottom', '#33302c'), kind='denim' if cid in ('barista', 'biker') else 'plain', dirt=0.9)
+    under = L.get('undress') == 'underwear' or L.get('topOpen')
+    if L.get('undress') == 'underwear':
+        cloth(L_TOP, L.get('bra', '#d9c9c0'), weave=0.3, wear=0.3, dirt=0.2, rgh=0.6)
+        cloth(L_BOTTOM, L.get('panties', L.get('boxers', '#d9c9c0')), weave=0.3, wear=0.3, dirt=0.4, rgh=0.65)
+    else:
+        cloth(L_TOP, L.get('top', '#4b5a52'), kind='knit' if cid in ('mother', 'mei') else 'plain', dirt=0.3)
+    cloth(L_ACC, L.get('bra', '#d9c9c0'), weave=0.3, wear=0.3, dirt=0.2, rgh=0.6)
+    if L.get('undress') != 'underwear': cloth(L_BOTTOM, L.get('bottom', '#33302c'), kind='denim' if cid in ('barista', 'biker') else 'plain', dirt=0.9)
     cloth(L_COAT, L.get('coat', L.get('top', '#4a4434')), kind='leather' if cid == 'biker' else 'plain', wear=0.8, dirt=0.6, rgh=0.6 if cid == 'biker' else 0.9)
     cloth(L_SKIRT, L.get('skirt', '#3b4656'), dirt=0.5)
     cloth(L_SCARF, L.get('scarf', '#8a6638'), kind='knit', dirt=0.2)

@@ -230,7 +230,9 @@ def body(look, G, s):
     muscle = look.get('muscle', 0.42 if fem else 0.58)
     extra = {f'eyes/{S}-eye-height2-incr': 0.45 for S in 'lr'}       # eyes open enough to read at a distance
     if fem:
-        extra.update({f'eyes/{S}-eye-scale-incr': 0.2 for S in 'lr'})  # a woman's figure that reads at a distance: waist in, hips and bust a little fuller
+        extra.update({f'eyes/{S}-eye-scale-incr': 0.2 for S in 'lr'})
+        if look.get('undress') != 'nude':  # under a bra and a top the nipples don't show through
+            extra.update({'breast/nipple-point-decr': 1.0, 'breast/nipple-size-decr': 1.0, 'breast/breast-point-decr': 0.6})  # a woman's figure that reads at a distance: waist in, hips and bust a little fuller
         extra.update({'torso/measure-waist-circ-decr': 0.45, 'hip/hip-scale-horiz-incr': 0.15, 'torso/measure-shoulder-dist-decr': 0.25,
                       'head/head-oval': 0.4})
     if look.get('weight', 0) > 95:
@@ -251,7 +253,7 @@ def body(look, G, s):
         c = ev.mean(axis=0); r = float(np.linalg.norm(ev - c, axis=1).mean())
         eyes.append((c, r))
     marks = landmarks(V, J, O)
-    return {'V': V[used], 'F': remap[tri].astype(np.int32), 'J': J, 'eyes': eyes, 'marks': marks, 'Vall': V}
+    return {'V': V[used], 'F': remap[tri].astype(np.int32), 'J': J, 'eyes': eyes, 'marks': marks, 'Vall': V, 'used': used}
 
 
 def landmarks(V, J, O):
@@ -382,3 +384,37 @@ def tag_distance(B, marks, P, tag, s):
             d = np.minimum(d, np.where((t > 0.01) & (np.linalg.norm(P - b, axis=1) < 0.25), 0.0, 9.0))
         return d
     return None
+
+
+GAME_BONES = ['pelvis', 'spine', 'chest', 'head', 'hipL', 'kneeL', 'ankleL', 'hipR', 'kneeR', 'ankleR', 'shL', 'elL', 'handL', 'shR', 'elR', 'handR']
+
+
+def game_weights(B, G):
+    """MakeHuman's own skin weights, gathered onto the game's sixteen bones; the trunk split by height at the game's joints"""
+    names, Wm = group_weights()
+    W = Wm[B['used']]
+    V = B['V']
+    out = np.zeros((len(V), len(GAME_BONES)))
+    col = {n: i for i, n in enumerate(names)}
+    put = lambda g, b: out.__setitem__((slice(None), GAME_BONES.index(b)), out[:, GAME_BONES.index(b)] + W[:, col[g]])
+    for S in 'LR':
+        put('upper' + S, 'sh' + S); put('lower' + S, 'el' + S); put('hand' + S, 'hand' + S)
+        put('thigh' + S, 'hip' + S); put('calf' + S, 'knee' + S); put('foot' + S, 'ankle' + S)
+    put('head', 'head')
+    y = V[:, 1]
+    sm = lambda a, b, x: np.clip((x - a) / (b - a), 0, 1) ** 2 * (3 - 2 * np.clip((x - a) / (b - a), 0, 1))
+    sp, ch = G['spine'][1], G['chest'][1]
+    up_sp = sm(sp - 0.02, sp + 0.06, y)            # above the waist joint the spine bone carries it
+    up_ch = sm(ch - 0.07, ch - 0.0, y)             # above the upper-chest joint, the chest
+    t = W[:, col['torso']]
+    out[:, 0] += t * (1 - up_sp)
+    out[:, 1] += t * up_sp * (1 - up_ch)
+    out[:, 2] += t * up_sp * up_ch
+    return out / np.maximum(out.sum(1, keepdims=True), 1e-9)
+
+
+def game_weights_all(V, G):
+    """the same, for every vertex of the base mesh (helpers too): what the dressed assets borrow through their reference vertices"""
+    names, Wm = group_weights()
+    B = {'V': V, 'used': np.arange(len(V))}
+    return game_weights(B, G)

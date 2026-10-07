@@ -5,8 +5,9 @@ const { chromium } = require('playwright'); const path = require('path'); const 
   const p = await b.newPage({ viewport: { width: 1600, height: 640 } }); const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.goto('file://' + path.join(__dirname, 'dist/test.html')); await p.waitForTimeout(2000);
   const ids = (process.argv[2] || 'you').split(','), bind = process.argv[3] === 'bind';
-  for (const id of ids) {
-    await p.evaluate(id => { const D = __dbg; const look = id === 'you' ? D.PLAYER_LOOK : id === 'mother' ? D.MOTHER_LOOK : D.DEF_T[id] ? Object.assign({ assetId: id }, D.DEF_T[id].look) : Object.assign({ infected: true, blood: true, assetId: id }, D.INF[id]); const h = D.makeHumanForTest(look); D.initSprings(h); window.__h = h; }, id);
+  for (const spec of ids) {
+    const [id, asset] = spec.split(':');
+    await p.evaluate(([id, asset]) => { const D = __dbg; let look = id === 'you' ? D.PLAYER_LOOK : id === 'mother' ? D.MOTHER_LOOK : D.DEF_T[id] ? Object.assign({ assetId: id }, D.DEF_T[id].look) : Object.assign({ infected: true, blood: true, assetId: id }, D.INF[id]); if (asset) look = Object.assign({}, look, { assetId: asset }); const h = D.makeHumanForTest(look); D.initSprings(h); window.__h = h; }, [id, asset]);
     await p.waitForFunction(() => window.__h.flesh, null, { timeout: 30000 }).catch(() => errs.push(id + ': flesh never arrived'));
     const url = await p.evaluate(bind => {
       const D = __dbg, h = __h, S = new THREE.Scene();
@@ -25,7 +26,7 @@ const { chromium } = require('playwright'); const path = require('path'); const 
       r.setViewport(1280, 0, 320, 320); r.setScissor(1280, 0, 320, 320); cam.position.set(hp.x, hp.y + 0.1, hp.z + 0.9); cam.lookAt(hp.x, hp.y + 0.05, hp.z); r.render(S, cam);
       r.setScissorTest(false); r.autoClear = true; const u = r.domElement.toDataURL('image/png'); S.remove(h.root); return u;
     }, bind);
-    fs.writeFileSync(path.join(__dirname, 'shots', `one_${id}${bind ? '_bind' : ''}.png`), Buffer.from(url.split(',')[1], 'base64'));
+    fs.writeFileSync(path.join(__dirname, 'shots', `one_${asset || id}${bind ? '_bind' : ''}.png`), Buffer.from(url.split(',')[1], 'base64'));
   }
   console.log(errs.slice(0, 8).join('\n') || 'no errors'); await b.close();
 })();

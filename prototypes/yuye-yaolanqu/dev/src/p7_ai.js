@@ -30,6 +30,13 @@ const INF_CIV = {
   bride: ['walker', SHE, { name: '新娘', height: 1.64, skin: '#e0c0aa', top: '#f3f1ec', skirt: '#f3f1ec', shoes: '#efece6', shoeStyle: 'heels', hair: '#1a120c', hairStyle: 'long', lip: '#b23a44', seed: 103 }],
   chef: ['heavy', { name: '厨师', height: 1.76, girth: 1.3, skin: '#c49a7e', top: '#efefea', bottom: '#3a3a3a', apron: true, apronCol: '#e8e4dc', cap: '#efefea', hair: '#1c140e', hairStyle: 'short', seed: 105 }],
   rider: ['runner', { name: '外卖骑手', height: 1.74, girth: 1.0, skin: '#c08f70', top: '#e2b322', coat: '#e2b322', bottom: '#2a2a2e', cap: '#e2b322', backpack: '#e2b322', hair: '#120c09', hairStyle: 'messy', voice: 1.0, seed: 107 }],
+  // caught at night, at home or on a ward, half-dressed or not at all (adults only: the virus took the ones who could carry it)
+  undiesF: ['walker', SHE, { name: '只穿内衣的女人', height: 1.66, girth: 0.86, skin: '#dcbca6', undress: 'underwear', bra: '#e6d8d0', panties: '#e6d8d0', top: '#dcbca6', bottom: '#e6d8d0', shoes: '#dcbca6', shoeStyle: 'flats', barefoot: true, hair: '#100b08', hairStyle: 'long', seed: 111 }],
+  lingerie: ['runner', SHE, { name: '穿黑色内衣的女人', height: 1.68, girth: 0.85, skin: '#e0c2ac', undress: 'underwear', bra: '#18161a', panties: '#18161a', top: '#e0c2ac', bottom: '#18161a', shoes: '#e0c2ac', shoeStyle: 'flats', barefoot: true, hair: '#2a1a12', hairStyle: 'bob', lip: '#8a2a34', seed: 113 }],
+  tornF: ['runner', SHE, { name: '衣衫破烂的女人', height: 1.65, skin: '#d8b49c', top: '#ece8ea', topOpen: true, bra: '#2a2226', skirt: '#3a3c44', skirtLen: 'knee', legs: '#1a1a1e', tears: 4, shoes: '#1a1414', shoeStyle: 'heels', oneShoe: true, hair: '#1c130d', hairStyle: 'long', seed: 115 }],
+  nudeF: ['walker', SHE, { name: '赤裸的女人', height: 1.64, girth: 0.88, skin: '#d4ab90', undress: 'nude', top: '#d4ab90', bottom: '#d4ab90', shoes: '#d4ab90', shoeStyle: 'flats', barefoot: true, hair: '#140e0a', hairStyle: 'long', seed: 117 }],
+  undiesM: ['walker', { name: '只穿短裤的男人', height: 1.74, girth: 1.05, skin: '#c49a7e', undress: 'underwear', boxers: '#3a4a6a', top: '#c49a7e', bottom: '#3a4a6a', shoes: '#c49a7e', barefoot: true, hair: '#1c140e', hairStyle: 'messy', voice: 0.95, seed: 119 }],
+  nudeM: ['heavy', { name: '赤裸的男人', height: 1.78, girth: 1.15, skin: '#c09478', undress: 'nude', top: '#c09478', bottom: '#c09478', shoes: '#c09478', barefoot: true, hair: '#1a120c', hairStyle: 'short', voice: 0.9, weight: 86, seed: 121 }],
   worker: ['walker', { name: '地铁检修工', height: 1.75, girth: 1.1, skin: '#b98a6c', top: '#2b3448', vest: '#e0662a', stripes: true, bottom: '#2b3448', cap: '#2b3448', hair: '#2a231d', hairStyle: 'short', voice: 0.92, weight: 84, stab: 1.1, seed: 109 }]
 };
 for (const [k, [tpl, ...looks]] of Object.entries(INF_CIV)) INF[k] = Object.assign({ civ: true }, INF_TPL[tpl], ...looks, { tpl });
@@ -41,7 +48,9 @@ function civVariant(T) { if (!T.civ) return null; const i = Math.floor(Math.rand
 function waveTypes(w) {
   const R = rng(w * 7919 + 13), n = Math.min(10, 4 + 2 * (w - 1)), civ = Object.keys(INF).filter(k => INF[k].civ), out = ['office'];
   if (w >= 2) out.push('fireman'); if (w % 2 === 1 || w >= 4) out.push('butcher'); if (R() < 0.7) out.push('student');
-  while (out.length < n) out.push(civ[Math.floor(R() * civ.length)]);
+  // the half-dressed and the naked turn up less often than people in their work clothes
+  const wt = civ.map(k => INF[k].undress || INF[k].topOpen ? 0.5 : 1), tot = wt.reduce((a, b) => a + b, 0);
+  while (out.length < n) { let r = R() * tot, i = 0; while (r > wt[i] && i < civ.length - 1) r -= wt[i++]; out.push(civ[i]); }
   return out.slice(0, n);
 }
 // the dark ring around the floodlight where they lurk

@@ -50,6 +50,9 @@ def build(cid, rigs, h_body=0.003, h_fine=0.0016):
     Gc, clo = field(A, GV, lo, hi, 0.008)
     vc, fc = surface(Gc - 0.0035, clo, 0.008)
     parts = {'body': (vb, fb), 'head': (vh, fh), 'cage': (vc, fc)}
+    if hasattr(ch, 'mhB'):  # the bare body and its skin weights, for weighting the clothes the way the body bends
+        import mh
+        ch.mh_w = mh.game_weights(ch.mhB, ch.J)
     print(cid, 'body', len(fb), 'head', len(fh), 'tris', f'{time.time() - t0:.1f}s', flush=True)
     return ch, parts
 
@@ -59,4 +62,5 @@ if __name__ == '__main__':
     out = sys.argv[3]
     for cid in sys.argv[2].split(','):
         ch, parts = build(cid, rigs)
-        np.savez_compressed(f'{out}/{cid}_hi.npz', **{f'{k}_v': v for k, (v, f) in parts.items()}, **{f'{k}_f': f for k, (v, f) in parts.items()})
+        extra = {'mh_v': ch.mhB['V'], 'mh_f': ch.mhB['F'], 'mh_w': ch.mh_w} if hasattr(ch, 'mh_w') else {}
+        np.savez_compressed(f'{out}/{cid}_hi.npz', **{f'{k}_v': v for k, (v, f) in parts.items()}, **{f'{k}_f': f for k, (v, f) in parts.items()}, **extra)
